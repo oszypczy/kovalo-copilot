@@ -12,19 +12,18 @@ Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-archit
 | `api` | FastAPI + LangGraph | 8080 | graf copilota (`understand`, routing, workflow akceptacji, agent), checkpointy, koszty, trace |
 | `mcp-server` | FastMCP (`mcp` SDK), streamable HTTP | 8765 | 6 narzędzi tylko do odczytu, zasoby (dokumenty), prompt; dostęp do indeksu i danych firmy |
 | `postgres` | `pgvector/pgvector:pg16` | 5432 | indeks wektorowy (`langchain-postgres`), checkpointy LangGraph (`langgraph-checkpoint-postgres`), zapisy przebiegów |
-| `ingest` | ten sam obraz co `api`, zadanie jednorazowe | – | wczytanie korpusu → chunki z kontekstem → embeddingi → upsert do pgvector |
-| `eval` | ten sam obraz, profil `eval` | – | ewaluacje (retrieval, RAG, dialogi, trace agenta, asystent) → `reports/` |
-| `ollama` | `ollama/ollama`, profil `local-llm` | 11434 | opcjonalny lokalny LLM (zapas przy wyczerpaniu darmowego tieru) |
 
-Zewnętrznie: **Gemini API** (domyślny LLM, darmowy klucz z Google AI Studio), opcjonalnie **Groq** (fallback) i **LangSmith** (tracing, darmowy plan dla jednej osoby).
+Indeksowanie i ewaluacja to **nie osobne usługi**, tylko polecenia CLI (`kovalo ingest`, `kovalo eval`) uruchamiane jednorazowo w obrazie `api`: `make ingest` = `docker compose run --rm api kovalo ingest` (korpus → chunki z kontekstem → embeddingi → upsert do pgvector), `make eval STAGE=e2` = `docker compose run --rm api kovalo eval e2` (raport w `reports/`, montowanym jako wolumen).
 
-Embeddingi liczymy **lokalnie** (fastembed, model ONNX wbudowany w obraz), więc ani `ingest`, ani `mcp-server` nie potrzebują klucza.
+Zewnętrznie: **Gemini API** (domyślny LLM, darmowy klucz z Google AI Studio), opcjonalnie **LangSmith** (tracing, darmowy plan dla jednej osoby).
+
+Embeddingi liczymy **lokalnie** (fastembed, model ONNX wbudowany w obraz), więc ani indeksowanie, ani `mcp-server` nie potrzebują klucza.
 
 ```
 Chainlit (ui) ──HTTP/SSE──> FastAPI (api) ──LangGraph──> Gemini API
                                  │   └──MCP streamable HTTP──> mcp-server ──> pgvector + data/company
                                  └──checkpointy / trace──> postgres
-ingest ──> data/corpus ──> chunki ──> fastembed ──> pgvector
+make ingest ──> data/corpus ──> chunki ──> fastembed ──> pgvector
 ```
 
 ## 2. Moduły Pythona (`src/kovalo/`)
@@ -32,7 +31,7 @@ ingest ──> data/corpus ──> chunki ──> fastembed ──> pgvector
 ```
 src/kovalo/
   config.py          ustawienia: config.yaml (PINNED z kursu) + .env (pydantic-settings)
-  llm.py             fabryka modeli: init_chat_model(provider), rate limiter, fallbacki; fabryka embeddingów
+  llm.py             fabryka modeli: init_chat_model(provider), rate limiter, fallback Flash → Flash-Lite; fabryka embeddingów
   knowledge/         MP1/MP2: loader, tokeny, chunking (zwykły i z kontekstem), embeddingi, vector store, retriever (+ hybryda BM25)
   cost/              MP1: tokenizer o200k_base, scenariusz kosztów, licznik kosztów per tura
   rag/               MP2: odpowiedź ze źródłami (structured output), rekord przebiegu

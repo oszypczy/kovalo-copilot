@@ -9,14 +9,14 @@ Etapy idą w kolejności miniprojektów, bo każda warstwa korzysta z poprzednie
 | repo, `pyproject.toml` (uv), `ruff`, `mypy`, `pre-commit`, struktura `src/kovalo/` | devops-engineer |
 | `config.yaml` (PINNED z kursu + nasze sekcje `llm`, `embeddings`, `db`), `config.py` (pydantic-settings) | architect → ai-engineer |
 | `docker-compose.yml` z `postgres` (pgvector), szkielety `api`, `ui`, `mcp-server`; `Makefile` | devops-engineer |
-| `llm.py`: fabryka Gemini/Groq/Ollama, rate limiter, fallback; test „pierwszego wywołania” | ai-engineer |
+| `llm.py`: fabryka Gemini, rate limiter, fallback Flash → Flash-Lite; test „pierwszego wywołania” | ai-engineer |
 | GitHub Actions: lint + testy unit | devops-engineer |
 
 **Gotowe, gdy:** `docker compose up` startuje Postgresa i puste usługi z `/health`; `make first-call` zwraca odpowiedź Gemini.
 
 ## F1: wiedza (MP1)
 
-loader z metadanymi, tokeny i kalkulator kosztów, chunking 800/120, fastembed + cache, PGVector, wyszukiwanie + własny cosine, zadanie `ingest`, ewaluacja E1 (hit@k, porównanie kilku modeli embeddingów → decyzja w ADR-0003).
+loader z metadanymi, tokeny i kalkulator kosztów, chunking 800/120, fastembed + cache, PGVector, wyszukiwanie + własny cosine, polecenie `kovalo ingest` (`make ingest`), ewaluacja E1 (hit@k, porównanie kilku modeli embeddingów → decyzja w ADR-0003).
 
 **Gotowe, gdy:** 18 dokumentów / 8762 tokeny / 47 chunków; raport E1; wybrany model embeddingów.
 

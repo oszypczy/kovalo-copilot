@@ -4,7 +4,7 @@ Kurs mierzy system na każdym poziomie osobno, bo jedna liczba „trafności” 
 
 Dwie warstwy:
 - **testy deterministyczne** (`pytest -m "not live"`): bez LLM-a, atrapy modeli, odtwarzanie dialogów z idealnym `understand`; uruchamiane w CI,
-- **ewaluacja na żywo** (`make eval` / kontener `eval`): prawdziwy LLM, raport w `reports/<data>-<etap>.md` + JSON z pełnymi rekordami.
+- **ewaluacja na żywo** (`make eval STAGE=eN`, polecenie `kovalo eval` w obrazie `api`): prawdziwy LLM, raport w `reports/<data>-<etap>.md` + JSON z pełnymi rekordami.
 
 ## Zestawy danych (`data/eval/`)
 
@@ -21,7 +21,7 @@ Dwie warstwy:
 | Etap | Metryka | Referencja kursu | Nasz cel (free LLM + lokalne embeddingi) |
 |---|---|---|---|
 | E1 retrieval | hit@1 / hit@3 (chunki MP1) | 0,9 / 0,9 | ≥ 0,8 / ≥ 0,9; z hybrydą: M03 trafione |
-| E1 koszty | miesięczny koszt retrieval / cały korpus | $17,78 / $69,86 | identycznie (liczone po cenach referencyjnych) |
+| E1 koszty | miesięczny koszt retrieval / cały korpus | $17,78 / $69,86 | identycznie po cenach referencyjnych; obok szacunek po cenach płatnego tieru Gemini (free tier = $0) |
 | E2 RAG | retrieval, dowody, odpowiedź (fakty, sędzia), odwołania, odmowy | 9/10, 8/10, 8/10 (8/8, 8/8), 8/8, 2/2 | ≥ referencja − 1 na każdym poziomie |
 | E3 dialogi | kierowanie, pola, stan wniosku, osoby zatwierdzające, pauzy, status | 13/13, 11/11, 8/8, 11/11, 13/13, 13/13 | odtworzenie 100%; na żywo ≥ 12/13 kierowania |
 | E4 agent | pokrycie narzędzi, argumenty, fakty, liczby bez źródła, twierdzenia o akceptacji | 8/9, 3/3, 8/9, 0, 0/9 | 9/9, 3/3, 9/9 (T1 dzięki FR-4.7), 0, 0/9 |

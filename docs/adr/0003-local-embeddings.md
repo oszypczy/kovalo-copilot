@@ -16,5 +16,4 @@ Embeddingi liczymy lokalnie przez **fastembed** (ONNX, CPU, bez PyTorcha, mały 
 
 ## Rozważane alternatywy
 - Gemini `text-embedding` (darmowy tier): limity współdzielone z czatem.
-- Ollama `bge-m3`: wymaga kontenera Ollamy i więcej RAM-u.
 - `sentence-transformers` z PyTorchem: obraz większy o ok. 1–2 GB.

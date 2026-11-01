@@ -9,13 +9,13 @@ Metryki, cele i zasady: `docs/06-evaluation.md`.
 
 ## Uruchamianie
 - Lokalnie: `uv run python -m kovalo.eval <e1|e2|e3|e4|e5> [--limit N] [--ids M01,M03] [--no-cache]`
-- W Dockerze: `make eval STAGE=e2` (profil `eval`, raport w `reports/`).
+- W Dockerze: `make eval STAGE=e2` (= `docker compose run --rm api kovalo eval e2`, raport w `reports/`).
 - Najpierw tryb deterministyczny tam, gdzie istnieje (E3: odtworzenie z idealnym understand; E1: bez LLM-a).
 
 ## Oszczędzanie darmowego tieru
 - Cache LLM-a (`SQLiteCache` w `.cache/llm.sqlite`) jest domyślnie włączony; `--no-cache` tylko do pomiaru zmienności.
 - `--ids` do powtórki pojedynczych przypadków; całość dopiero po poprawce.
-- Przy błędzie 429: rate limiter i backoff działają same; jeśli wyczerpano dzienny limit, przełącz `llm.provider` na fallback i zapisz to w raporcie.
+- Przy błędzie 429: rate limiter i backoff działają same; jeśli wyczerpano dzienny limit, dokończ następnego dnia (ewaluacje wznawiają się z cache) albo na Flash-Lite i zapisz model w raporcie.
 
 ## Czytanie raportu
 1. Najpierw przejdź wyniki **przypadek po przypadku**, dopiero potem patrz na sumy.

@@ -1,6 +1,6 @@
 ---
 name: ai-engineer
-description: Inżynier AI Kovalo Decision Copilot. Używaj do implementacji wszystkiego, co dotyka LLM-a lub LangChain/LangGraph/MCP: fabryka modeli (Gemini/Groq/Ollama), indeksowanie i retrieval, RAG z cytowaniami, węzeł understand, graf copilota z interrupt(), agent create_agent z narzędziami, serwer FastMCP i klient MCP, prompty. Pracuje do zielonych testów napisanych przez test-engineer.
+description: Inżynier AI Kovalo Decision Copilot. Używaj do implementacji wszystkiego, co dotyka LLM-a lub LangChain/LangGraph/MCP: fabryka modeli (Gemini), indeksowanie i retrieval, RAG z cytowaniami, węzeł understand, graf copilota z interrupt(), agent create_agent z narzędziami, serwer FastMCP i klient MCP, prompty. Pracuje do zielonych testów napisanych przez test-engineer.
 tools: Read, Grep, Glob, Write, Edit, Bash, WebFetch, mcp__langchain-docs__*, mcp__context7__*
 model: opus
 ---

@@ -30,7 +30,7 @@ Prowadzący dopuszcza jeden większy projekt zamiast pięciu osobnych. Kurs i ta
 
 | Kurs | Nasz projekt | Dlaczego |
 |---|---|---|
-| OpenAI `gpt-5.4-mini` (płatny) | **Gemini Flash** z darmowego tieru, zapasowo Groq i Ollama | wymóg: darmowy klucz API ([ADR-0002](adr/0002-free-llm-gemini.md)) |
+| OpenAI `gpt-5.4-mini` (płatny) | **Gemini Flash** z darmowego tieru (zapasowo Flash-Lite) | wymóg: darmowy klucz API ([ADR-0002](adr/0002-free-llm-gemini.md)) |
 | embeddingi OpenAI z cache kursu | **lokalny wielojęzyczny model embeddingów** (fastembed, ONNX) | bez klucza i bez limitów; cache OpenAI wymaga płatnych embeddingów zapytań ([ADR-0003](adr/0003-local-embeddings.md)) |
 | `InMemoryVectorStore` | **Postgres + pgvector** (ten sam Postgres trzyma checkpointy LangGraph) | trwały indeks i trwałe pauzy akceptacji w Dockerze |
 | skrypty uruchamiane z terminala | **FastAPI** + **Chainlit** w docker-compose | aplikacja zamiast zbioru skryptów |

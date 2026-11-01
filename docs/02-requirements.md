@@ -9,11 +9,11 @@
 | ID | Wymaganie | Kryterium akceptacji |
 |---|---|---|
 | FR-1.1 | Wczytaj 18 dokumentów `data/corpus/*.md` jako `Document` LangChaina z metadanymi z `catalog.csv` (`doc_id, title, doc_type, department, owner, effective_date, language`) | 18 dokumentów, każde pole metadanych wypełnione; brak pliku z katalogu = błąd |
-| FR-1.2 | Policz tokeny tokenizerem `o200k_base` i oszacuj miesięczny koszt (400 pytań/dzień, 21 dni, 350 tokenów wyjścia, ceny z `config.yaml`) dla dwóch wariantów: retrieval i cały korpus w prompcie | dla korpusu kursu: 8762 tokeny; koszt $17,78 wobec $69,86 (x3,9) |
+| FR-1.2 | Policz tokeny tokenizerem `o200k_base` i oszacuj miesięczny koszt (400 pytań/dzień, 21 dni, 350 tokenów wyjścia, ceny z `config.yaml`) dla dwóch wariantów: retrieval i cały korpus w prompcie. Dwa cenniki obok siebie: referencyjny kursu (`gpt-5.4-mini`, PINNED, do porównania z przebiegiem wzorcowym) i nasz (płatny tier Gemini Flash, `cost.our_model`, ceny do sprawdzenia przy F1) | po cenach kursu: 8762 tokeny; $17,78 wobec $69,86 (x3,9); po cenach Gemini: nasza kolumna, ten sam scenariusz |
 | FR-1.3 | Podziel dokumenty na chunki (`RecursiveCharacterTextSplitter`, 800/120, separatory z configu) z identyfikatorem `<doc_id>#<nnn>` | 47 chunków, najdłuższy ≤ 800 znaków |
 | FR-1.4 | Zbuduj embeddingi z cache (`CacheBackedEmbeddings`) i indeks wektorowy | ponowne indeksowanie nie liczy embeddingów od nowa |
 | FR-1.5 | Wyszukuj `top_k=3` chunki po podobieństwie kosinusowym; policz podobieństwo także samodzielnie | wynik własnego cosine = wynik vector store (±1e-6) |
-| FR-1.6 | Fabryka LLM-a: jeden punkt konfiguracji dostawcy (Gemini / Groq / Ollama / OpenAI) | zmiana `llm.provider` w configu przełącza model bez zmian w kodzie |
+| FR-1.6 | Fabryka LLM-a: jeden punkt konfiguracji dostawcy (Gemini; opcjonalnie OpenAI w trybie zgodnym z kursem) | zmiana `llm.provider` w configu przełącza model bez zmian w kodzie |
 
 ### FR-2: odpowiedzi ze źródłami (MP2)
 
@@ -66,7 +66,7 @@
 |---|---|---|
 | FR-6.1 | API (FastAPI): `POST /threads`, `POST /threads/{id}/messages`, `POST /threads/{id}/resume`, `GET /threads/{id}` (stan, pauza), `GET /threads/{id}/trace`, `GET /health` | kontrakt OpenAPI, testy API |
 | FR-6.2 | UI (Chainlit): czat, strumieniowanie odpowiedzi, kroki agenta (tool calls) jako rozwijane `Step`, pauzy jako przyciski akceptacji (`AskActionMessage`) i pole marży, źródła jako elementy z treścią chunku | ręczny scenariusz C1–C5 z MP5 przechodzi w UI |
-| FR-6.3 | Indeksowanie jako osobne zadanie (`ingest`), idempotentne | ponowne uruchomienie nie duplikuje chunków |
+| FR-6.3 | Indeksowanie jako polecenie `kovalo ingest` (`make ingest`), idempotentne | ponowne uruchomienie nie duplikuje chunków |
 | FR-6.4 | Ewaluacja jako zadanie (`eval`) z raportem Markdown/JSON w `reports/` | raport porównuje wynik z referencyjnym |
 | FR-6.5 | Licznik kosztów i tokenów per tura i per przebieg | widoczny w UI i raporcie ewaluacji |
 
@@ -77,7 +77,7 @@
 | NFR-1 | **Darmowe działanie:** domyślna konfiguracja nie wymaga płatnego klucza (Gemini free tier + lokalne embeddingi). |
 | NFR-2 | **Uruchomienie jednym poleceniem:** `docker compose up` (+ `make ingest` przy pierwszym uruchomieniu). |
 | NFR-3 | **Testy bez LLM-a:** `pytest -m "not live"` nie wywołuje żadnego API (atrapy modeli `GenericFakeChatModel` / skryptowane scenariusze). |
-| NFR-4 | **Odporność na limity darmowego tieru:** `InMemoryRateLimiter`, ponowienia z backoffem, `with_fallbacks` (Gemini → Groq). |
+| NFR-4 | **Odporność na limity darmowego tieru:** `InMemoryRateLimiter`, ponowienia z backoffem, `with_fallbacks` (Gemini Flash → Gemini Flash-Lite, osobny limit na model). |
 | NFR-5 | **Audytowalność:** każda liczba w odpowiedzi agenta pochodzi z wyniku narzędzia; trace zapisany per tura. |
 | NFR-6 | **Język:** UI, dokumentacja i odpowiedzi po polsku; identyfikatory, klucze i statusy po angielsku. Liczby w zapisie polskim (94,6%; 7296,00 PLN). |
 | NFR-7 | **Sekrety:** klucze tylko w `.env` (poza gitem); nigdy w argumentach ani wynikach narzędzi MCP. |
