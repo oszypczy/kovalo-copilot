@@ -1,0 +1,15 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+reports/*
+!reports/.gitkeep
+.DS_Store
+.chainlit/
+.files/
+.claude/settings.local.json
+.vscode/
