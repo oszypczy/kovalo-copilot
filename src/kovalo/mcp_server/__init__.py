@@ -1,0 +1,1 @@
+"""Serwer MCP (mcp-server)."""

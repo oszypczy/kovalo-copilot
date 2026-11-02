@@ -1,0 +1,100 @@
+name: kovalo
+
+x-app-env: &app-env
+  env_file:
+    - path: .env
+      required: false
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kovalo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kovalo}
+      POSTGRES_DB: ${POSTGRES_DB:-kovalo}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: app
+    image: kovalo-app
+    <<: *app-env
+    environment:
+      KOVALO_DB__HOST: postgres
+    command: ["kovalo-mcp", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8765"]
+    ports:
+      - "8765:8765"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: app
+    image: kovalo-app
+    <<: *app-env
+    environment:
+      KOVALO_DB__HOST: postgres
+      KOVALO_SERVICES__MCP_URL: http://mcp-server:8765/mcp
+    command: ["kovalo-api"]
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      - ./reports:/app/reports
+      - ./data:/app/data:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: ui
+    image: kovalo-ui
+    <<: *app-env
+    environment:
+      KOVALO_SERVICES__API_URL: http://api:8080
+    command: ["kovalo-ui"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  pgdata:

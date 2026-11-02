@@ -14,6 +14,8 @@ Etapy idą w kolejności miniprojektów, bo każda warstwa korzysta z poprzednie
 
 **Gotowe, gdy:** `docker compose up` startuje Postgresa i puste usługi z `/health`; `make first-call` zwraca odpowiedź Gemini.
 
+**Status:** zrealizowane (szczegóły i przegląd: [contracts/f0.md](contracts/f0.md) §1 i §9). Otwarte przed F2: czas odpowiedzi modelu głównego (`llm.timeout_s`, `llm.max_retries`, §9.4) i poprawka ładowania `.env` (A4).
+
 ## F1: wiedza (MP1)
 
 loader z metadanymi, tokeny i kalkulator kosztów, chunking 800/120, fastembed + cache, PGVector, wyszukiwanie + własny cosine, polecenie `kovalo ingest` (`make ingest`), ewaluacja E1 (hit@k, porównanie kilku modeli embeddingów → decyzja w ADR-0003).

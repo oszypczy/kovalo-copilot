@@ -13,7 +13,7 @@ Domyślnie **Gemini Flash** przez `langchain-google-genai` (klucz z Google AI St
 - Wyniki ewaluacji będą się różnić od referencyjnych; raporty pokazują oba.
 - Limity dzienne darmowego tieru wymagają cache odpowiedzi w ewaluacjach i oszczędnego uruchamiania.
 - Google może wykorzystywać dane z darmowego tieru; dane Kovalo są fikcyjne.
-- Dokładne limity i nazwy modeli sprawdzamy w AI Studio przy F0. Zewnętrzne źródła z 2026 r. podają je niespójnie.
+- Dokładne limity i nazwy modeli sprawdzamy w AI Studio przy F0. Zewnętrzne źródła z 2026 r. podają je niespójnie. Wynik: [ADR-0006](0006-config-and-llm-factory.md).
 
 ## Rozważane alternatywy
 - Groq jako domyślny: szybki, ale słabszy polski i structured output, niski limit tokenów na minutę.
