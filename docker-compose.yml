@@ -16,6 +16,7 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -33,6 +34,9 @@ services:
     <<: *app-env
     environment:
       KOVALO_DB__HOST: postgres
+      KOVALO_EMBEDDINGS__LOCAL__LOCAL_FILES_ONLY: "true"
+    volumes:
+      - embeddings-cache:/app/.cache/embeddings
     command: ["kovalo-mcp", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8765"]
     ports:
       - "127.0.0.1:8765:8765"
@@ -54,10 +58,12 @@ services:
     environment:
       KOVALO_DB__HOST: postgres
       KOVALO_SERVICES__MCP_URL: http://mcp-server:8765/mcp
+      KOVALO_EMBEDDINGS__LOCAL__LOCAL_FILES_ONLY: "true"
     command: ["kovalo-api"]
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     volumes:
+      - embeddings-cache:/app/.cache/embeddings
       - ./reports:/app/reports
       - ./data:/app/data:ro
     depends_on:
@@ -96,5 +102,7 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+# embeddings-cache znika razem z pgdata przy `make db-reset` (przeliczenie 47 chunków to sekundy)
 volumes:
   pgdata:
+  embeddings-cache:

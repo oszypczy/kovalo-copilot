@@ -8,9 +8,12 @@ description: Uruchamianie i interpretacja ewaluacji Kovalo Decision Copilot (E1 
 Metryki, cele i zasady: `docs/06-evaluation.md`.
 
 ## Uruchamianie
-- Lokalnie: `uv run python -m kovalo.eval <e1|e2|e3|e4|e5> [--limit N] [--ids M01,M03] [--no-cache]`
-- W Dockerze: `make eval STAGE=e2` (= `docker compose run --rm api kovalo eval e2`, raport w `reports/`).
-- Najpierw tryb deterministyczny tam, gdzie istnieje (E3: odtworzenie z idealnym understand; E1: bez LLM-a).
+- Lokalnie: `make eval-local STAGE=e1 ARGS="..."` (= `uv run --env-file .env kovalo eval e1 ...`).
+- W Dockerze: `make eval STAGE=e1 ARGS="--backend pgvector"` (= `docker compose run --rm api kovalo eval e1 ...`, raport w `reports/`).
+- E1 (F1): `kovalo eval e1 [--candidates] [--model NAME]... [--backend memory|pgvector] [--with-llm] [--out DIR]`; opis opcji i kodów wyjścia: `docs/contracts/f1.md` §7.2. Porównanie kandydatów (`--candidates`) tylko lokalnie (pobiera ok. 5,8 GB modeli). `--with-llm` = jedno wywołanie Gemini.
+- Opcje `--limit`, `--ids`, `--no-cache` są planowane dla E2–E5 (jeszcze nie istnieją).
+- Najpierw tryb deterministyczny tam, gdzie istnieje (E3: odtworzenie z idealnym understand; E1: bez `--with-llm`).
+- Testy na żywo: `uv run --env-file .env pytest -m live tests/live/test_e1_live.py` (jedno wywołanie); samo `-m live` uruchamia wszystkie testy na żywo (w F1 dwa wywołania). Szczegóły: `docs/06-evaluation.md`, „Testy z prawdziwymi usługami”.
 
 ## Oszczędzanie darmowego tieru
 - Cache LLM-a (`SQLiteCache` w `.cache/llm.sqlite`) jest domyślnie włączony; `--no-cache` tylko do pomiaru zmienności.

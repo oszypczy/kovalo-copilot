@@ -22,6 +22,10 @@ loader z metadanymi, tokeny i kalkulator kosztów, chunking 800/120, fastembed +
 
 **Gotowe, gdy:** 18 dokumentów / 8762 tokeny / 47 chunków; raport E1; wybrany model embeddingów.
 
+**Kontrakt i zadania:** [contracts/f1.md](contracts/f1.md); decyzje: [ADR-0007](adr/0007-knowledge-index-f1.md).
+
+**Status (2026-11-02):** kod, testy jednostkowe i architektury, `-m model` i `-m live` zielone; E1 zrobione ([raport](../reports/mp1/2026-11-02-e1.md)), wybrany `intfloat/multilingual-e5-large` ([ADR-0003](adr/0003-local-embeddings.md) przyjęty; MP1 0,9 / 1,0, MP2 0,9 / 1,0, trafia też Q10/M03). Otwarte: weryfikacja w compose (D3: `make ingest` dwa razy, `--backend pgvector`, `pytest -m integration`), bo Postgres w Dockerze nie był dostępny, oraz drobne poprawki z przeglądu ([contracts/f1.md §12](contracts/f1.md)).
+
 ## F2: odpowiedzi ze źródłami (MP2)
 
 chunki z kontekstem (nagłówki → rozmiar), odpowiedź w schemacie z cytowaniami, rekord przebiegu, ocena 4-poziomowa bez LLM-a, sędzia LLM, hybryda BM25 (FR-2.5), ewaluacja E2.

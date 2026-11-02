@@ -7,8 +7,8 @@ ARG UV_VERSION=0.9.18
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
-# --- builder: zależności (osobna warstwa, przebudowywana tylko po zmianie uv.lock) ---
-FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
+# --- deps: zależności (osobna warstwa, przebudowywana tylko po zmianie uv.lock) ---
+FROM python:${PYTHON_VERSION}-slim-bookworm AS deps
 COPY --from=uv /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -18,6 +18,16 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
+
+# --- models: model embeddingów i tokenizer (z deps, nie zależy od src/: zmiana kodu nie pobiera ich ponownie) ---
+FROM deps AS models
+# musi równać się embeddings.local.model w config.yaml (pilnuje tego tests/unit/test_docker_config.py)
+ARG FASTEMBED_MODEL=intfloat/multilingual-e5-large
+RUN /opt/venv/bin/python -c "from fastembed import TextEmbedding as T; T('${FASTEMBED_MODEL}', cache_dir='/models/fastembed')" \
+    && TIKTOKEN_CACHE_DIR=/models/tiktoken /opt/venv/bin/python -c "import tiktoken; tiktoken.get_encoding('o200k_base')"
+
+# --- builder: kod projektu ---
+FROM deps AS builder
 # kod projektu (README.md jest wymagany przez metadane pakietu)
 COPY README.md ./
 COPY src ./src
@@ -25,28 +35,30 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable
 
 # --- runtime: wspólna baza ---
-FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime-base
 RUN groupadd --gid 1000 kovalo \
     && useradd --uid 1000 --gid kovalo --create-home --shell /usr/sbin/nologin kovalo
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    KOVALO_CONFIG_FILE=/app/config.yaml
+    KOVALO_CONFIG_FILE=/app/config.yaml \
+    TIKTOKEN_CACHE_DIR=/app/.cache/tiktoken \
+    HF_HUB_DISABLE_TELEMETRY=1
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY config.yaml ./
-# .cache: modele fastembed i cache embeddingów; reports: wyniki (w compose montowane jako wolumen)
-RUN mkdir -p /app/.cache /app/reports && chown -R kovalo:kovalo /app
-# TODO(F1): pobranie modelu fastembed przy budowaniu (po dodaniu fastembed do zależności),
-#           np. RUN python -c "from fastembed import TextEmbedding; TextEmbedding('<model>', cache_dir='/app/.cache/fastembed')"
+# embeddings: cache wektorów (wolumen w compose); reports: wyniki (wolumen/bind mount)
+RUN mkdir -p /app/.cache/embeddings /app/reports && chown -R kovalo:kovalo /app
 USER kovalo
 
 # --- app: api, mcp-server, kovalo ingest|eval|first-call ---
-FROM runtime AS app
+FROM runtime-base AS app
+COPY --from=models --chown=kovalo:kovalo /models/fastembed /app/.cache/fastembed
+COPY --from=models --chown=kovalo:kovalo /models/tiktoken /app/.cache/tiktoken
 EXPOSE 8080 8765
 CMD ["kovalo-api"]
 
 # --- ui: Chainlit ---
-FROM runtime AS ui
+FROM runtime-base AS ui
 EXPOSE 8000
 CMD ["kovalo-ui"]

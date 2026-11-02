@@ -9,10 +9,10 @@
 | ID | Wymaganie | Kryterium akceptacji |
 |---|---|---|
 | FR-1.1 | Wczytaj 18 dokumentów `data/corpus/*.md` jako `Document` LangChaina z metadanymi z `catalog.csv` (`doc_id, title, doc_type, department, owner, effective_date, language`) | 18 dokumentów, każde pole metadanych wypełnione; brak pliku z katalogu = błąd |
-| FR-1.2 | Policz tokeny tokenizerem `o200k_base` i oszacuj miesięczny koszt (400 pytań/dzień, 21 dni, 350 tokenów wyjścia, ceny z `config.yaml`) dla dwóch wariantów: retrieval i cały korpus w prompcie. Dwa cenniki obok siebie: referencyjny kursu (`gpt-5.4-mini`, PINNED, do porównania z przebiegiem wzorcowym) i nasz (płatny tier Gemini Flash, `cost.our_model`, ceny do sprawdzenia przy F1) | po cenach kursu: 8762 tokeny; $17,78 wobec $69,86 (x3,9); po cenach Gemini: nasza kolumna, ten sam scenariusz |
+| FR-1.2 | Policz tokeny tokenizerem `o200k_base` i oszacuj miesięczny koszt (400 pytań/dzień, 21 dni, 350 tokenów wyjścia, ceny z `config.yaml`) dla dwóch wariantów: retrieval i cały korpus w prompcie. Dwa cenniki obok siebie: referencyjny kursu (`gpt-5.4-mini`, PINNED, do porównania z przebiegiem wzorcowym) i nasz (płatny tier Gemini, `cost.our_model` i `cost.our_prices_per_1m_tokens`, [ADR-0007](adr/0007-knowledge-index-f1.md)) | po cenach kursu: 8762 tokeny; $17,78 wobec $69,86 (x3,9); po cenach `gemini-3.6-flash` (0,75 / 3,75 USD, stan 2026-11-02) przy wyszukiwaniu referencyjnym: $15,58 wobec $67,65 |
 | FR-1.3 | Podziel dokumenty na chunki (`RecursiveCharacterTextSplitter`, 800/120, separatory z configu) z identyfikatorem `<doc_id>#<nnn>` | 47 chunków, najdłuższy ≤ 800 znaków |
 | FR-1.4 | Zbuduj embeddingi z cache (`CacheBackedEmbeddings`) i indeks wektorowy | ponowne indeksowanie nie liczy embeddingów od nowa |
-| FR-1.5 | Wyszukuj `top_k=3` chunki po podobieństwie kosinusowym; policz podobieństwo także samodzielnie | wynik własnego cosine = wynik vector store (±1e-6) |
+| FR-1.5 | Wyszukuj `top_k=3` chunki po podobieństwie kosinusowym; policz podobieństwo także samodzielnie | wynik własnego cosine = wynik vector store (±1e-6 w pamięci, ±1e-5 w pgvector, który trzyma `float4`; wynik zawsze jako podobieństwo, [ADR-0007](adr/0007-knowledge-index-f1.md)) |
 | FR-1.6 | Fabryka LLM-a: jeden punkt konfiguracji dostawcy (Gemini; opcjonalnie OpenAI w trybie zgodnym z kursem) | zmiana `llm.provider` w configu przełącza model bez zmian w kodzie |
 
 ### FR-2: odpowiedzi ze źródłami (MP2)

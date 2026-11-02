@@ -11,7 +11,7 @@ Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-archit
 | `ui` | Chainlit | 8000 | czat, kroki agenta, przyciski akceptacji, źródła; rozmawia tylko z `api` |
 | `api` | FastAPI + LangGraph | 8080 | graf copilota (`understand`, routing, workflow akceptacji, agent), checkpointy, koszty, trace |
 | `mcp-server` | FastMCP (`mcp` SDK), streamable HTTP (`/mcp`) | 8765 | 6 narzędzi tylko do odczytu, zasoby (dokumenty), prompt; dostęp do indeksu i danych firmy |
-| `postgres` | `pgvector/pgvector:pg16` | 5432 | indeks wektorowy (`langchain-postgres`), checkpointy LangGraph (`langgraph-checkpoint-postgres`), zapisy przebiegów |
+| `postgres` | `pgvector/pgvector:pg16` | 5432 | indeks wektorowy (`langchain-postgres`, `PGVectorStore`: tabela na kolekcję), checkpointy LangGraph (`langgraph-checkpoint-postgres`), zapisy przebiegów |
 
 Indeksowanie i ewaluacja to **nie osobne usługi**, tylko polecenia CLI (`kovalo ingest`, `kovalo eval`) uruchamiane jednorazowo w obrazie `api`: `make ingest` = `docker compose run --rm api kovalo ingest` (korpus → chunki z kontekstem → embeddingi → upsert do pgvector), `make eval STAGE=e2` = `docker compose run --rm api kovalo eval e2` (raport w `reports/`, montowanym jako wolumen).
 
@@ -49,7 +49,7 @@ src/kovalo/
   ui/                Chainlit (app.py) zamontowany w FastAPI (server.py, /health); renderowanie kroków, pauz i źródeł
 ```
 
-Punkty wejścia: `kovalo` (CLI), `kovalo-api`, `kovalo-ui`, `kovalo-mcp`. Kontrakty modułów fundamentu (`config`, `llm`, `health`, `cli`) opisuje [contracts/f0.md](contracts/f0.md).
+Punkty wejścia: `kovalo` (CLI), `kovalo-api`, `kovalo-ui`, `kovalo-mcp`. Kontrakty modułów fundamentu (`config`, `llm`, `health`, `cli`) opisuje [contracts/f0.md](contracts/f0.md), a modułów wiedzy i kosztów (`knowledge`, `cost`, `eval` E1) [contracts/f1.md](contracts/f1.md).
 
 Zasady zależności (sprawdzane w review):
 - `policy/`, `company/`, `cost/` nie importują LangChaina ani niczego z LLM-em: to deterministyczny rdzeń.
@@ -57,7 +57,8 @@ Zasady zależności (sprawdzane w review):
 - `workflow/` nie zna transportu narzędzi: dostaje listę narzędzi (bezpośrednich albo z MCP) przez parametr.
 - `api/` i `ui/` nie zawierają logiki biznesowej. `ui/` nie importuje `llm`, `workflow`, `agents`, `tools`, `knowledge`, `rag`: rozmawia z `api` przez HTTP.
 - Tylko `llm.py` importuje integracje dostawców (`langchain_google_genai`, `langchain_openai`) i `init_chat_model`. `config.py` i `health.py` nie importują LangChaina.
-- Nazwy modeli są tylko w `config.yaml`. Część zasad sprawdza test `tests/architecture/test_dependencies.py`.
+- `fastembed` importuje tylko `knowledge/embeddings.py`, `langchain_postgres` tylko `knowledge/pgvector.py`, `tiktoken` tylko `cost/tokens.py`. `knowledge/` i `cost/` nie importują `llm`: model embeddingów dostają przez parametr z `llm.get_embeddings()` ([contracts/f1.md §2.3](contracts/f1.md)).
+- Nazwy modeli (czatu i embeddingów) są tylko w `config.yaml` (model embeddingów także w `ARG` Dockerfile, pilnowanym testem). Część zasad sprawdza test `tests/architecture/test_dependencies.py`.
 
 ## 3. Graf copilota (LangGraph)
 
@@ -97,7 +98,7 @@ Każde narzędzie zwraca słownik z polem `status` (`ok / no_data / unknown_supp
 
 ![Indeksowanie](architecture/kovalo-architecture-3-ingest.png)
 
-`catalog.csv` + `corpus/*.md` → `Document` z metadanymi → `MarkdownHeaderTextSplitter` → `RecursiveCharacterTextSplitter(800/120)` → nagłówek `<tytuł> > <sekcja>` → `CacheBackedEmbeddings(fastembed)` → `PGVector` (kolekcja `kovalo_ctx`, opcjonalnie `kovalo_mp1` dla porównania) + indeks BM25 (w pamięci, budowany przy starcie z tych samych chunków).
+`catalog.csv` + `corpus/*.md` → `Document` z metadanymi → `MarkdownHeaderTextSplitter` → `RecursiveCharacterTextSplitter(800/120)` → nagłówek `<tytuł> > <sekcja>` → `CacheBackedEmbeddings(fastembed)` (osobny cache dokumentów i pytań) → `PGVectorStore` (tabela `kovalo_ctx` od F2; w F1 chunki MP1 w `kovalo_mp1`) + indeks BM25 (w pamięci, budowany przy starcie z tych samych chunków). `kovalo ingest` buduje tabelę obok i podmienia ją w jednej transakcji, a model i wymiar zapisuje w `kovalo_index_meta` ([ADR-0007](adr/0007-knowledge-index-f1.md)).
 
 ## 6. Obserwowalność i koszty
 

@@ -1,7 +1,8 @@
-.PHONY: up down logs test lint first-call first-call-local db-reset ingest eval mcp-inspector
+.PHONY: up down logs test test-integration test-model test-live lint first-call first-call-local db-reset ingest ingest-local eval eval-local mcp-inspector
 
 S ?=
-STAGE ?= e2
+STAGE ?= e1
+ARGS ?=
 
 up:
 	docker compose up -d --build
@@ -13,7 +14,7 @@ logs:
 	docker compose logs -f $(S)
 
 test:
-	uv run pytest -m "not live and not integration"
+	uv run pytest
 
 lint:
 	uv run ruff check --fix
@@ -26,18 +27,34 @@ first-call:
 first-call-local:
 	uv run --env-file .env kovalo first-call
 
-# usuwa wolumen pgvector (dane i checkpointy)
+test-integration:
+	uv run pytest -m integration
+
+test-model:
+	uv run pytest -m model
+
+# Testy z prawdziwym LLM-em (darmowy tier): wybierz jeden plik, np. make test-live T=tests/live/test_e1_live.py
+T ?= tests/live
+test-live:
+	uv run --env-file .env pytest -m live $(T)
+
+# usuwa wolumeny: pgvector (dane i checkpointy) oraz cache embeddingów (przeliczenie 47 chunków to sekundy)
 db-reset:
 	docker compose down -v
 	docker compose up -d postgres
 
-# F1: kovalo ingest powstaje w etapie F1
 ingest:
 	docker compose run --rm api kovalo ingest
 
-# F1+: kovalo eval powstaje w kolejnych etapach (STAGE=e1|e2|...)
+ingest-local:
+	uv run --env-file .env kovalo ingest
+
+# STAGE=e1|e2|...; ARGS przekazuje opcje, np. make eval STAGE=e1 ARGS="--backend pgvector"
 eval:
-	docker compose run --rm api kovalo eval $(STAGE)
+	docker compose run --rm api kovalo eval $(STAGE) $(ARGS)
+
+eval-local:
+	uv run --env-file .env kovalo eval $(STAGE) $(ARGS)
 
 mcp-inspector:
 	npx @modelcontextprotocol/inspector uv run kovalo-mcp

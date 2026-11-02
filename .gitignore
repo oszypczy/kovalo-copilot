@@ -6,8 +6,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .cache/
-reports/*
+reports/**
 !reports/.gitkeep
+!reports/*/
+!reports/*/*-e[0-9].md
 .DS_Store
 .chainlit/
 .files/

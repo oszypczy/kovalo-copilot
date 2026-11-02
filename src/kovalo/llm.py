@@ -1,6 +1,7 @@
-"""Fabryka modeli czatu: init_chat_model z configu, rate limiter na model, fallback.
+"""Fabryka modeli: czat (init_chat_model, rate limiter, fallback) i embeddingi (F1).
 
-Kontrakt: docs/contracts/f0.md, sekcja 5; decyzje: ADR-0002, ADR-0006.
+Kontrakt: docs/contracts/f0.md, sekcja 5 i docs/contracts/f1.md, sekcja 6;
+decyzje: ADR-0002, ADR-0003, ADR-0006, ADR-0007.
 Jedyny moduł, który importuje integracje dostawców i init_chat_model.
 Nazwy modeli pochodzą wyłącznie z config.yaml.
 """
@@ -11,10 +12,12 @@ import contextlib
 import importlib.util
 import threading
 from collections.abc import Callable, Iterator, Sequence
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from langchain.chat_models import init_chat_model
+from langchain_core.embeddings import Embeddings
 from langchain_core.exceptions import (
     ModelAPIError,
     ModelConnectionError,
@@ -29,6 +32,7 @@ from langchain_core.runnables import Runnable
 
 from kovalo.config import (
     ConfigError,
+    EmbeddingModelSpec,
     MissingConfigError,
     ModelProvider,
     ModelPurpose,
@@ -39,12 +43,19 @@ from kovalo.config import (
     get_settings,
 )
 
+if TYPE_CHECKING:
+    from kovalo.knowledge.embeddings import FastEmbedEmbeddings
+
 __all__ = [
     "FALLBACK_EXCEPTIONS",
     "get_chat_model",
+    "get_embeddings",
     "get_fallback_models",
+    "get_reference_embeddings",
     "get_resilient_chat_model",
     "override_chat_model",
+    "override_embeddings",
+    "reset_embeddings",
     "reset_rate_limiters",
     "with_model_fallbacks",
 ]
@@ -206,3 +217,108 @@ def override_chat_model(model: ModelOverride) -> Iterator[None]:
         yield
     finally:
         _override = previous
+
+
+# ---------------------------------------------------------------------------
+# Embeddingi (F1, kontrakt F1 sekcja 6). Bez klucza API: fastembed liczy lokalnie,
+# a tryb openai_cache tylko czyta cache kursu.
+# ---------------------------------------------------------------------------
+
+EmbeddingsOverride = Embeddings | Callable[[EmbeddingModelSpec | None], Embeddings]
+_embeddings_override: EmbeddingsOverride | None = None
+
+# Rejestr modeli fastembed: ładowanie e5-large trwa kilka sekund i zajmuje ok. 2,5 GB RAM,
+# więc jedna instancja na (model, katalog modeli, ustawienia onnxruntime) w procesie.
+_EmbeddingKey = tuple[EmbeddingModelSpec, Path, int | None, bool]
+_fastembed_models: dict[_EmbeddingKey, FastEmbedEmbeddings] = {}
+_fastembed_lock = threading.Lock()
+
+
+def reset_embeddings() -> None:
+    """Czyści rejestr modeli fastembed (tylko testy)."""
+    with _fastembed_lock:
+        _fastembed_models.clear()
+
+
+def _fastembed_model(settings: Settings, spec: EmbeddingModelSpec) -> FastEmbedEmbeddings:
+    from kovalo.knowledge.embeddings import FastEmbedEmbeddings
+
+    local = settings.embeddings.local
+    key: _EmbeddingKey = (spec, local.models_dir, local.threads, local.local_files_only)
+    with _fastembed_lock:
+        model = _fastembed_models.get(key)
+        if model is None:
+            model = FastEmbedEmbeddings(
+                spec,
+                models_dir=local.models_dir,
+                batch_size=settings.embeddings.batch_size,
+                threads=local.threads,
+                local_files_only=local.local_files_only,
+            )
+            _fastembed_models[key] = model
+        return model
+
+
+def get_embeddings(
+    *,
+    settings: Settings | None = None,
+    spec: EmbeddingModelSpec | None = None,
+    cache: bool = True,
+) -> Embeddings:
+    """Model embeddingów z configu (albo kandydat `spec` w E1).
+
+    fastembed: CacheBackedEmbeddings(CountingEmbeddings(FastEmbedEmbeddings)) z cache
+    w embeddings.local.cache_dir (cache=False: bez CacheBackedEmbeddings). Każde wywołanie
+    daje nowy licznik, model ONNX pochodzi z rejestru procesu.
+    openai_cache: cache kursu tylko do odczytu; `spec` → ConfigError.
+    """
+    override = _embeddings_override
+    if override is not None:
+        return override if isinstance(override, Embeddings) else override(spec)
+    settings = settings or get_settings()
+    embeddings = settings.embeddings
+    if embeddings.provider == "openai_cache":
+        if spec is not None:
+            raise ConfigError(
+                "Tryb embeddings.provider=openai_cache nie ma kandydatów: porównanie modeli "
+                "wymaga provider=fastembed."
+            )
+        return get_reference_embeddings(settings=settings)
+
+    from kovalo.knowledge.embeddings import CountingEmbeddings, build_cached_embeddings
+
+    spec = spec or embeddings.local.spec()
+    counting = CountingEmbeddings(_fastembed_model(settings, spec))
+    if not cache:
+        return counting
+    return build_cached_embeddings(
+        counting,
+        cache_dir=embeddings.local.cache_dir,
+        model=spec.model,
+        batch_size=embeddings.batch_size,
+    )
+
+
+def get_reference_embeddings(*, settings: Settings | None = None) -> Embeddings:
+    """Zawsze tryb openai_cache (wiersz „referencja kursu” w E1), niezależnie od providera."""
+    from kovalo.knowledge.embeddings import build_course_cache_embeddings
+
+    settings = settings or get_settings()
+    return build_course_cache_embeddings(
+        settings.paths.embedding_cache, model=settings.embeddings.model
+    )
+
+
+@contextlib.contextmanager
+def override_embeddings(embeddings: EmbeddingsOverride) -> Iterator[None]:
+    """Na czas bloku get_embeddings zwraca atrapę (albo wynik fabryki dla danego `spec`).
+
+    get_reference_embeddings nie jest podmieniany: czyta tylko cache kursu, bez sieci.
+    """
+    global _embeddings_override
+    previous = _embeddings_override
+    _embeddings_override = embeddings
+    try:
+        yield
+    finally:
+        _embeddings_override = previous
