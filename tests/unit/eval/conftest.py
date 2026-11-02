@@ -25,8 +25,9 @@ def local_spec(session_settings):
 @pytest.fixture(scope="session")
 def e1_report(session_settings, local_spec):
     """Raport E1: referencja kursu (prawdziwy cache) + atrapa zamiast modelu z configu."""
-    from kovalo.eval.retrieval.e1 import run_e1
     from langchain_core.embeddings import DeterministicFakeEmbedding
+
+    from kovalo.eval.retrieval.e1 import run_e1
 
     fake = DeterministicFakeEmbedding(size=16)
     return run_e1(

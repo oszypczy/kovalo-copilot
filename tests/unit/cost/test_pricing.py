@@ -32,9 +32,8 @@ def test_monthly_cost_negative_raises(settings):
 
 
 def test_reference_price_independent_of_llm_model(monkeypatch: pytest.MonkeyPatch, settings):
-    from kovalo.cost.pricing import reference_price
-
     from kovalo.config import load_settings
+    from kovalo.cost.pricing import reference_price
 
     monkeypatch.setenv("KOVALO_LLM__MODEL", "inny-model")
     other = load_settings(google_api_key="test-key")
@@ -73,9 +72,8 @@ def test_estimate_costs_rounding_and_ratio(settings):
 
 
 def test_estimate_costs_ratio_uses_unrounded_amounts(settings):
-    from kovalo.cost.pricing import estimate_costs, monthly_cost
-
     from kovalo.config import TokenPrice
+    from kovalo.cost.pricing import estimate_costs, monthly_cost
 
     scenario = settings.cost.scenario
     price = TokenPrice(input=0.75, output=4.5)

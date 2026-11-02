@@ -188,13 +188,13 @@ def test_reset_embeddings_exists():
 
 
 def test_get_embeddings_fastembed_wiring(local_settings, fake_text_embedding):
+    from langchain_classic.embeddings import CacheBackedEmbeddings
+
     from kovalo.knowledge.embeddings import (
         CountingEmbeddings,
         FastEmbedEmbeddings,
         cache_namespace,
     )
-    from langchain_classic.embeddings import CacheBackedEmbeddings
-
     from kovalo.llm import get_embeddings
 
     emb = get_embeddings(settings=local_settings)  # bez klucza API
