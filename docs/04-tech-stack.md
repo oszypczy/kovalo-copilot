@@ -28,7 +28,7 @@ Pełny kontrakt: [contracts/f0.md §4](contracts/f0.md), uzasadnienie: [ADR-0006
 ```yaml
 llm:
   provider: google_genai          # google_genai | openai
-  model: gemini-3.8-flash         # stabilna wersja, nie alias -latest
+  model: gemini-3.6-flash         # stabilna wersja, nie alias -latest; 3.8/3.7 dają 504 w darmowym tierze (ADR-0006)
   temperature: null               # domyślna dostawcy (Gemini 3: 1.0, zalecenie Google)
   max_retries: 2
   timeout_s: 60
