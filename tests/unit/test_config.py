@@ -254,11 +254,15 @@ def test_f1_config_keys_load():
     assert by_name["sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"].dimensions == 384
     assert by_name["sentence-transformers/paraphrase-multilingual-mpnet-base-v2"].dimensions == 768
     cost = s.cost
-    assert cost.our_model == "gemini-3.6-flash"
+    assert cost.our_model == "gemini-3.5-flash-lite" == s.llm.model  # koszt = model odpowiedzi
     assert cost.our_prices_checked_on == datetime.date(2026, 11, 2)
     assert cost.our_prices_per_1m_tokens["gemini-3.6-flash"].input == 0.75
     assert cost.our_prices_per_1m_tokens["gemini-3.6-flash"].output == 3.75
+    assert cost.our_prices_per_1m_tokens["gemini-3.5-flash-lite"].input == 0.3
     assert cost.our_prices_per_1m_tokens["gemini-3.5-flash-lite"].output == 2.5
+    assert [f.model for f in s.llm.fallbacks] == ["gemini-3.6-flash"]  # ADR-0006, aneks 2026-11-02
+    assert s.llm.rate_limit.requests_per_second == 0.25
+    assert s.llm.fallbacks[0].rate_limit.requests_per_second == 0.15
     assert s.db.index_meta_table == "kovalo_index_meta"
     assert s.db.vector_collection_mp1 == "kovalo_mp1"
 
@@ -316,7 +320,9 @@ def test_negative_price_rejected(tmp_config: Path, patch_config):
     from kovalo.config import ConfigError
 
     patch_config(
-        tmp_config, "cost.our_prices_per_1m_tokens.gemini-3.6-flash", {"input": -1, "output": 1}
+        tmp_config,
+        "cost.our_prices_per_1m_tokens.gemini-3.5-flash-lite",
+        {"input": -1, "output": 1},
     )
     with pytest.raises(ConfigError):
         _f1_settings(tmp_config)
@@ -353,3 +359,82 @@ def test_table_name_too_long_rejected(tmp_config: Path, patch_config, field: str
     patch_config(tmp_config, f"db.{field}", "t" * length)
     with pytest.raises(ConfigError, match=field):
         _f1_settings(tmp_config)
+
+
+# ---------------------------------------------------------------------------
+# F2 (kontrakt: docs/contracts/f2.md, sekcja 4)
+# ---------------------------------------------------------------------------
+
+
+def test_f2_config_keys_load():
+    from kovalo.config import load_settings
+
+    s = load_settings(google_api_key="test-key")
+    assert s.retrieval.top_k == 3
+    assert s.retrieval.mode == "vector"
+    hybrid = s.retrieval.hybrid
+    assert (hybrid.fetch_k, hybrid.rrf_c) == (10, 60)
+    assert (hybrid.weights.vector, hybrid.weights.bm25) == (0.5, 0.5)
+    assert (hybrid.bm25.k1, hybrid.bm25.b, hybrid.bm25.epsilon) == (1.5, 0.75, 0.25)
+    assert s.paths.llm_cache_dir.is_absolute()
+    assert s.paths.llm_cache_dir == s.root / ".cache" / "llm"
+    assert s.prompts.judge_system.strip()
+    assert "correct" in s.prompts.judge_system and "grounded" in s.prompts.judge_system
+
+
+def test_retrieval_mode_from_env(monkeypatch: pytest.MonkeyPatch):
+    from kovalo.config import load_settings
+
+    monkeypatch.setenv("KOVALO_RETRIEVAL__MODE", "hybrid")
+    assert load_settings().retrieval.mode == "hybrid"
+    monkeypatch.setenv("KOVALO_RETRIEVAL__MODE", "bm25")
+    from kovalo.config import ConfigError
+
+    with pytest.raises(ConfigError, match="mode"):
+        load_settings()
+
+
+def test_fetch_k_below_top_k_rejected(tmp_config: Path, patch_config):
+    from kovalo.config import ConfigError, load_settings
+
+    patch_config(tmp_config, "retrieval.hybrid.fetch_k", 2)
+    with pytest.raises(ConfigError, match="fetch_k") as info:
+        load_settings(tmp_config)
+    assert "top_k" in str(info.value) or "3" in str(info.value)  # komunikat z obiema wartościami
+
+
+@pytest.mark.parametrize(
+    "weights",
+    [{"vector": 0, "bm25": 0}, {"vector": -0.1, "bm25": 0.5}, {"vector": 0.5, "bm25": -1}],
+    ids=["both_zero", "negative_vector", "negative_bm25"],
+)
+def test_hybrid_weights_validation(tmp_config: Path, patch_config, weights):
+    from kovalo.config import ConfigError, load_settings
+
+    patch_config(tmp_config, "retrieval.hybrid.weights", weights)
+    with pytest.raises(ConfigError, match=r"weights|vector|bm25"):
+        load_settings(tmp_config)
+
+
+def test_one_zero_weight_is_allowed(tmp_config: Path, patch_config):
+    from kovalo.config import load_settings
+
+    patch_config(tmp_config, "retrieval.hybrid.weights", {"vector": 1.0, "bm25": 0})
+    assert load_settings(tmp_config).retrieval.hybrid.weights.bm25 == 0
+
+
+def test_purpose_params_merge(tmp_config: Path, patch_config):
+    from kovalo.config import load_settings
+
+    patch_config(tmp_config, "llm.purposes", {"answer": {"params": {"thinking_level": "minimal"}}})
+    s = load_settings(tmp_config)
+    assert s.llm.purposes["answer"].params == {"thinking_level": "minimal"}
+    assert "judge" not in s.llm.purposes
+    assert s.llm.params["thinking_level"] == "low"  # llm.params bez zmian
+
+
+def test_default_purposes_have_no_params():
+    from kovalo.config import load_settings
+
+    s = load_settings()
+    assert all(not override.params for override in s.llm.purposes.values())

@@ -279,3 +279,101 @@ def test_override_embeddings(local_settings, fake_embeddings, fake_text_embeddin
     with override_embeddings(factory):
         assert get_embeddings(settings=local_settings) is fake_embeddings
     assert seen == [None]
+
+
+# ---------------------------------------------------------------------------
+# F2: structured output z fallbackiem, params per cel, cache (kontrakt F2, 6)
+# ---------------------------------------------------------------------------
+
+
+def test_structured_model_with_fallbacks(settings):
+    from langchain_core.runnables.fallbacks import RunnableWithFallbacks
+
+    from kovalo.llm import FALLBACK_EXCEPTIONS, get_structured_model
+    from kovalo.rag.records import Answer
+
+    model = get_structured_model(Answer, "answer", settings=settings)  # bez wywołań sieciowych
+    assert isinstance(model, RunnableWithFallbacks)
+    assert model.exceptions_to_handle == FALLBACK_EXCEPTIONS
+    assert len(model.fallbacks) == 1 == len(settings.llm.fallbacks)
+
+
+def test_structured_model_override():
+    from kovalo.llm import get_structured_model, override_chat_model
+    from kovalo.rag.records import Answer
+    from tests.fakes import FakeStructuredChatModel
+
+    fake = FakeStructuredChatModel(
+        results={Answer: Answer(answer="x", citations=[], answerable=True)}
+    )
+    with override_chat_model(fake):
+        model = get_structured_model(Answer, "answer")
+        result = model.invoke("pytanie")
+    assert set(result) == {"raw", "parsed", "parsing_error"}
+    assert result["parsed"] == Answer(answer="x", citations=[], answerable=True)
+    assert result["parsing_error"] is None
+    assert fake.schemas == [Answer] and fake.include_raw_flags == [True]
+
+
+def test_structured_model_missing_key():
+    from kovalo.config import MissingConfigError, load_settings
+    from kovalo.llm import get_structured_model
+    from kovalo.rag.records import Answer
+
+    with pytest.raises(MissingConfigError, match="GOOGLE_API_KEY"):
+        get_structured_model(Answer, "answer", settings=load_settings())
+
+
+def test_purpose_params_passed(tmp_config: Path, patch_config, monkeypatch):
+    import kovalo.llm as llm_module
+    from kovalo.llm import get_chat_model
+
+    captured: list[dict] = []
+    real_init = llm_module.init_chat_model
+
+    def spy(model, **kwargs):
+        captured.append(kwargs)
+        return real_init(model, **kwargs)
+
+    monkeypatch.setattr(llm_module, "init_chat_model", spy)
+    patch_config(tmp_config, "llm.purposes", {"answer": {"params": {"thinking_level": "minimal"}}})
+    s = _settings(tmp_config)
+
+    answer = get_chat_model("answer", settings=s)
+    assert captured[-1]["thinking_level"] == "minimal"
+    assert answer.thinking_level == "minimal"
+    default = get_chat_model("default", settings=s)
+    assert captured[-1]["thinking_level"] == s.llm.params["thinking_level"] == "low"
+    assert default.thinking_level == "low"
+
+
+def test_purpose_params_passed_to_fallbacks(tmp_config: Path, patch_config):
+    from kovalo.llm import get_fallback_models
+
+    patch_config(tmp_config, "llm.purposes", {"answer": {"params": {"thinking_level": "minimal"}}})
+    s = _settings(tmp_config)
+    models = get_fallback_models("answer", settings=s)
+    assert models and all(getattr(m, "thinking_level", None) == "minimal" for m in models)
+
+
+def test_cache_passed_to_models(settings):
+    from langchain_core.caches import InMemoryCache
+
+    from kovalo.llm import get_chat_model, get_fallback_models
+
+    cache = InMemoryCache()
+    assert get_chat_model(settings=settings, cache=cache).cache is cache
+    fallbacks = get_fallback_models(settings=settings, cache=cache)
+    assert fallbacks and all(m.cache is cache for m in fallbacks)
+    assert get_chat_model(settings=settings).cache is None  # domyślnie bez cache
+
+
+def test_llm_string_stable_and_secret_free(tmp_config: Path):
+    from kovalo.config import load_settings
+    from kovalo.llm import get_chat_model
+
+    secret = "AIza-super-tajny-klucz-123"
+    a = get_chat_model(settings=load_settings(tmp_config, google_api_key=secret))
+    b = get_chat_model(settings=load_settings(tmp_config, google_api_key=secret))
+    assert a._get_llm_string() == b._get_llm_string()
+    assert secret not in a._get_llm_string()

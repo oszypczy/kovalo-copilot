@@ -20,5 +20,5 @@ Usługi i porty: ui 8000, api 8080, mcp-server 8765, postgres 5432.
 ## Typowe problemy
 - `api` nie startuje: sprawdź `docker compose ps`. Postgres musi być `healthy`, a `mcp-server` musi odpowiadać.
 - Puste wyniki wyszukiwania: nie uruchomiono `make ingest` albo zmieniono model embeddingów bez ponownego indeksowania (inna kolekcja/wymiar).
-- 401/403 od Gemini: brak `GOOGLE_API_KEY` w `.env`. 429: limit darmowego tieru, fallback przełącza na Flash-Lite; jeśli oba limity dzienne wyczerpane, poczekaj do resetu.
+- 401/403 od Gemini: brak `GOOGLE_API_KEY` w `.env`. 429: limit darmowego tieru, fallback przełącza z Flash-Lite na Flash (20 zapytań dziennie); jeśli oba limity dzienne wyczerpane, poczekaj do resetu.
 - Zmiana `pyproject.toml`: `uv lock` lokalnie, potem `make up` (przebudowa warstwy zależności).

@@ -47,7 +47,7 @@ def test_our_price_is_gemini(settings):
     from kovalo.cost.pricing import our_price
 
     price = our_price(settings.cost)
-    assert (price.input, price.output) == (0.75, 3.75)
+    assert (price.input, price.output) == (0.30, 2.50)  # gemini-3.5-flash-lite (llm.model)
 
 
 def test_estimate_costs_rounding_and_ratio(settings):
@@ -99,3 +99,21 @@ def test_estimate_costs_invalid_input_raises(settings):
         estimate_costs([1], [], **kwargs)
     with pytest.raises(ValueError):
         estimate_costs([-5], [1], **kwargs)
+
+
+def test_monthly_cost_tokens(settings):
+    from kovalo.cost.pricing import monthly_cost, monthly_cost_tokens, reference_price
+
+    price = reference_price(settings.cost)
+    scenario = settings.cost.scenario
+    assert scenario.output_tokens_per_answer == 350
+    got = monthly_cost_tokens(1000, 350, price=price, scenario=scenario)
+    assert got == pytest.approx(monthly_cost(1000, price=price, scenario=scenario))
+    assert round(got, 2) == 19.53
+    # liczby tokenów wyjścia z argumentu, a nie ze scenariusza
+    doubled = monthly_cost_tokens(1000, 700, price=price, scenario=scenario)
+    assert doubled == pytest.approx(got + 400 * 21 * 350 * price.output / 1e6)
+    assert monthly_cost_tokens(0, 0, price=price, scenario=scenario) == 0
+    for bad in ((-1, 10), (10, -1)):
+        with pytest.raises(ValueError):
+            monthly_cost_tokens(*bad, price=price, scenario=scenario)

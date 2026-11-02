@@ -12,7 +12,14 @@ from pydantic import BaseModel
 
 from kovalo.config import CostConfig, CostScenario, TokenPrice
 
-__all__ = ["CostEstimate", "estimate_costs", "monthly_cost", "our_price", "reference_price"]
+__all__ = [
+    "CostEstimate",
+    "estimate_costs",
+    "monthly_cost",
+    "monthly_cost_tokens",
+    "our_price",
+    "reference_price",
+]
 
 _PER_MILLION = 1_000_000
 
@@ -29,6 +36,21 @@ def monthly_cost(
     per_question = (
         input_tokens_per_question * price.input + scenario.output_tokens_per_answer * price.output
     ) / _PER_MILLION
+    return scenario.questions_per_day * scenario.working_days_per_month * per_question
+
+
+def monthly_cost_tokens(
+    input_tokens: float, output_tokens: float, *, price: TokenPrice, scenario: CostScenario
+) -> float:
+    """Koszt miesięczny z faktycznych tokenów wejścia i wyjścia na pytanie (E2, FR-6.5).
+
+    scenario.output_tokens_per_answer jest ignorowany. Bez zaokrąglania; ujemne → ValueError.
+    """
+    if input_tokens < 0 or output_tokens < 0:
+        raise ValueError(
+            f"Liczba tokenów nie może być ujemna: wejście {input_tokens}, wyjście {output_tokens}"
+        )
+    per_question = (input_tokens * price.input + output_tokens * price.output) / _PER_MILLION
     return scenario.questions_per_day * scenario.working_days_per_month * per_question
 
 

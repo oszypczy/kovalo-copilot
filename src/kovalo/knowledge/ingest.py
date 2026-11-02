@@ -1,4 +1,7 @@
-"""Ingest MP1: korpus → chunki → embeddingi (cache) → zapis indeksu (FR-6.3; kontrakt F1, 5.7)."""
+"""Ingest: korpus → chunki (MP1 albo z kontekstem) → embeddingi (cache) → zapis indeksu.
+
+FR-6.3; kontrakty: F1 sekcja 5.7, F2 sekcja 5.4.
+"""
 
 from __future__ import annotations
 
@@ -12,17 +15,25 @@ from langchain_core.embeddings import Embeddings
 from pydantic import BaseModel
 
 from kovalo.config import Settings
-from kovalo.knowledge.chunking import ChunkStats, chunk_documents, chunk_stats
+from kovalo.knowledge.chunking import ChunkStats, ChunkVariant, build_chunks, chunk_stats
 from kovalo.knowledge.corpus import CorpusStats, corpus_stats, load_corpus
 from kovalo.knowledge.embeddings import CountingEmbeddings
 from kovalo.knowledge.pgvector import IndexMeta
 
-__all__ = ["IndexWriter", "IngestStats", "configured_embedding_model", "ingest_mp1"]
+__all__ = [
+    "IndexWriter",
+    "IngestStats",
+    "configured_embedding_model",
+    "index_table",
+    "ingest_chunks",
+    "ingest_mp1",
+]
 
 IndexWriter = Callable[[Sequence[Document], IndexMeta], tuple[int, int]]
 
 
 class IngestStats(BaseModel):
+    variant: ChunkVariant
     corpus: CorpusStats
     chunks: ChunkStats
     table: str
@@ -54,22 +65,34 @@ def _counter(embeddings: Embeddings) -> CountingEmbeddings | None:
     return None
 
 
+def index_table(settings: Settings, variant: ChunkVariant) -> str:
+    """Tabela wariantu: db.vector_collection_mp1 ('mp1') albo db.vector_collection ('ctx')."""
+    return settings.db.vector_collection_mp1 if variant == "mp1" else settings.db.vector_collection
+
+
 def ingest_mp1(settings: Settings, *, embeddings: Embeddings, writer: IndexWriter) -> IngestStats:
-    """load_corpus → chunk_documents → embed_documents (przez cache) → writer(chunks, meta).
+    """Ingest chunków MP1 (F1): ingest_chunks(variant='mp1')."""
+    return ingest_chunks(settings, variant="mp1", embeddings=embeddings, writer=writer)
+
+
+def ingest_chunks(
+    settings: Settings, *, variant: ChunkVariant, embeddings: Embeddings, writer: IndexWriter
+) -> IngestStats:
+    """load_corpus → build_chunks(variant) → embed_documents (przez cache) → writer(chunks, meta).
 
     `embedded` to przyrost licznika CountingEmbeddings w tym przebiegu (0, gdy model nie jest
     opakowany licznikiem). Wektory liczymy jawnie przed zapisem, więc writer bierze je z cache.
     """
     start = time.perf_counter()
     docs = load_corpus(settings)
-    chunks = chunk_documents(docs, settings.chunking)
+    chunks = build_chunks(docs, settings.chunking, variant)
     counter = _counter(embeddings)
     before = counter.documents_embedded if counter is not None else 0
     embeddings.embed_documents([c.page_content for c in chunks])
     embedded = (counter.documents_embedded - before) if counter is not None else 0
 
     model, dimensions = configured_embedding_model(settings)
-    table = settings.db.vector_collection_mp1
+    table = index_table(settings, variant)
     meta = IndexMeta(
         table=table,
         embedding_provider=settings.embeddings.provider,
@@ -80,6 +103,7 @@ def ingest_mp1(settings: Settings, *, embeddings: Embeddings, writer: IndexWrite
     )
     rows_after, rows_before = writer(chunks, meta)
     return IngestStats(
+        variant=variant,
         corpus=corpus_stats(docs, encoding=settings.tokenizer.encoding),
         chunks=chunk_stats(chunks),
         table=table,

@@ -53,6 +53,7 @@ ingest-local:
 eval:
 	docker compose run --rm api kovalo eval $(STAGE) $(ARGS)
 
+# Lokalnie (bez Dockera), np. make eval-local STAGE=e2 ARGS="--with-llm" (wymaga GOOGLE_API_KEY w .env)
 eval-local:
 	uv run --env-file .env kovalo eval $(STAGE) $(ARGS)
 

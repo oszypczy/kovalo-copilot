@@ -15,12 +15,9 @@ def pg_settings():  # type: ignore[no-untyped-def]
     return load_settings(google_api_key="test-key")
 
 
-@pytest.fixture
-def pg_table(pg_settings) -> Iterator[str]:  # type: ignore[no-untyped-def]
+def _drop_table(pg_settings, table: str) -> None:  # type: ignore[no-untyped-def]
     import psycopg
 
-    table = f"test_mp1_{uuid.uuid4().hex[:8]}"
-    yield table
     with psycopg.connect(pg_settings.postgres_dsn()) as conn:
         conn.execute(f'DROP TABLE IF EXISTS "{table}"')
         conn.execute(f'DROP TABLE IF EXISTS "{table}__new"')
@@ -31,3 +28,18 @@ def pg_table(pg_settings) -> Iterator[str]:  # type: ignore[no-untyped-def]
             conn.execute(
                 f'DELETE FROM "{pg_settings.db.index_meta_table}" WHERE table_name = %s', (table,)
             )
+
+
+@pytest.fixture
+def pg_table(pg_settings) -> Iterator[str]:  # type: ignore[no-untyped-def]
+    table = f"test_mp1_{uuid.uuid4().hex[:8]}"
+    yield table
+    _drop_table(pg_settings, table)
+
+
+@pytest.fixture
+def pg_ctx_table(pg_settings) -> Iterator[str]:  # type: ignore[no-untyped-def]
+    """Tabela testowa dla chunków z kontekstem (F2): test_ctx_<uuid8>."""
+    table = f"test_ctx_{uuid.uuid4().hex[:8]}"
+    yield table
+    _drop_table(pg_settings, table)

@@ -1,6 +1,6 @@
 # ADR-0002: Darmowy LLM: Gemini Flash
 
-- Status: przyjęty
+- Status: przyjęty; kolejność modeli zmieniona przez [ADR-0006](0006-config-and-llm-factory.md) (od F2 model główny to Flash-Lite, a Flash jest fallbackiem: darmowy tier Flash ma 20 zapytań dziennie)
 - Data: 2026-11-01
 
 ## Kontekst

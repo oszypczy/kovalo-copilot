@@ -19,6 +19,7 @@ paths:
   mini_project_4_output_dir: reports/mp4
   mini_project_5_conversations: data/eval/mini_project_5_conversations.yaml
   mini_project_5_output_dir: reports/mp5
+  llm_cache_dir: .cache/llm         # NASZE (ADR-0008): cache odpowiedzi LLM-a w ewaluacjach (JSON na dysku)
 
 corpus:
   required_metadata: [doc_id, title, doc_type, department, owner, effective_date, language]
@@ -53,6 +54,12 @@ embeddings:
 
 retrieval:
   top_k: 3                        # PINNED
+  mode: vector                    # NASZE (ADR-0008): vector | hybrid; vector wybrany po E2 (pytanie U2, R1 F2)
+  hybrid:                         # NASZE: BM25 + wektory, fuzja Reciprocal Rank Fusion
+    fetch_k: 10                   # kandydaci z każdej listy przed fuzją (≥ top_k)
+    rrf_c: 60                     # stała RRF (jak domyślna w EnsembleRetriever)
+    weights: {vector: 0.5, bm25: 0.5}
+    bm25: {k1: 1.5, b: 0.75, epsilon: 0.25}   # domyślne rank_bm25.BM25Okapi
 
 reference_llm:
   # PINNED – LLM, z którym projekt jest budowany i sprawdzany: używają go przebiegi
@@ -63,21 +70,21 @@ reference_llm:
 llm:
   # NASZE (ADR-0002, ADR-0006). Nazwy modeli są tylko tutaj, nigdy w kodzie.
   provider: google_genai          # google_genai | openai (opcjonalny, extra `openai`)
-  model: gemini-3.6-flash         # stabilna wersja, nie alias -latest; 3.8/3.7 dają 504 w darmowym tierze (ADR-0006)
+  model: gemini-3.5-flash-lite    # stabilna wersja; Flash (3.5/3.6) ma w darmowym tierze tylko 20 zapytań/dzień (ADR-0006, aneks 2026-11-02)
   temperature: null               # null = domyślna dostawcy (Gemini 3: 1.0, zalecenie Google)
   max_retries: 1                  # 1 = bez ponowień w SDK Google; po timeoucie od razu fallback (ADR-0006)
   timeout_s: 60
-  params:                         # przekazywane 1:1 jako kwargs do init_chat_model
-    thinking_level: low           # Gemini 3: minimal | low | medium | high (domyślnie high)
+  params:                         # przekazywane 1:1 jako kwargs do init_chat_model (także fallbackom)
+    thinking_level: low           # Gemini 3: minimal | low | medium | high; obsługiwane przez 3.5 Flash-Lite (domyślnie minimal) i 3.6 Flash (domyślnie medium)
   rate_limit:                     # InMemoryRateLimiter, osobny na każdy model w procesie
-    requests_per_second: 0.15     # ok. 9 zapytań/min
+    requests_per_second: 0.25     # ok. 15 zapytań/min
     check_every_n_seconds: 0.1
     max_bucket_size: 1            # bez serii zapytań
   fallbacks:                      # w tej kolejności; każdy ma własny limiter
     - provider: google_genai
-      model: gemini-3.5-flash-lite
-      rate_limit: {requests_per_second: 0.25, check_every_n_seconds: 0.1, max_bucket_size: 1}
-  purposes: {}                    # opcjonalne nadpisania per cel, np. judge: {model: …, temperature: …}
+      model: gemini-3.6-flash     # tylko awaryjnie: 20 zapytań/dzień w darmowym tierze
+      rate_limit: {requests_per_second: 0.15, check_every_n_seconds: 0.1, max_bucket_size: 1}
+  purposes: {}                    # opcjonalne nadpisania per cel, np. answer: {params: {thinking_level: minimal}}; judge: {model: …} (pytania U3, U5)
 
 cost:
   # Miesięczne oszacowanie zawsze liczy się według cen tego modelu, niezależnie od twojego LLM-a.
@@ -93,7 +100,7 @@ cost:
     output_tokens_per_answer: 350
   # NASZE (ADR-0007): drugi cennik w raportach. Płatny tier Gemini API (Standard), USD za 1M tokenów,
   # wyjście razem z tokenami myślenia. Darmowy tier = 0 USD.
-  our_model: gemini-3.6-flash
+  our_model: gemini-3.5-flash-lite   # model odpowiedzi (llm.model); koszt liczony według jego cen
   our_prices_checked_on: 2026-11-02
   our_prices_per_1m_tokens:
     gemini-3.6-flash: {input: 0.75, output: 3.75}       # do 2026-12-31; od 2027-01-01: 1.50 / 7.50
@@ -198,6 +205,19 @@ prompts:
     Pola rabatu: wypełniaj je tylko tym, co mówi menedżer, albo tym, co jasno wynika
     z wcześniejszej rozmowy. Flagi (clearance, strategic_account, competitor_offer):
     null, gdy wiadomość o nich nie wspomina; true albo false tylko wtedy, gdy wspomina.
+  judge_system: |                 # NASZE (ADR-0008), wersja 1. Kurs zostawia rubrykę sędziego studentowi (krok 4 MP2)
+    Jesteś sędzią, który ocenia odpowiedzi Kovalo Decision Copilot. Dostajesz pytanie,
+    kontekst (fragmenty dokumentów, które widział oceniany model), ocenianą odpowiedź
+    i odpowiedź wzorcową.
+    correct: true, jeśli oceniana odpowiedź podaje kluczowe fakty z odpowiedzi wzorcowej
+    i żadnemu z nich nie przeczy. Dodatkowe szczegóły nie obniżają oceny, jeśli kontekst
+    je potwierdza. Inne sformułowanie, odmiana słów, zapis liczb (94,6% i 94.6%) oraz
+    równoważne nazwy stanowisk (CFO i dyrektor finansowy) nie są błędem. Zaprzeczenie
+    faktu („nie CFO”) oznacza, że faktu brakuje.
+    grounded: true, jeśli każde twierdzenie odpowiedzi wynika z kontekstu. Twierdzenie
+    spoza kontekstu, nawet prawdziwe, oznacza false. Odpowiedź wzorcowa nie jest kontekstem.
+    reason: jedno lub dwa zdania po polsku; wskaż brakujący fakt albo twierdzenie
+    bez pokrycia w kontekście.
 
 db:
   # NASZE (ADR-0006)

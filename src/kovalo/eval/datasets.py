@@ -1,4 +1,7 @@
-"""Zestawy pytań ewaluacyjnych (port helpers/eval_queries.py kursu; kontrakt F1, 7.3)."""
+"""Zestawy pytań ewaluacyjnych (port helpers/eval_queries.py i helpers/gold.py kursu).
+
+Kontrakty: F1 sekcja 7.3, F2 sekcja 8.1.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +11,13 @@ from typing import Any
 
 import yaml
 
-__all__ = ["EvalQuery", "load_eval_queries", "load_mp2_retrieval_queries"]
+__all__ = [
+    "EvalQuery",
+    "GoldQuestion",
+    "load_eval_queries",
+    "load_gold",
+    "load_mp2_retrieval_queries",
+]
 
 
 @dataclass(frozen=True)
@@ -52,3 +61,27 @@ def load_mp2_retrieval_queries(path: Path) -> list[EvalQuery]:
         for q in _read_list(path, "questions")
         if q.get("answerable") is True
     ]
+
+
+@dataclass(frozen=True)
+class GoldQuestion:
+    """Pytanie MP2 z faktami wzorcowymi (port helpers/gold.py; listy jak w kursie)."""
+
+    id: str
+    question: str
+    answerable: bool
+    relevant_docs: list[str]
+    requires_all: bool
+    evidence_facts: list[list[str]]  # każdy fakt: lista akceptowanych wariantów
+    key_facts: list[list[str]]
+    reference: str
+
+
+def load_gold(path: Path) -> list[GoldQuestion]:
+    """Pytania MP2 (klucz "questions"). Brak pliku → FileNotFoundError; zły kształt → ValueError."""
+    path = Path(path)
+    items = _read_list(path, "questions")
+    try:
+        return [GoldQuestion(**q) for q in items]
+    except (KeyError, TypeError) as exc:
+        raise ValueError(f"{path}: każde pytanie musi mieć pola GoldQuestion ({exc})") from exc

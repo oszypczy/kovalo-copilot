@@ -170,3 +170,81 @@ def test_eval_does_not_import_entrypoints():
     assert (SRC / "eval" / "retrieval" / "e1.py").is_file(), "brak eval/retrieval/e1.py"
     forbidden = ("kovalo.cli", "kovalo.api", "kovalo.ui")
     assert _violations(_py_files("eval"), forbidden) == []
+
+
+# ---------------------------------------------------------------------------
+# F2 (kontrakt: docs/contracts/f2.md, sekcja 2.3)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("package", "allowed"),
+    [
+        ("rank_bm25", "knowledge/lexical.py"),
+        ("langchain_text_splitters", "knowledge/chunking.py"),
+    ],
+)
+def test_bm25_and_splitters_isolated(package: str, allowed: str):
+    assert (SRC / allowed).is_file(), f"brak src/kovalo/{allowed}"
+    others = [f for f in SRC.rglob("*.py") if f != SRC / allowed]
+    assert _violations(others, (package,)) == []
+    assert package in {n.split(".")[0] for n in _imports(SRC / allowed)}
+
+
+def test_no_langchain_community():
+    # ADR-0007/0008: BM25 i fuzja bez BM25Retriever/EnsembleRetriever
+    forbidden = ("langchain_community", "langchain_classic.retrievers")
+    assert _violations(sorted(SRC.rglob("*.py")), forbidden) == []
+
+
+def test_f2_modules_exist():
+    for rel in (
+        "knowledge/lexical.py",
+        "knowledge/retrievers.py",
+        "rag/records.py",
+        "rag/citations.py",
+        "rag/answer.py",
+        "rag/factory.py",
+        "eval/llm_cache.py",
+        "eval/rag/scoring.py",
+        "eval/rag/judge.py",
+        "eval/rag/summary.py",
+        "eval/rag/reference.py",
+        "eval/rag/e2.py",
+        "eval/rag/report.py",
+    ):
+        assert (SRC / rel).is_file(), f"brak src/kovalo/{rel}"
+
+
+def test_rag_layering():
+    rag_files = _py_files("rag")
+    factory = SRC / "rag" / "factory.py"
+    assert factory.is_file(), "brak src/kovalo/rag/factory.py"
+    forbidden = (
+        "kovalo.eval",
+        "kovalo.cli",
+        "kovalo.api",
+        "kovalo.ui",
+        "kovalo.workflow",
+        "kovalo.agents",
+        "kovalo.tools",
+        "kovalo.mcp_client",
+        "kovalo.mcp_server",
+        "kovalo.cost",
+    )
+    assert _violations(rag_files, forbidden) == []
+    # kovalo.llm importuje tylko rag/factory.py; answer.py dostaje model przez parametr
+    assert _violations([f for f in rag_files if f != factory], ("kovalo.llm",)) == []
+    assert any(n == "kovalo.llm" or n.startswith("kovalo.llm.") for n in _imports(factory))
+    # knowledge/ jest warstwą niżej niż rag/
+    assert _violations(_py_files("knowledge"), ("kovalo.rag", "kovalo.llm")) == []
+
+
+def test_llm_does_not_import_eval():
+    assert (SRC / "llm.py").is_file()
+    assert _violations([SRC / "llm.py"], ("kovalo.eval",)) == []
+
+
+def test_eval_may_use_rag_but_not_entrypoints():
+    # eval/ może importować rag, knowledge, cost, llm; nadal nie importuje cli/api/ui
+    assert _violations(_py_files("eval"), ("kovalo.cli", "kovalo.api", "kovalo.ui")) == []

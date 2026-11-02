@@ -47,8 +47,8 @@ ENV PATH=/opt/venv/bin:$PATH \
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY config.yaml ./
-# embeddings: cache wektorów (wolumen w compose); reports: wyniki (wolumen/bind mount)
-RUN mkdir -p /app/.cache/embeddings /app/reports && chown -R kovalo:kovalo /app
+# embeddings: cache wektorów, llm: cache odpowiedzi LLM-a w ewaluacjach (wolumeny w compose); reports: wyniki (wolumen/bind mount)
+RUN mkdir -p /app/.cache/embeddings /app/.cache/llm /app/reports && chown -R kovalo:kovalo /app
 USER kovalo
 
 # --- app: api, mcp-server, kovalo ingest|eval|first-call ---

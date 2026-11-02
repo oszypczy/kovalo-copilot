@@ -1,0 +1,39 @@
+# Komentarze z przeglądu ręcznego raportu E2 (kontrakt F2, 14.3).
+# Generator (`kovalo eval e2`) wstawia je do sekcji „Rozbieżności przejrzane ręcznie”.
+# Wygenerowanego Markdownu nie edytujemy; komentarze zmieniamy tutaj.
+# Klucz wpisu: etykieta `<strona>-<wariant>` + id pytania. answer_digest: skrót odpowiedzi,
+# której dotyczy komentarz (raport pokazuje go jako „odpowiedź #…”).
+version: 1
+reviewed_on: 2026-11-02
+intro: |
+  Przegląd T2 (2026-11-02) na podstawie answers.ours-*.json i live_report.ours-*.json.
+  Pierwszy przebieg na Flash-Lite (po zmianie modelu odpowiedzi i sędziego na gemini-3.5-flash-lite):
+  20261102-153627-87b0e6c8, 11 wywołań LLM-a, 31 z cache. W tamtym przebiegu M07 hybrid miał
+  pokrycie 0,00 przed poprawką `normalize_text` (pomija zerowe ułamki „,00”; test
+  `test_zero_decimals_do_not_hide_a_found_fact`). Ten raport przeliczono z cache (`--cache-only`)
+  po poprawce, więc tabele wyżej pokazują już skorygowane pokrycie M07 hybrid.
+  Rekomendacja pozostaje „vector” (hit@1: ctx 10, hybrid 9).
+items:
+  - variants: [ours-ctx]
+    id: M04
+    answer_digest: {ours-ctx: 9daaa2b53177}
+    comment: |
+      odmowa uczciwa, ocena trafna; to realne pudło wyszukiwania, nie błąd ewaluatora. Dowód („Forklifts may be operated only by people with valid UDT certification”) leży w PL-601#ctx002, a w top-3 są inne chunki PL-601 (ctx004 „Prohibitions”, ctx003) i MTG-401: pytanie po polsku, chunk po angielsku, e5 premiuje „forklift” w ctx004. Model nie zgadywał i nie halucynował, odpowiedział „dokumenty nie zawierają” (answerable=false, bez odwołań). Hit@1 = ✓ dla dokumentu, ale bez dowodów (hit@k ≠ dowody). Referencja (text-embedding-3-small, ctx) trafia ctx002. Kurs ma tu to samo ryzyko (jego odmowy „bez fraz”: 2).
+  - variants: [ours-hybrid]
+    id: M04
+    answer_digest: {ours-hybrid: a61e55d9b2de}
+    comment: |
+      ta sama przyczyna, gorzej: BM25 nie pomaga w zapytaniu PL do dokumentu EN (brak wspólnych tokenów poza „Gdańsku”), przez co na 1. miejscu jest CON-103#ctx000 („magazynu w Gdańsku”), a PL-601#ctx002 nie ma w top-3. Odmowa poprawna wobec kontekstu. Możliwa poprawa poza zakresem F2: tłumaczenie/rozszerzenie zapytania albo chunki PL-601 z kontekstem w obu językach.
+  - variants: [ours-hybrid]
+    id: M07
+    answer_digest: {ours-hybrid: a4124403a495}
+    comment: |
+      błąd ewaluatora, nie odpowiedzi. Odpowiedź: „powyżej 500 000,00 PLN rocznie”, kontekst: „500 000 PLN”, treść poprawna. Format „,00” wynika z promptu kursu („7296,00 PLN”), a klucz gold ma warianty bez „,00” (data/ jest tylko do odczytu). Sędzia miał rację, pokrycie 0,00 było fałszywie ujemne. Naprawione w scoring.py (jedna linia) + test regresyjny; po poprawce pokrycie 1,00. Uzasadnienie sędziego jest ogólnikowe („próg kwotowy”), nie wymienia liczby, więc samo nie dowodzi, że kwotę sprawdził.
+  - variants: [ours-ctx, ours-hybrid]
+    id: M09
+    answer_digest: {ours-ctx: f7bb94e91afb, ours-hybrid: 875f51e6f54c}
+    comment: |
+      brak na liście automatycznej (pokrycie 1,00, sędzia tak/tak), ale przegląd uzasadnień znalazł przepuszczony błąd. Odpowiedzi przesadzają: „klienci przechodzą do Hurtix głównie z powodu lepszych cen” (ctx i hybrid), hybrid dodaje, że ceny były „główną przyczyną” odejścia dla 29% klientów. Z REP-302#ctx002 wynika co innego: główna przyczyna to spóźnione/niekompletne dostawy (38%), ceny są drugie (29%); wzorzec mówi „jedną z głównych przyczyn”. Sędzia (ten sam model co odpowiedź) uznał obie za poprawne i w pełni oparte na kontekście. To samoocena: sędzia powtarza sformułowanie odpowiedzi i nie weryfikuje go względem tabeli. Pokrycie fraz („ceny”) też tego nie wychwytuje. Wniosek: „sędzia 9/9” to górna granica jakości, nie dowód poprawności; do rozważenia sędzia z innego modelu (gemini-3.6-flash, limit 20/dzień) albo ręczna próbka.
+notes:
+  - "Pozostałe uzasadnienia sędziego (M01–M03, M05, M06, M08, M10, oba warianty): sprawdzone z kontekstem i wzorcem, odpowiedzi poprawne. Uzasadnienia są szablonowe („zgodne z odpowiedzią wzorcową i kontekstem”), bez cytowania liczb, więc słabo audytowalne. M01 hybrid: poprawne, ale zbędnie wtrąca progi 5–12% w nawiasie; M08 hybrid: dopisek „nawet jeśli mniej niż 5%” jest w kontekście (POL-001#ctx003)."
+  - "Odmowy M11, M12: poprawne w obu wariantach, nie wymagają komentarza (odmowa ≠ błąd)."

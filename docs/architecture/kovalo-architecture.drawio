@@ -45,7 +45,7 @@
                 <mxCell id="e6" edge="1" parent="compose" source="mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;exitX=0.75;exitY=1;entryX=0.75;entryY=0;" target="data" value="dane firmy">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="gemini" parent="1" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;Gemini API&lt;/b&gt;&lt;br&gt;Flash, darmowy tier&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;LLM domyślny&lt;/font&gt;" vertex="1">
+                <mxCell id="gemini" parent="1" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;Gemini API&lt;/b&gt;&lt;br&gt;Flash-Lite → Flash, darmowy tier&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;LLM domyślny i fallback&lt;/font&gt;" vertex="1">
                     <mxGeometry height="110" width="210" x="310" y="20" as="geometry"/>
                 </mxCell>
                 <mxCell id="langsmith" parent="1" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;dashed=1;fillColor=#ffffff;strokeColor=#666666;" value="&lt;b&gt;LangSmith&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;tracing (opcjonalnie)&lt;/font&gt;" vertex="1">
@@ -228,7 +228,7 @@
                 <mxCell id="lane1" parent="1" style="rounded=1;arcSize=4;align=left;verticalAlign=top;spacingLeft=10;spacingTop=4;fillColor=#f8f9fa;strokeColor=#999999;dashed=1;whiteSpace=wrap;html=1;" value="&lt;b&gt;Przepływ 1: indeksowanie&lt;/b&gt; – jednorazowo, &lt;i&gt;make ingest&lt;/i&gt; (i po zmianie dokumentów)" vertex="1">
                     <mxGeometry height="170" width="1430" x="20" y="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="lane2" parent="1" style="rounded=1;arcSize=4;align=left;verticalAlign=top;spacingLeft=10;spacingTop=4;fillColor=#f8f9fa;strokeColor=#999999;dashed=1;whiteSpace=wrap;html=1;" value="&lt;b&gt;Przepływ 2: wyszukiwanie&lt;/b&gt; – przy każdym zapytaniu, w mcp-server" vertex="1">
+                <mxCell id="lane2" parent="1" style="rounded=1;arcSize=4;align=left;verticalAlign=top;spacingLeft=10;spacingTop=4;fillColor=#f8f9fa;strokeColor=#999999;dashed=1;whiteSpace=wrap;html=1;" value="&lt;b&gt;Przepływ 2: wyszukiwanie&lt;/b&gt; – przy każdym zapytaniu, w api (F2–F4) i mcp-server (F5); retrieval.mode: vector (domyślnie, decyzja po E2) albo hybrid" vertex="1">
                     <mxGeometry height="250" width="1430" x="20" y="250" as="geometry"/>
                 </mxCell>
                 <mxCell id="src" parent="1" style="shape=note;size=14;fillColor=#ffffff;strokeColor=#666666;whiteSpace=wrap;html=1;" value="&lt;b&gt;data/corpus&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;18 × .md + catalog.csv&lt;/font&gt;" vertex="1">
@@ -249,22 +249,22 @@
                 <mxCell id="emb" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;CacheBackedEmbeddings&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;fastembed (lokalnie), osobny cache dokumentów i pytań&lt;/font&gt;" vertex="1">
                     <mxGeometry height="70" width="180" x="1050" y="110" as="geometry"/>
                 </mxCell>
-                <mxCell id="pgv" parent="1" style="shape=cylinder3;boundedLbl=1;size=10;fillColor=#fff2cc;strokeColor=#d6b656;whiteSpace=wrap;html=1;" value="&lt;b&gt;PGVectorStore&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;tabela kovalo_ctx (F2)&lt;br&gt;kovalo_mp1 (F1)&lt;br&gt;+ kovalo_index_meta&lt;/font&gt;" vertex="1">
-                    <mxGeometry height="100" width="140" x="1280" y="95" as="geometry"/>
+                <mxCell id="pgv" parent="1" style="shape=cylinder3;boundedLbl=1;size=10;fillColor=#fff2cc;strokeColor=#d6b656;whiteSpace=wrap;html=1;" value="&lt;b&gt;PGVectorStore&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;kovalo_ctx: 87 chunków z kontekstem&lt;br&gt;kovalo_mp1: 47 chunków MP1 (E1/E2)&lt;br&gt;+ kovalo_index_meta&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="130" width="160" x="1270" y="80" as="geometry"/>
                 </mxCell>
                 <mxCell id="q" parent="1" style="ellipse;fillColor=#f5f5f5;strokeColor=#666666;whiteSpace=wrap;html=1;" value="pytanie /&lt;br&gt;search_documents(question)" vertex="1">
                     <mxGeometry height="70" width="200" x="40" y="340" as="geometry"/>
                 </mxCell>
-                <mxCell id="vec" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;wyszukiwanie wektorowe&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;embedding pytania → cosine → top 3&lt;/font&gt;" vertex="1">
+                <mxCell id="vec" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;wyszukiwanie wektorowe&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;embedding pytania → cosine → top 3 (vector) albo top 10 (hybryda)&lt;/font&gt;" vertex="1">
                     <mxGeometry height="70" width="200" x="560" y="300" as="geometry"/>
                 </mxCell>
-                <mxCell id="bm25" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;BM25Retriever&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;słowa kluczowe, dokładne id (SUP-114) → top 3; indeks w pamięci, budowany przy starcie z chunków z Postgresa&lt;/font&gt;" vertex="1">
+                <mxCell id="bm25" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;BM25 (rank-bm25)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;tokeny po casefold, SUP-114 to jeden token → top 10; indeks w pamięci, budowany przy starcie z korpusu (zgodność z n_chunks w kovalo_index_meta)&lt;/font&gt;" vertex="1">
                     <mxGeometry height="80" width="200" x="560" y="400" as="geometry"/>
                 </mxCell>
-                <mxCell id="ens" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;EnsembleRetriever&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;fuzja rankingów (RRF): do 6 kandydatów, duplikaty łączone → top 3 (PINNED)&lt;/font&gt;" vertex="1">
+                <mxCell id="ens" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;fuzja RRF (własna)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Σ waga / (60 + pozycja), wagi 0,5 / 0,5, duplikaty łączone po chunk_id → top 3 (PINNED)&lt;/font&gt;" vertex="1">
                     <mxGeometry height="80" width="200" x="860" y="340" as="geometry"/>
                 </mxCell>
-                <mxCell id="rag" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;RAG / agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;odpowiedź ze schematem i cytowaniami&lt;/font&gt;" vertex="1">
+                <mxCell id="rag" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;rag.answer_question / agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;RunRecord: Answer z cytowaniami (strona 4)&lt;/font&gt;" vertex="1">
                     <mxGeometry height="70" width="180" x="1250" y="345" as="geometry"/>
                 </mxCell>
                 <mxCell id="i1" edge="1" parent="1" source="src" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" target="load" value="">
@@ -298,15 +298,56 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="i10" edge="1" parent="1" source="vec" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;exitX=1;exitY=0.5;entryX=0;entryY=0.3;" target="ens" value="3">
+                <mxCell id="i10" edge="1" parent="1" source="vec" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;exitX=1;exitY=0.5;entryX=0;entryY=0.3;" target="ens" value="10">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="i11" edge="1" parent="1" source="bm25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;exitX=1;exitY=0.5;entryX=0;entryY=0.7;" target="ens" value="3">
+                <mxCell id="i11" edge="1" parent="1" source="bm25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;exitX=1;exitY=0.5;entryX=0;entryY=0.7;" target="ens" value="10">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="i12" edge="1" parent="1" source="ens" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" target="rag" value="3 chunki&amp;nbsp;">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram id="rag-e2" name="4. Odpowiedź ze źródłami i E2">
+        <mxGraphModel dx="1134" dy="704" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="620" math="0" shadow="0" adaptiveColors="auto">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="r_title" parent="1" style="text;html=1;fontSize=18;align=left;verticalAlign=middle;" value="&lt;b&gt;Odpowiedź ze źródłami (rag) i ewaluacja E2&lt;/b&gt;" vertex="1"><mxGeometry x="40" y="10" width="900" height="30" as="geometry"/></mxCell>
+                <mxCell id="laneA" parent="1" style="rounded=1;arcSize=4;align=left;verticalAlign=top;spacingLeft=10;spacingTop=4;fillColor=#f8f9fa;strokeColor=#999999;dashed=1;whiteSpace=wrap;html=1;" value="&lt;b&gt;Odpowiedź&lt;/b&gt; – rag.answer_question; w aplikacji od F3 (węzeł answer_documents)" vertex="1"><mxGeometry x="20" y="50" width="1430" height="170" as="geometry"/></mxCell>
+                <mxCell id="laneB" parent="1" style="rounded=1;arcSize=4;align=left;verticalAlign=top;spacingLeft=10;spacingTop=4;fillColor=#f8f9fa;strokeColor=#999999;dashed=1;whiteSpace=wrap;html=1;" value="&lt;b&gt;Ewaluacja E2&lt;/b&gt; – kovalo eval e2 (make eval STAGE=e2); bez --with-llm zero wywołań LLM-a" vertex="1"><mxGeometry x="20" y="250" width="1430" height="350" as="geometry"/></mxCell>
+                <mxCell id="a_q" parent="1" style="ellipse;fillColor=#f5f5f5;strokeColor=#666666;whiteSpace=wrap;html=1;" value="pytanie" vertex="1"><mxGeometry x="40" y="110" width="140" height="70" as="geometry"/></mxCell>
+                <mxCell id="a_ret" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;Retriever&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;vector (cosine) albo hybrid (BM25 + RRF), top 3 (PINNED); strona 3&lt;/font&gt;" vertex="1"><mxGeometry x="220" y="110" width="200" height="70" as="geometry"/></mxCell>
+                <mxCell id="a_prompt" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;build_prompt&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;prompts.answer_system (PINNED), bloki [doc_id]&lt;/font&gt;" vertex="1"><mxGeometry x="460" y="110" width="190" height="70" as="geometry"/></mxCell>
+                <mxCell id="a_model" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;get_structured_model(Answer)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;with_structured_output(include_raw=True) na modelu głównym i fallbacku&lt;/font&gt;" vertex="1"><mxGeometry x="690" y="110" width="230" height="70" as="geometry"/></mxCell>
+                <mxCell id="a_gem" parent="1" style="ellipse;shape=cloud;fillColor=#ffffff;strokeColor=#666666;whiteSpace=wrap;html=1;" value="&lt;b&gt;Gemini API&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;3.5 Flash-Lite → 3.6 Flash&lt;/font&gt;" vertex="1"><mxGeometry x="960" y="60" width="170" height="80" as="geometry"/></mxCell>
+                <mxCell id="a_rec" parent="1" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;whiteSpace=wrap;html=1;" value="&lt;b&gt;RunRecord&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;kontekst, prompt, Answer {answer, citations, answerable} albo error, tokeny, model&lt;/font&gt;" vertex="1"><mxGeometry x="1180" y="110" width="240" height="70" as="geometry"/></mxCell>
+                <mxCell id="b_gold" parent="1" style="shape=note;size=14;fillColor=#ffffff;strokeColor=#666666;whiteSpace=wrap;html=1;" value="&lt;b&gt;data/eval&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;mini_project_2_questions.yaml: 12 pytań, frazy dowodowe, fakty, wzorzec&lt;/font&gt;" vertex="1"><mxGeometry x="40" y="300" width="160" height="80" as="geometry"/></mxCell>
+                <mxCell id="b_var" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;3 warianty × 2 strony&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;chunki MP1 / z kontekstem / hybryda; embeddingi kursu (cache) / e5 z configu&lt;/font&gt;" vertex="1"><mxGeometry x="240" y="300" width="200" height="80" as="geometry"/></mxCell>
+                <mxCell id="b_l12" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;poziomy 1–2 (bez LLM-a)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;hit@1, hit@3, frazy dowodowe w znalezionym tekście, tokeny promptu&lt;/font&gt;" vertex="1"><mxGeometry x="480" y="300" width="210" height="80" as="geometry"/></mxCell>
+                <mxCell id="b_rep" parent="1" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;whiteSpace=wrap;html=1;" value="&lt;b&gt;raport&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;reports/mp2/&amp;lt;data&amp;gt;-e2.md + JSON w kształcie kursu; liczba wywołań LLM-a&lt;/font&gt;" vertex="1"><mxGeometry x="1210" y="300" width="210" height="80" as="geometry"/></mxCell>
+                <mxCell id="b_ans" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;answer_question&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;--with-llm, warianty z --variants&lt;/font&gt;" vertex="1"><mxGeometry x="480" y="430" width="210" height="70" as="geometry"/></mxCell>
+                <mxCell id="b_score" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;score_record (bez LLM-a)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;outcome, pokrycie dowodów i faktów, odwołania, odmowy&lt;/font&gt;" vertex="1"><mxGeometry x="730" y="430" width="210" height="70" as="geometry"/></mxCell>
+                <mxCell id="b_judge" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;judge_record&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Verdict {correct, grounded, reason}, prompt judge_system; tylko odpowiedzi&lt;/font&gt;" vertex="1"><mxGeometry x="980" y="430" width="200" height="70" as="geometry"/></mxCell>
+                <mxCell id="b_sum" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;summarise&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;4 poziomy z mianownikami kursu, obok referencji&lt;/font&gt;" vertex="1"><mxGeometry x="1210" y="430" width="210" height="70" as="geometry"/></mxCell>
+                <mxCell id="b_cache" parent="1" style="shape=cylinder3;boundedLbl=1;size=10;fillColor=#fff2cc;strokeColor=#d6b656;whiteSpace=wrap;html=1;" value="&lt;b&gt;JsonFileLlmCache&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;paths.llm_cache_dir; powtórka = 0 wywołań&lt;/font&gt;" vertex="1"><mxGeometry x="840" y="520" width="180" height="70" as="geometry"/></mxCell>
+                <mxCell id="ra1" edge="1" parent="1" source="a_q" target="a_ret" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value=""><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="ra2" edge="1" parent="1" source="a_ret" target="a_prompt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value="3 chunki"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="ra3" edge="1" parent="1" source="a_prompt" target="a_model" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value=""><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="ra4" edge="1" parent="1" source="a_model" target="a_gem" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;dashed=1;exitX=0.75;exitY=0;entryX=0;entryY=0.5;" value="HTTP"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="ra5" edge="1" parent="1" source="a_model" target="a_rec" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value=""><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="rb1" edge="1" parent="1" source="b_gold" target="b_var" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value=""><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="rb2" edge="1" parent="1" source="b_var" target="b_l12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value=""><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="rb3" edge="1" parent="1" source="b_l12" target="b_rep" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value=""><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="rb4" edge="1" parent="1" source="b_var" target="b_ans" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;exitX=0.5;exitY=1;entryX=0;entryY=0.5;" value=""><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="rb5" edge="1" parent="1" source="b_ans" target="b_score" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value="RunRecord"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="rb6" edge="1" parent="1" source="b_score" target="b_judge" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value=""><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="rb7" edge="1" parent="1" source="b_judge" target="b_sum" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value=""><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="rb8" edge="1" parent="1" source="b_sum" target="b_rep" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" value=""><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="rb9" edge="1" parent="1" source="b_cache" target="b_ans" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;dashed=1;exitX=0;exitY=0.5;entryX=0.5;entryY=1;" value="odpowiedzi"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="rb10" edge="1" parent="1" source="b_cache" target="b_judge" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;dashed=1;exitX=1;exitY=0.5;entryX=0.5;entryY=1;" value="werdykty"><mxGeometry relative="1" as="geometry"/></mxCell>
             </root>
         </mxGraphModel>
     </diagram>

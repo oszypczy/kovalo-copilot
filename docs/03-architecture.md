@@ -1,6 +1,6 @@
 # 03. Architektura
 
-Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-architecture.drawio). Plik ma trzy strony: kontenery, graf copilota i przepływ danych w indeksowaniu. Eksporty PNG leżą obok pliku.
+Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-architecture.drawio). Plik ma cztery strony: kontenery, graf copilota, indeksowanie i wyszukiwanie, odpowiedź ze źródłami i ewaluacja E2. Eksporty PNG leżą obok pliku.
 
 ![Kontenery](architecture/kovalo-architecture-1-containers.png)
 
@@ -13,7 +13,7 @@ Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-archit
 | `mcp-server` | FastMCP (`mcp` SDK), streamable HTTP (`/mcp`) | 8765 | 6 narzędzi tylko do odczytu, zasoby (dokumenty), prompt; dostęp do indeksu i danych firmy |
 | `postgres` | `pgvector/pgvector:pg16` | 5432 | indeks wektorowy (`langchain-postgres`, `PGVectorStore`: tabela na kolekcję), checkpointy LangGraph (`langgraph-checkpoint-postgres`), zapisy przebiegów |
 
-Indeksowanie i ewaluacja to **nie osobne usługi**, tylko polecenia CLI (`kovalo ingest`, `kovalo eval`) uruchamiane jednorazowo w obrazie `api`: `make ingest` = `docker compose run --rm api kovalo ingest` (korpus → chunki z kontekstem → embeddingi → upsert do pgvector), `make eval STAGE=e2` = `docker compose run --rm api kovalo eval e2` (raport w `reports/`, montowanym jako wolumen).
+Indeksowanie i ewaluacja to **nie osobne usługi**, tylko polecenia CLI (`kovalo ingest`, `kovalo eval`) uruchamiane jednorazowo w obrazie `api`: `make ingest` = `docker compose run --rm api kovalo ingest` (korpus → chunki MP1 i chunki z kontekstem → embeddingi → podmiana tabel `kovalo_mp1` i `kovalo_ctx`), `make eval STAGE=e2` = `docker compose run --rm api kovalo eval e2` (raport w `reports/`, montowanym jako wolumen).
 
 Zewnętrznie: **Gemini API** (domyślny LLM, darmowy klucz z Google AI Studio), opcjonalnie **LangSmith** (tracing, darmowy plan dla jednej osoby).
 
@@ -31,12 +31,12 @@ make ingest ──> data/corpus ──> chunki ──> fastembed ──> pgvecto
 ```
 src/kovalo/
   config.py          ustawienia: config.yaml (PINNED z kursu) + .env (pydantic-settings), get_settings()
-  llm.py             fabryka modeli: init_chat_model(provider), rate limiter, fallback Flash → Flash-Lite; fabryka embeddingów (F1)
+  llm.py             fabryka modeli: init_chat_model(provider), rate limiter, fallback Flash-Lite → Flash (ADR-0006); fabryka embeddingów (F1)
   health.py          wspólny format /health i sprawdzenia (Postgres, HTTP, klucz LLM-a)
   cli.py             polecenie `kovalo`: first-call, ingest, eval
-  knowledge/         MP1/MP2: loader, tokeny, chunking (zwykły i z kontekstem), embeddingi, vector store, retriever (+ hybryda BM25)
+  knowledge/         MP1/MP2: loader, chunking (zwykły i z kontekstem), embeddingi, vector store, BM25 (rank-bm25), Retriever (wektorowy | hybryda RRF)
   cost/              MP1: tokenizer o200k_base, scenariusz kosztów, licznik kosztów per tura
-  rag/               MP2: odpowiedź ze źródłami (structured output), rekord przebiegu
+  rag/               MP2: schematy Answer/Verdict, rekord przebiegu, normalizacja odwołań, answer_question (model przez parametr)
   policy/            MP3: silnik polityki course-v1 (czysty kod, zero LLM-a)
   company/           MP4: odczyt danych firmy, kalkulator kary (Decimal, grosze)
   tools/             MP4: narzędzia LangChain (@tool) z kontraktami wyników i polem status
@@ -44,12 +44,12 @@ src/kovalo/
   workflow/          MP3/MP5: stan, węzły, graf copilota, parser odpowiedzi człowieka
   mcp_server/        MP5: FastMCP, transport stdio + streamable-http
   mcp_client/        MP5: połączenie, limity czasu, klasy błędów, walidacja structuredContent
-  eval/              MP1–MP5: retrieval, rag (4 poziomy + sędzia), dialogues, trace (5 testów), assistant
+  eval/              MP1–MP5: retrieval (E1), rag (E2: 4 poziomy + sędzia), cache LLM-a na dysku, dialogues, trace (5 testów), assistant
   api/               FastAPI: routery, schematy, zależności (graf, checkpointer)
   ui/                Chainlit (app.py) zamontowany w FastAPI (server.py, /health); renderowanie kroków, pauz i źródeł
 ```
 
-Punkty wejścia: `kovalo` (CLI), `kovalo-api`, `kovalo-ui`, `kovalo-mcp`. Kontrakty modułów fundamentu (`config`, `llm`, `health`, `cli`) opisuje [contracts/f0.md](contracts/f0.md), a modułów wiedzy i kosztów (`knowledge`, `cost`, `eval` E1) [contracts/f1.md](contracts/f1.md).
+Punkty wejścia: `kovalo` (CLI), `kovalo-api`, `kovalo-ui`, `kovalo-mcp`. Kontrakty modułów fundamentu (`config`, `llm`, `health`, `cli`) opisuje [contracts/f0.md](contracts/f0.md), modułów wiedzy i kosztów (`knowledge`, `cost`, `eval` E1) [contracts/f1.md](contracts/f1.md), a odpowiedzi ze źródłami i E2 (`rag`, `knowledge` z hybrydą, `eval/rag`) [contracts/f2.md](contracts/f2.md).
 
 Zasady zależności (sprawdzane w review):
 - `policy/`, `company/`, `cost/` nie importują LangChaina ani niczego z LLM-em: to deterministyczny rdzeń.
@@ -58,6 +58,8 @@ Zasady zależności (sprawdzane w review):
 - `api/` i `ui/` nie zawierają logiki biznesowej. `ui/` nie importuje `llm`, `workflow`, `agents`, `tools`, `knowledge`, `rag`: rozmawia z `api` przez HTTP.
 - Tylko `llm.py` importuje integracje dostawców (`langchain_google_genai`, `langchain_openai`) i `init_chat_model`. `config.py` i `health.py` nie importują LangChaina.
 - `fastembed` importuje tylko `knowledge/embeddings.py`, `langchain_postgres` tylko `knowledge/pgvector.py`, `tiktoken` tylko `cost/tokens.py`. `knowledge/` i `cost/` nie importują `llm`: model embeddingów dostają przez parametr z `llm.get_embeddings()` ([contracts/f1.md §2.3](contracts/f1.md)).
+- `rank_bm25` importuje tylko `knowledge/lexical.py`, `langchain_text_splitters` tylko `knowledge/chunking.py`; `langchain_community` nigdzie ([ADR-0008](adr/0008-rag-hybrid-e2.md)).
+- Generacja RAG żyje w `rag/`: `answer_question` dostaje `Retriever` i model przez parametr, a `kovalo.llm` importuje tylko `rag/factory.py`. `knowledge/` nie importuje `rag/`; `rag/` nie importuje `eval/`, `workflow/`, `api/`, `ui/`. `llm.py` dostaje cache LLM-a parametrem i nie importuje `eval/` ([contracts/f2.md §2.3](contracts/f2.md)).
 - Nazwy modeli (czatu i embeddingów) są tylko w `config.yaml` (model embeddingów także w `ARG` Dockerfile, pilnowanym testem). Część zasad sprawdza test `tests/architecture/test_dependencies.py`.
 
 ## 3. Graf copilota (LangGraph)
@@ -75,7 +77,7 @@ START → understand ─┬─ document_question ─> answer_with_tools  (agent 
 - **Stan** (`CopilotState`, TypedDict): `messages` (z reducerem `add_messages`), `turn` (kind, request_action, standalone, pola rabatu), `request` (aktualny wniosek: warunki, wersja, wymagane role, decyzje), `status`, `trace`, `usage`.
 - **Checkpointer:** `PostgresSaver`; `thread_id` = identyfikator rozmowy w UI. Pauza przetrwa restart kontenera.
 - **Pauzy:** `interrupt({"kind": "clarify_margin" | "approval", "role": ..., "request": ...})`; API zwraca ładunek pauzy, UI pokazuje przyciski, odpowiedź wraca jako `Command(resume=...)`.
-- **Węzeł `answer_with_tools`** w MP3 to RAG z FR-2; w MP5 podmieniamy go na agenta z narzędziami MCP. Implementujemy to jako fabrykę grafu z parametrem `document_answerer`, więc obie wersje istnieją i są testowane.
+- **Węzeł `answer_with_tools`** w MP3 to RAG z FR-2 (`rag.build_document_answerer` → `RunRecord`, [contracts/f2.md §7.4](contracts/f2.md)); w MP5 podmieniamy go na agenta z narzędziami MCP. Implementujemy to jako fabrykę grafu z parametrem `document_answerer`, więc obie wersje istnieją i są testowane.
 
 ## 4. Kontrakty
 
@@ -98,7 +100,15 @@ Każde narzędzie zwraca słownik z polem `status` (`ok / no_data / unknown_supp
 
 ![Indeksowanie](architecture/kovalo-architecture-3-ingest.png)
 
-`catalog.csv` + `corpus/*.md` → `Document` z metadanymi → `MarkdownHeaderTextSplitter` → `RecursiveCharacterTextSplitter(800/120)` → nagłówek `<tytuł> > <sekcja>` → `CacheBackedEmbeddings(fastembed)` (osobny cache dokumentów i pytań) → `PGVectorStore` (tabela `kovalo_ctx` od F2; w F1 chunki MP1 w `kovalo_mp1`) + indeks BM25 (w pamięci, budowany przy starcie z tych samych chunków). `kovalo ingest` buduje tabelę obok i podmienia ją w jednej transakcji, a model i wymiar zapisuje w `kovalo_index_meta` ([ADR-0007](adr/0007-knowledge-index-f1.md)).
+`catalog.csv` + `corpus/*.md` → `Document` z metadanymi → `MarkdownHeaderTextSplitter` → `RecursiveCharacterTextSplitter(800/120)` → nagłówek `<tytuł> > <sekcja>` (87 chunków, id `<doc_id>#ctxNNN`) → `CacheBackedEmbeddings(fastembed)` (osobny cache dokumentów i pytań) → `PGVectorStore`, tabela `kovalo_ctx`. Obok, do porównań E1/E2, chunki MP1 (47) w `kovalo_mp1`. `kovalo ingest` buduje każdą tabelę obok i podmienia ją w jednej transakcji, a model, wymiar i liczbę chunków zapisuje w `kovalo_index_meta` ([ADR-0007](adr/0007-knowledge-index-f1.md)).
+
+Wyszukiwanie (`knowledge.Retriever`): tryb `retrieval.mode` = `vector` (cosine, top 3) albo `hybrid`: top 10 z wektorów i top 10 z BM25 (`rank-bm25`, indeks w pamięci budowany przy starcie z korpusu, zgodność sprawdzana z `kovalo_index_meta.n_chunks`) → ważona Reciprocal Rank Fusion → top 3 ([ADR-0008](adr/0008-rag-hybrid-e2.md)). Domyślnie `vector`: w E2 z e5 hybryda nie dała przewagi (hit@1 9/10 wobec 10/10, reszta remis), a `hybrid` zostaje do włączenia w configu.
+
+## 5a. Odpowiedź ze źródłami i E2
+
+![RAG i E2](architecture/kovalo-architecture-4-rag.png)
+
+`rag.answer_question`: pytanie → `Retriever` (top 3) → `build_prompt(answer_system)` → `get_structured_model(Answer)` (Gemini z fallbackiem, `include_raw=True`) → `RunRecord` (kontekst, prompt, `Answer` albo błąd, tokeny, model). Ewaluacja E2 ocenia rekord bez LLM-a (`score_record`: dowody, fakty, odwołania, odmowy) i sędzią (`judge_record`, prompt `judge_system`), a odpowiedzi modeli trzyma w cache na dysku (`paths.llm_cache_dir`), więc powtórny przebieg nie zużywa limitu ([contracts/f2.md §8](contracts/f2.md)).
 
 ## 6. Obserwowalność i koszty
 

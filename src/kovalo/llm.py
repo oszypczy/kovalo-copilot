@@ -1,7 +1,8 @@
 """Fabryka modeli: czat (init_chat_model, rate limiter, fallback) i embeddingi (F1).
 
-Kontrakt: docs/contracts/f0.md, sekcja 5 i docs/contracts/f1.md, sekcja 6;
-decyzje: ADR-0002, ADR-0003, ADR-0006, ADR-0007.
+Kontrakt: docs/contracts/f0.md, sekcja 5, docs/contracts/f1.md, sekcja 6
+i docs/contracts/f2.md, sekcja 6 (structured output, cache, params per cel);
+decyzje: ADR-0002, ADR-0003, ADR-0006, ADR-0007, ADR-0008.
 Jedyny moduł, który importuje integracje dostawców i init_chat_model.
 Nazwy modeli pochodzą wyłącznie z config.yaml.
 """
@@ -13,10 +14,11 @@ import importlib.util
 import threading
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 from langchain.chat_models import init_chat_model
+from langchain_core.caches import BaseCache
 from langchain_core.embeddings import Embeddings
 from langchain_core.exceptions import (
     ModelAPIError,
@@ -29,6 +31,7 @@ from langchain_core.language_models import BaseChatModel, LanguageModelInput
 from langchain_core.messages import BaseMessage
 from langchain_core.rate_limiters import InMemoryRateLimiter
 from langchain_core.runnables import Runnable
+from pydantic import BaseModel
 
 from kovalo.config import (
     ConfigError,
@@ -53,6 +56,7 @@ __all__ = [
     "get_fallback_models",
     "get_reference_embeddings",
     "get_resilient_chat_model",
+    "get_structured_model",
     "override_chat_model",
     "override_embeddings",
     "reset_embeddings",
@@ -80,6 +84,11 @@ _API_KEY_HELP: dict[str, str] = {
 # Rejestr limiterów: jeden na (provider, model) w procesie, wspólny dla wszystkich celów.
 _limiters: dict[tuple[str, str], InMemoryRateLimiter] = {}
 _limiters_lock = threading.Lock()
+
+# Wynik with_structured_output(include_raw=True):
+# {"raw": AIMessage, "parsed": ..., "parsing_error": ...}
+StructuredResult = dict[str, Any]
+StructuredModel = Runnable[LanguageModelInput, StructuredResult]
 
 ModelOverride = BaseChatModel | Callable[[ModelPurpose], BaseChatModel]
 _override: ModelOverride | None = None
@@ -129,6 +138,8 @@ def _build_model(
     spec: ModelSpec,
     *,
     temperature: float | None,
+    params: dict[str, Any],
+    cache: BaseCache | None = None,
 ) -> BaseChatModel:
     llm = settings.llm
     if spec.provider == "openai" and importlib.util.find_spec("langchain_openai") is None:
@@ -144,15 +155,34 @@ def _build_model(
     }
     if temperature is not None:  # null → domyślna temperatura dostawcy
         kwargs["temperature"] = temperature
+    if cache is not None:  # None → bez cache (domyślnie)
+        kwargs["cache"] = cache
     if spec.provider == "google_genai":
-        kwargs.update(llm.params)
+        kwargs.update(params)
     return init_chat_model(spec.model, **kwargs)
 
 
+def _purpose_settings(
+    settings: Settings, purpose: ModelPurpose
+) -> tuple[str, float | None, dict[str, Any]]:
+    """(model, temperatura, params) dla celu: llm.* nadpisane przez llm.purposes[purpose]."""
+    llm = settings.llm
+    override = llm.purposes.get(purpose)
+    model = override.model if override and override.model else llm.model
+    temperature = (
+        override.temperature if override and override.temperature is not None else llm.temperature
+    )
+    params = {**llm.params, **(override.params if override else {})}
+    return model, temperature, params
+
+
 def get_chat_model(
-    purpose: ModelPurpose = "default", *, settings: Settings | None = None
+    purpose: ModelPurpose = "default",
+    *,
+    settings: Settings | None = None,
+    cache: BaseCache | None = None,
 ) -> BaseChatModel:
-    """Model główny z configu (bez fallbacku), z rate limiterem.
+    """Model główny z configu (bez fallbacku), z rate limiterem i opcjonalnym cache.
 
     Dla create_agent (F4: fallback przez ModelFallbackMiddleware).
     """
@@ -161,28 +191,26 @@ def get_chat_model(
         return overridden
     settings = settings or get_settings()
     llm = settings.llm
-    override = llm.purposes.get(purpose)
-    model = override.model if override and override.model else llm.model
-    temperature = (
-        override.temperature if override and override.temperature is not None else llm.temperature
-    )
+    model, temperature, params = _purpose_settings(settings, purpose)
     spec = ModelSpec(provider=llm.provider, model=model, rate_limit=llm.rate_limit)
-    return _build_model(settings, spec, temperature=temperature)
+    return _build_model(settings, spec, temperature=temperature, params=params, cache=cache)
 
 
 def get_fallback_models(
-    purpose: ModelPurpose = "default", *, settings: Settings | None = None
+    purpose: ModelPurpose = "default",
+    *,
+    settings: Settings | None = None,
+    cache: BaseCache | None = None,
 ) -> list[BaseChatModel]:
     """Modele z llm.fallbacks w kolejności z configu, każdy z własnym limiterem."""
     if _override is not None:
         return []
     settings = settings or get_settings()
-    llm = settings.llm
-    override = llm.purposes.get(purpose)
-    temperature = (
-        override.temperature if override and override.temperature is not None else llm.temperature
-    )
-    return [_build_model(settings, spec, temperature=temperature) for spec in llm.fallbacks]
+    _, temperature, params = _purpose_settings(settings, purpose)
+    return [
+        _build_model(settings, spec, temperature=temperature, params=params, cache=cache)
+        for spec in settings.llm.fallbacks
+    ]
 
 
 def with_model_fallbacks(
@@ -202,6 +230,36 @@ def get_resilient_chat_model(
     if _override is not None:
         return primary
     return with_model_fallbacks(primary, get_fallback_models(purpose, settings=settings))
+
+
+def get_structured_model(
+    schema: type[BaseModel],
+    purpose: ModelPurpose = "default",
+    *,
+    settings: Settings | None = None,
+    cache: BaseCache | None = None,
+) -> Runnable[LanguageModelInput, StructuredResult]:
+    """Structured output (include_raw=True) związany z modelem głównym i każdym fallbackiem.
+
+    Fallback tylko dla FALLBACK_EXCEPTIONS (dostępność modelu); błąd parsowania wraca
+    w 'parsing_error' i nie przełącza modelu (ADR-0006 pkt 4, ADR-0008 pkt 5).
+    Brak klucza → MissingConfigError przy budowie, przed jakimkolwiek wywołaniem.
+    """
+    overridden = _overridden(purpose)
+    if overridden is not None:
+        return cast(StructuredModel, overridden.with_structured_output(schema, include_raw=True))
+    primary = get_chat_model(purpose, settings=settings, cache=cache)
+    fallbacks = get_fallback_models(purpose, settings=settings, cache=cache)
+    structured = cast(StructuredModel, primary.with_structured_output(schema, include_raw=True))
+    if not fallbacks:
+        return structured
+    return structured.with_fallbacks(
+        [
+            cast(StructuredModel, fb.with_structured_output(schema, include_raw=True))
+            for fb in fallbacks
+        ],
+        exceptions_to_handle=FALLBACK_EXCEPTIONS,
+    )
 
 
 @contextlib.contextmanager
