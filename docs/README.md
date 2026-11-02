@@ -12,7 +12,7 @@ Projekt łączy pięć miniprojektów kursu TEG w jedną aplikację: asystenta d
 | [06-evaluation.md](06-evaluation.md) | ewaluacja: retrieval, RAG na 4 poziomach, dialogi, trace agenta, cały asystent |
 | [07-roadmap.md](07-roadmap.md) | etapy realizacji i definicja ukończenia każdego z nich |
 | [08-dev-workflow.md](08-dev-workflow.md) | jak pracujemy z Claude Code: subagenci, skille, serwery MCP |
-| [contracts/](contracts/) | kontrakty etapów (moduły, sygnatury, testy) przed implementacją; F0: [contracts/f0.md](contracts/f0.md) |
+| [contracts/](contracts/) | kontrakty etapów (moduły, sygnatury, testy) przed implementacją; F0: [contracts/f0.md](contracts/f0.md), F1: [contracts/f1.md](contracts/f1.md), F2: [contracts/f2.md](contracts/f2.md) |
 | [adr/](adr/) | zapisy decyzji architektonicznych (ADR) |
 | [architecture/](architecture/) | diagramy draw.io (`.drawio` i eksporty PNG) |
 | [course/](course/) | oryginalne materiały kursu: README i CONCEPTS miniprojektów, scenariusz, słownik |

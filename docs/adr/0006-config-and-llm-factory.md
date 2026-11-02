@@ -14,9 +14,9 @@ Stan na 2026-11-01 (ai.google.dev, strony models, pricing, rate-limits, gemini-3
 - `langchain-google-genai` 4.4 mapuje błędy HTTP na klasy `langchain_core.exceptions.Model*Error`.
 
 ## Decyzja
-1. **Modele:** główny `gemini-3.6-flash`, fallback `gemini-3.5-flash-lite` (zmiana z pierwotnego `gemini-3.8-flash`, zob. „Pomiar 2026-11-02”). Konkretne wersje zamiast aliasów `-latest`, żeby ewaluacje dało się powtórzyć. Zmiana modelu to zmiana w `config.yaml` i nowy przebieg ewaluacji.
+1. **Modele:** główny `gemini-3.5-flash-lite`, fallback `gemini-3.6-flash` (od F2, zob. „Pomiar 2026-11-02 (trzeci, F2 / E2)”; wcześniej główny `gemini-3.6-flash` z fallbackiem `gemini-3.5-flash-lite`, a pierwotnie `gemini-3.8-flash`, zob. „Pomiar 2026-11-02”). Konkretne wersje zamiast aliasów `-latest`, żeby ewaluacje dało się powtórzyć. Zmiana modelu to zmiana w `config.yaml` i nowy przebieg ewaluacji.
 2. **Parametry:** `temperature: null` (domyślna dostawcy), `thinking_level: low` (mniej tokenów myślenia w limicie darmowego tieru i krótszy czas odpowiedzi), `max_retries: 1` (bez ponowień w SDK: po przekroczeniu limitu od razu fallback), `timeout_s: 60`.
-3. **Rate limiter:** `InMemoryRateLimiter`, jeden na model w procesie: 0,15 req/s dla Flash, 0,25 req/s dla Flash-Lite, `max_bucket_size: 1`.
+3. **Rate limiter:** `InMemoryRateLimiter`, jeden na model w procesie: 0,25 req/s dla Flash-Lite (główny), 0,15 req/s dla Flash (fallback), `max_bucket_size: 1`.
 4. **Fallback:** tylko przy błędach dostępności (`ModelRateLimitError`, `ModelAPIError`, `ModelNotFoundError`, `ModelConnectionError`, `ModelTimeoutError`, timeout i błąd transportu `httpx`). Bez fallbacku przy 400/401/403, przepełnieniu kontekstu i błędach parsowania.
 5. **Układ `config.yaml`:** sekcje PINNED i `corpus` kopiujemy 1:1 z kursu (pilnuje tego test). Sekcję `llm` kursu zastępujemy naszą (w kursie to „TWÓJ WYBÓR”, nie PINNED). Do `embeddings` dopisujemy `provider` i `local`, nie zmieniając kluczy PINNED. Dodajemy sekcje `db` i `services`. Katalogi wyników `paths.mini_project_N_output_dir` wskazują `reports/mpN`.
 6. **Konfiguracja w kodzie:** `pydantic-settings` ze źródłem YAML; nadpisania z env z prefiksem `KOVALO_` i separatorem `__`. Sekrety pod nazwami z `.env.example`. Brak klucza Gemini nie blokuje startu usług; błąd zgłasza dopiero fabryka modeli.
@@ -71,3 +71,31 @@ Wpływ na kalkulator kosztów:
 - Kolumna Gemini w raporcie E1 jest **dolną granicą**, co raport już podaje. Przy 677 tokenach wyjścia koszt wariantu retrieval po cenach `gemini-3.6-flash` (0,75 / 3,75) rośnie z ok. $15,6 do ok. $25,9 miesięcznie (o ok. 66%). Wariant „cały korpus” rośnie o tę samą kwotę (ok. $10,3), więc przewaga retrieval maleje względnie, ale zostaje.
 - W darmowym tierze koszt jest zerowy, ale tokeny myślenia zużywają limit tokenów na minutę.
 - Rozdział tokenów odpowiedzi i myślenia zapisujemy w rekordzie wywołania (zadanie poprawki w [contracts/f1.md §12](../contracts/f1.md)). Gdyby w E2/E4 myślenie stale przekraczało tokeny odpowiedzi, rozważamy `thinking_level: minimal` dla celów bez rozumowania (np. `answer`), przez `llm.purposes`, bez zmian w kodzie.
+
+
+## Pomiar 2026-11-02 (trzeci, F2 / E2) i zmiana modelu głównego
+
+Przebieg `kovalo eval e2 --with-llm` (24 odpowiedzi + sędzia) wyczerpał dzienny limit `gemini-3.6-flash` po ok. 6 wywołaniach. Odpowiedź 429: `Quota exceeded for metric generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash`, czyli 20 zapytań dziennie (RPD) w darmowym tierze. W raporcie [reports/mp2/2026-11-02-e2.md](../../reports/mp2/2026-11-02-e2.md) 18 z 24 odpowiedzi dał fallback Flash-Lite. Limity liczą się per projekt, a RPD resetuje się o północy czasu pacyficznego.
+
+| Model | Wynik w darmowym tierze | Czas |
+|---|---|---|
+| `gemini-3.6-flash` | 429 po ok. 6 wywołaniach; limit 20 zapytań/dzień | – |
+| `gemini-3.5-flash` | 429; limit 20 zapytań/dzień | – |
+| `gemini-3.5-flash-lite` | ok. 36 zapytań bez 429 | ok. 0,5 s |
+| `gemini-3.7-flash` | `504` | 58,7 s |
+| `gemini-3.8-flash` | `503` | – |
+| `gemini-3.1-flash-lite` | `503` | – |
+| `gemini-2.5-flash-lite` | `404` | – |
+| `gemma-4-26b-a4b-it` | odpowiedź poprawna | 6,5 s |
+
+**Decyzja (właściciel projektu, 2026-11-02):** model główny `gemini-3.5-flash-lite`, fallback `gemini-3.6-flash`.
+- Limit 20 zapytań dziennie nie wystarcza nawet na jeden pełny przebieg E2 (do 48 wywołań), a co dopiero na E3, E4 i UI. Flash-Lite ma wyższy limit i odpowiada najszybciej.
+- `gemini-3.6-flash` zostaje jako fallback, bo jego 20 zapytań dziennie wystarcza na pojedyncze błędy Flash-Lite.
+- Rate limiter: 0,25 req/s dla Flash-Lite (dotychczasowa wartość fallbacku), 0,15 req/s dla Flash.
+- `thinking_level: low` zostaje. `langchain-google-genai` 4.4.2 podaje w profilu `gemini-3.5-flash-lite` poziomy `minimal | low | medium | high` (domyślny `minimal`), więc parametr jest obsługiwany przez oba modele. Oba należą też do modeli ze stałym próbkowaniem (`temperature` ignorowana), co zgadza się z `temperature: null`.
+- `cost.our_model` = `gemini-3.5-flash-lite` (0,30 / 2,50 USD za 1M tokenów), bo kolumna kosztu ma odpowiadać modelowi odpowiedzi. Raport E1 w `reports/mp1/` liczono po cenach `gemini-3.6-flash` i zostaje bez zmian jako zapis pomiaru.
+- Sędzia E2 to domyślnie ten sam model co odpowiedzi (pytanie U3 kontraktu F2). Raport zapisuje model, który faktycznie ocenił każdą odpowiedź (`judged_by`), więc przejście sędziego na fallback jest widoczne.
+
+Konsekwencje:
+- Flash-Lite to mniejszy model, więc wyniki poziomów 3–4 E2 mogą być niższe niż dla Flash. Porównujemy je z referencją kursu w następnym przebiegu E2.
+- Gdy Google podniesie limit Flash albo zacznie odpowiadać `gemini-3.8-flash`, wracamy do Flash jako modelu głównego (zmiana w `config.yaml` i nowy przebieg ewaluacji).

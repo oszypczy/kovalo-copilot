@@ -72,6 +72,7 @@ class PathsConfig(_Section):
     mini_project_4_output_dir: Path
     mini_project_5_conversations: Path
     mini_project_5_output_dir: Path
+    llm_cache_dir: Path  # NASZE (ADR-0008): cache odpowiedzi LLM-a w ewaluacjach
 
 
 class CorpusConfig(_Section):
@@ -140,8 +141,49 @@ class EmbeddingsConfig(_Section):
         return self
 
 
+class Bm25Config(_Section):
+    """Parametry rank_bm25.BM25Okapi (ADR-0008 pkt 3)."""
+
+    k1: float = Field(gt=0)
+    b: float = Field(ge=0, le=1)
+    epsilon: float = Field(ge=0)
+
+
+class HybridWeights(_Section):
+    vector: float = Field(ge=0)
+    bm25: float = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _check_positive_sum(self) -> HybridWeights:
+        if self.vector + self.bm25 <= 0:
+            raise ValueError("weights: suma wag vector i bm25 musi być większa od 0")
+        return self
+
+
+class HybridConfig(_Section):
+    """Hybryda BM25 + wektory z fuzją Reciprocal Rank Fusion (FR-2.5, ADR-0008)."""
+
+    fetch_k: int = Field(ge=1)
+    rrf_c: int = Field(ge=0)
+    weights: HybridWeights
+    bm25: Bm25Config
+
+
+RetrievalMode = Literal["vector", "hybrid"]
+
+
 class RetrievalConfig(_Section):
     top_k: int
+    mode: RetrievalMode = "vector"
+    hybrid: HybridConfig
+
+    @model_validator(mode="after")
+    def _check_fetch_k(self) -> RetrievalConfig:
+        if self.hybrid.fetch_k < self.top_k:
+            raise ValueError(
+                f"hybrid.fetch_k ({self.hybrid.fetch_k}) musi być ≥ top_k ({self.top_k})"
+            )
+        return self
 
 
 class ReferenceLlmConfig(_Section):
@@ -164,6 +206,7 @@ class ModelSpec(_Section):
 class PurposeOverride(_Section):
     model: str | None = None
     temperature: float | None = None
+    params: dict[str, Any] = Field(default_factory=dict)  # nakładane na llm.params (F2, §6)
 
 
 class LlmConfig(_Section):
@@ -243,6 +286,7 @@ class PromptsConfig(_Section):
     understand_system: str
     agent_system: str
     assistant_understand_system: str
+    judge_system: str  # NASZE (ADR-0008), wersja 1: rubryka sędziego E2
 
 
 # Maks. 53 znaki: replace_table dokleja "__new" i "__new_pkey", a Postgres obcina nazwy do 63.

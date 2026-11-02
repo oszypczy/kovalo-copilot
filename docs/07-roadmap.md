@@ -9,7 +9,7 @@ Etapy idą w kolejności miniprojektów, bo każda warstwa korzysta z poprzednie
 | repo, `pyproject.toml` (uv), `ruff`, `mypy`, `pre-commit`, struktura `src/kovalo/` | devops-engineer |
 | `config.yaml` (PINNED z kursu + nasze sekcje `llm`, `embeddings`, `db`), `config.py` (pydantic-settings) | architect → ai-engineer |
 | `docker-compose.yml` z `postgres` (pgvector), szkielety `api`, `ui`, `mcp-server`; `Makefile` | devops-engineer |
-| `llm.py`: fabryka Gemini, rate limiter, fallback Flash → Flash-Lite; test „pierwszego wywołania” | ai-engineer |
+| `llm.py`: fabryka Gemini, rate limiter, fallback między modelami Gemini (kolejność: ADR-0006); test „pierwszego wywołania” | ai-engineer |
 | GitHub Actions: lint + testy unit | devops-engineer |
 
 **Gotowe, gdy:** `docker compose up` startuje Postgresa i puste usługi z `/health`; `make first-call` zwraca odpowiedź Gemini.
@@ -31,6 +31,10 @@ loader z metadanymi, tokeny i kalkulator kosztów, chunking 800/120, fastembed +
 chunki z kontekstem (nagłówki → rozmiar), odpowiedź w schemacie z cytowaniami, rekord przebiegu, ocena 4-poziomowa bez LLM-a, sędzia LLM, hybryda BM25 (FR-2.5), ewaluacja E2.
 
 **Gotowe, gdy:** raport E2 z porównaniem chunki MP1 / z kontekstem / hybryda.
+
+**Kontrakt i zadania:** [contracts/f2.md](contracts/f2.md); decyzje: [ADR-0008](adr/0008-rag-hybrid-e2.md) (przyjęty), zmiana modelu głównego na `gemini-3.5-flash-lite` w [ADR-0006](adr/0006-config-and-llm-factory.md). Budżet: `kovalo eval e2` bez LLM-a, `--with-llm` do 48 wywołań przy domyślnych wariantach, powtórka z cache 0.
+
+**Status (2026-11-02):** kod, testy jednostkowe i architektury, `-m model`, `-m integration` (compose) i `-m live` zielone; E2 zrobione ([raport](../reports/mp2/2026-11-02-e2.md)): poziomy 1–2 referencji odtwarzają `check.py` kursu co do znaku, poziomy 3–4 spełniają cel „≥ referencja − 1” dla `ctx` i `hybrid`, przeliczenie z cache daje 0 wywołań. `retrieval.mode: vector` (ADR-0008). Otwarte przed merge: komentarze z przeglądu ręcznego w `reports/mp2/review.yaml` i raport przeliczony z cache (zadanie P1 w [contracts/f2.md §14.3](contracts/f2.md)). Znane ograniczenia (pytania PL do dokumentów EN, samoocena sędziego) są w ADR-0008 jako kandydaci na F3–F6.
 
 ## F3: workflow decyzyjny (MP3)
 

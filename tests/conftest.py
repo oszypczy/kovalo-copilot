@@ -373,3 +373,46 @@ def reference_settings(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-unty
 
     monkeypatch.setenv("KOVALO_EMBEDDINGS__PROVIDER", "openai_cache")
     return load_settings(google_api_key="test-key")
+
+
+# ---------------------------------------------------------------------------
+# F2 (kontrakt: docs/contracts/f2.md, sekcja 11.1). Importy kodu produkcyjnego wewnątrz fixture'ów.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def ctx_chunks(documents, session_settings):  # type: ignore[no-untyped-def]
+    """Chunki z kontekstem prawdziwego korpusu (87)."""
+    from kovalo.knowledge.chunking import build_contextual_chunks
+
+    return build_contextual_chunks(documents, session_settings.chunking)
+
+
+@pytest.fixture(scope="session")
+def gold(session_settings):  # type: ignore[no-untyped-def]
+    """12 pytań MP2 z faktami wzorcowymi."""
+    from kovalo.eval.datasets import load_gold
+
+    return load_gold(session_settings.paths.mini_project_2_questions)
+
+
+@pytest.fixture
+def toy_store(fake_embeddings):  # type: ignore[no-untyped-def]
+    from kovalo.knowledge.retrieval import build_vector_store
+    from tests.fakes import TOY_CHUNKS
+
+    return build_vector_store(TOY_CHUNKS, fake_embeddings)
+
+
+@pytest.fixture
+def toy_retriever(toy_store):  # type: ignore[no-untyped-def]
+    from kovalo.knowledge.retrievers import VectorRetriever
+
+    return VectorRetriever(toy_store)
+
+
+@pytest.fixture
+def llm_cache(tmp_path: Path):  # type: ignore[no-untyped-def]
+    from kovalo.eval.llm_cache import JsonFileLlmCache
+
+    return JsonFileLlmCache(tmp_path / "llm")

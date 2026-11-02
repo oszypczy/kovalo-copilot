@@ -62,9 +62,9 @@ def test_reference_run_reproduces_course(settings):
     assert ref_cost.full_context_monthly_usd == 69.86
     assert ref_cost.full_to_rag_cost_ratio == 3.9
     ours = ref.cost_ours
-    assert ours.llm_model == settings.cost.our_model == "gemini-3.6-flash"
-    assert ours.rag_monthly_usd == 15.58
-    assert ours.full_context_monthly_usd == 67.65
+    assert ours.llm_model == settings.cost.our_model == "gemini-3.5-flash-lite"
+    assert ours.rag_monthly_usd == 9.17
+    assert ours.full_context_monthly_usd == 30.0
     assert ref.meets_target is True  # 0,9 / 0,9 >= 0,8 / 0,9
     assert ref.pg_consistent is None
     assert report.recommended_model is None  # tylko referencja

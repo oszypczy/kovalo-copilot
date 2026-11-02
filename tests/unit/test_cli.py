@@ -159,8 +159,8 @@ def test_eval_unknown_stage_or_model_exit_2(capsys, fake_embeddings, tmp_path):
     from kovalo.cli import main
     from kovalo.llm import override_embeddings
 
-    assert main(["eval", "e2"]) == 2
-    assert "Etap e2 jeszcze nie istnieje (F2)." in capsys.readouterr().err
+    assert main(["eval", "e3"]) == 2
+    assert "Etap e3 jeszcze nie istnieje (F3)." in capsys.readouterr().err
     with override_embeddings(fake_embeddings):
         assert main(["eval", "e1", "--model", "nieznany", "--out", str(tmp_path)]) == 2
     assert "nieznany" in capsys.readouterr().err
@@ -206,3 +206,237 @@ def test_eval_pgvector_without_configured_model_exit_2(capsys, fake_embeddings, 
         code = main(argv)
     assert code == 2
     assert "pgvector" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# F2: `kovalo ingest --chunks` i `kovalo eval e2` (kontrakt F2, 5.4 i 8.7)
+# ---------------------------------------------------------------------------
+
+
+def _capture_writer(monkeypatch):
+    import kovalo.cli as cli
+
+    written: list[tuple[str, int]] = []  # (tabela z meta, liczba chunków)
+    tables: list[str] = []  # tabela przekazana do _index_writer
+
+    def factory(settings, embeddings, table):
+        tables.append(table)
+
+        def writer(chunks, meta):
+            n = len(list(chunks))
+            written.append((meta.table, n))
+            return n, 0
+
+        return writer
+
+    monkeypatch.setattr(cli, "_index_writer", factory)
+    return written, tables
+
+
+def test_ingest_all_two_tables(capsys, monkeypatch, settings, counting_cached_factory):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    written, _ = _capture_writer(monkeypatch)
+    with override_embeddings(counting_cached_factory):
+        assert main(["ingest"]) == 0  # domyślnie --chunks all
+    out = capsys.readouterr().out
+    assert written == [("kovalo_mp1", 47), ("kovalo_ctx", 87)]  # najpierw mp1, potem ctx
+    assert out.count("Korpus: ") == 1
+    assert "Chunki: 47 (średnio 603,7 znaku, maks. 798)" in out
+    assert "Chunki: 87 (średnio 385,6 znaku, maks. 775)" in out
+    assert "Indeks: tabela kovalo_mp1, wierszy 47" in out
+    assert "Indeks: tabela kovalo_ctx, wierszy 87" in out
+    assert out.index("kovalo_mp1") < out.index("kovalo_ctx")
+    assert "mp1" in out and "ctx" in out  # nazwy wariantów przed blokami
+
+
+def test_ingest_single_variant(capsys, monkeypatch, counting_cached_factory):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    written, tables = _capture_writer(monkeypatch)
+    with override_embeddings(counting_cached_factory):
+        assert main(["ingest", "--chunks", "ctx"]) == 0
+    assert written == [("kovalo_ctx", 87)] and tables == ["kovalo_ctx"]
+    assert "Indeks: tabela kovalo_ctx, wierszy 87" in capsys.readouterr().out
+
+
+def test_ingest_table_requires_single_variant(capsys, monkeypatch, counting_cached_factory):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    written, _ = _capture_writer(monkeypatch)
+    with override_embeddings(counting_cached_factory):
+        assert main(["ingest", "--table", "x"]) == 2
+        assert main(["ingest", "--chunks", "all", "--table", "x"]) == 2
+    assert "--table wymaga --chunks mp1 albo ctx" in capsys.readouterr().err
+    assert written == []
+
+    written, tables = _capture_writer(monkeypatch)
+    with override_embeddings(counting_cached_factory):
+        assert main(["ingest", "--chunks", "mp1", "--table", "inna_tabela"]) == 0
+    assert tables == ["inna_tabela"]
+
+
+def test_ingest_unknown_chunks_variant_exit_2(capsys, monkeypatch, counting_cached_factory):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    _capture_writer(monkeypatch)
+    with override_embeddings(counting_cached_factory), pytest.raises(SystemExit) as info:
+        main(["ingest", "--chunks", "nieznany"])
+    assert info.value.code == 2
+
+
+def test_eval_e2_offline_ok(capsys, tmp_path, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    out_dir = tmp_path / "raporty"
+    with override_embeddings(fake_embeddings):
+        assert main(["eval", "e2", "--out", str(out_dir)]) == 0
+    names = {p.name for p in out_dir.iterdir()}
+    assert {"retrieval_report.json", "chunks_ctx.jsonl"} <= names
+    assert any(n.endswith("-e2.md") for n in names) and any(n.endswith("-e2.json") for n in names)
+    assert not [n for n in names if n.startswith(("answers.", "live_report."))]
+    out = capsys.readouterr().out
+    assert "reference mp1: hit@1 9/10, hit@3 9/10, dowody 9/10, tokeny 850,3" in out
+    assert "reference ctx: hit@1 9/10, hit@3 9/10, dowody 8/10, tokeny 610,4" in out
+    assert "reference hybrid: hit@1 9/10, hit@3 10/10, dowody 10/10, tokeny 631,0" in out
+    assert str(out_dir) in out  # ścieżki raportów
+
+
+def test_eval_e2_with_llm_fake(capsys, tmp_path, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+    from kovalo.rag.records import Answer, Verdict
+    from tests.fakes import FakeStructuredChatModel
+
+    fake = FakeStructuredChatModel(
+        results={
+            Answer: Answer(answer="CFO.", citations=["POL-001"], answerable=True),
+            Verdict: Verdict(correct=True, grounded=True, reason="atrapa"),
+        }
+    )
+    out_dir = tmp_path / "raporty"
+    argv = ["eval", "e2", "--with-llm", "--no-cache", "--variants", "ctx", "--out", str(out_dir)]
+    with override_embeddings(fake_embeddings), override_chat_model(fake):
+        assert main(argv) == 0
+    assert (out_dir / "answers.ours-ctx.json").is_file()
+    assert (out_dir / "live_report.ours-ctx.json").is_file()
+    assert not (out_dir / "answers.ours-hybrid.json").exists()
+    out = capsys.readouterr().out
+    assert "ctx: odpowiedzi " in out and "wywołania " in out
+
+
+def test_eval_e2_errors_exit_codes(capsys, tmp_path, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+    from tests.fakes import FakeStructuredChatModel
+
+    out_dir = tmp_path / "raporty"
+    base = ["eval", "e2", "--out", str(out_dir)]
+    with override_embeddings(fake_embeddings):
+        assert main([*base, "--variants", "nieznany"]) == 2
+        assert main([*base, "--with-llm", "--ids", "X99"]) == 2
+        assert main([*base, "--no-cache", "--cache-only"]) == 2
+        assert main(["eval", "e3"]) == 2
+        err = capsys.readouterr().err
+        assert "nieznany" in err and "X99" in err and "Etap e3 jeszcze nie istnieje (F3)." in err
+
+        failing = FakeStructuredChatModel(error=ValueError("sztuczny błąd"))
+        with override_chat_model(failing):
+            assert main([*base, "--with-llm", "--no-cache", "--variants", "ctx"]) == 3
+        assert "ValueError: sztuczny błąd" in capsys.readouterr().err
+    assert (out_dir / "answers.ours-ctx.json").is_file()  # raporty zapisane mimo błędów
+    assert any(p.name.endswith("-e2.md") for p in out_dir.iterdir())
+
+
+def test_eval_e2_with_llm_missing_key_exit_2(capsys, tmp_path, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    out_dir = tmp_path / "raporty"
+    with override_embeddings(fake_embeddings):
+        assert main(["eval", "e2", "--with-llm", "--no-cache", "--out", str(out_dir)]) == 2
+    assert "GOOGLE_API_KEY" in capsys.readouterr().err
+    assert any(p.name.endswith("-e2.md") for p in out_dir.iterdir())  # raport bez sekcji LLM-a
+    assert not list(out_dir.glob("answers.*"))
+
+
+def test_eval_e2_plan(capsys, tmp_path, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    out_dir = tmp_path / "raporty"
+    with override_embeddings(fake_embeddings):
+        assert main(["eval", "e2", "--with-llm", "--plan", "--out", str(out_dir)]) == 0
+    assert "48" in capsys.readouterr().out
+    assert not out_dir.exists() or not list(out_dir.iterdir())
+
+
+# ---------------------------------------------------------------------------
+# review.yaml (kontrakt F2, 14.3)
+# ---------------------------------------------------------------------------
+
+
+def test_eval_e2_reads_review(capsys, tmp_path, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    out_dir = tmp_path / "raporty"
+    out_dir.mkdir()
+    (out_dir / "review.yaml").write_text(
+        "version: 1\n"
+        "reviewed_on: 2026-11-02\n"
+        "intro: Wstęp przeglądu CLI.\n"
+        "items:\n"
+        "  - variants: [ours-ctx]\n"
+        "    id: M01\n"
+        "    comment: |\n"
+        "      Komentarz z pliku review.\n"
+        "      Druga linia.\n",
+        encoding="utf-8",
+    )
+    with override_embeddings(fake_embeddings):
+        assert main(["eval", "e2", "--out", str(out_dir)]) == 0
+    md = next(p for p in out_dir.iterdir() if p.name.endswith("-e2.md")).read_text(encoding="utf-8")
+    assert "Wstęp przeglądu CLI." in md
+    assert "Komentarz z pliku review." in md and "Druga linia." in md
+    assert "(do uzupełnienia w T2)" in md  # pozostałe pozycje bez wpisu
+    assert (out_dir / "review.yaml").is_file()  # plik wejściowy nietknięty
+
+
+def test_eval_e2_bad_review_exit_2(capsys, tmp_path, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+    from kovalo.rag.records import Answer, Verdict
+    from tests.fakes import FakeStructuredChatModel
+
+    fake = FakeStructuredChatModel(
+        results={
+            Answer: Answer(answer="CFO.", citations=["POL-001"], answerable=True),
+            Verdict: Verdict(correct=True, grounded=True, reason="atrapa"),
+        }
+    )
+    out_dir = tmp_path / "raporty"
+    out_dir.mkdir()
+    bad = {
+        "unknown_label": "  - {variants: [ours-nieznany], id: M01, comment: x}\n",
+        "unknown_id": "  - {variants: [ours-ctx], id: X99, comment: x}\n",
+        "schema": "  - {variants: [ours-ctx], id: M01, comment: ''}\n",
+    }
+    argv = ["eval", "e2", "--with-llm", "--no-cache", "--variants", "ctx", "--out", str(out_dir)]
+    for name, item in bad.items():
+        (out_dir / "review.yaml").write_text(
+            f"version: 1\nreviewed_on: 2026-11-02\nitems:\n{item}", encoding="utf-8"
+        )
+        with override_embeddings(fake_embeddings), override_chat_model(fake):
+            assert main(argv) == 2, name
+        err = capsys.readouterr().err
+        assert "review.yaml" in err, name
+        assert fake.calls == [], name  # zero wywołań modelu
+        assert not list(out_dir.glob("answers.*")), name
+    assert not any(p.name.endswith("-e2.md") for p in out_dir.iterdir())  # nic nie zapisano
+    assert fake_embeddings.calls == []  # także modele embeddingów nie zbudowane

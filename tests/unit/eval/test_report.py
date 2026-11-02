@@ -30,7 +30,7 @@ def test_markdown_sections_and_polish_numbers(e1_report):
     assert "referencja kursu (text-embedding-3-small)" in md
     assert "722,7 / 8988,5" in md
     assert "$17,78 / $69,86 (x3,9)" in md
-    assert "$15,58 / $67,65" in md
+    assert "$9,17 / $30,00" in md
     assert "0,9" in md
     # brak kropek dziesiętnych w kwotach i w trafieniach
     assert not re.search(r"\$\d+\.\d", md)

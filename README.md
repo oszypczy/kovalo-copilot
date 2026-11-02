@@ -4,7 +4,7 @@ Asystent AI dla kadry zarządzającej fikcyjnej firmy **Kovalo Distribution**. O
 
 To projekt zaliczeniowy z przedmiotu **Technologie Generatywne (TEG)**. Łączy pięć miniprojektów z [wodecki/TEG_PL_Project_2026](https://github.com/wodecki/TEG_PL_Project_2026) w jedną aplikację.
 
-**Stos:** LangChain 1.x · LangGraph 1.x · MCP (FastMCP) · Gemini Flash (darmowy tier) · fastembed · Postgres + pgvector · FastAPI · Chainlit · Docker.
+**Stos:** LangChain 1.x · LangGraph 1.x · MCP (FastMCP) · Gemini Flash-Lite (darmowy tier) · fastembed · Postgres + pgvector · FastAPI · Chainlit · Docker.
 
 ![Architektura](docs/architecture/kovalo-architecture-1-containers.png)
 
