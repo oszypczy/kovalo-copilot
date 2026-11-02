@@ -7,11 +7,11 @@
 | Workflow i agent | **LangGraph 1.x** (`StateGraph`, `interrupt`, `Command`, checkpointer) | wymóg |
 | LLM: domyślny | **Gemini Flash** przez `langchain-google-genai` (darmowy klucz z Google AI Studio) | [ADR-0002](adr/0002-free-llm-gemini.md) |
 | LLM: zapasowe | Gemini Flash-Lite (ten sam klucz, osobny limit), OpenAI (tryb zgodny z kursem, jeśli ktoś ma klucz) | wybór w `config.yaml` → `llm.provider` |
-| Embeddingi | **fastembed** (ONNX, CPU), model wielojęzyczny, np. `intfloat/multilingual-e5-large` albo `BAAI/bge-m3`; wybór po pomiarze hit@k | [ADR-0003](adr/0003-local-embeddings.md) |
-| Vector store | **Postgres 16 + pgvector**, `langchain-postgres` (`PGVector`) | [ADR-0004](adr/0004-postgres-pgvector-checkpointer.md) |
+| Embeddingi | **fastembed** (ONNX, CPU) przez własny adapter + `CacheBackedEmbeddings` (`langchain-classic`); model **`intfloat/multilingual-e5-large`** (1024, prefiksy `query: `/`passage: `), wybrany w E1 spośród 4 kandydatów (jina-v3, mpnet, MiniLM; wyniki w ADR-0003); wektory nieznormalizowane, więc tylko odległość kosinusowa | [ADR-0003](adr/0003-local-embeddings.md), [ADR-0007](adr/0007-knowledge-index-f1.md) |
+| Vector store | **Postgres 16 + pgvector**, `langchain-postgres` (`PGVectorStore`; `PGVector` jest przestarzały) | [ADR-0004](adr/0004-postgres-pgvector-checkpointer.md), [ADR-0007](adr/0007-knowledge-index-f1.md) |
 | Checkpointy | `langgraph-checkpoint-postgres` (`PostgresSaver`) | ten sam Postgres |
 | Wyszukiwanie leksykalne | `BM25Retriever` (`rank-bm25`) + `EnsembleRetriever` | rozszerzenie FR-2.5 |
-| Tokenizer do kosztów | `tiktoken` `o200k_base` | PINNED z kursu; dla Gemini liczymy też faktyczne tokeny z `usage_metadata` |
+| Tokenizer do kosztów | `tiktoken` `o200k_base` | PINNED z kursu; dla Gemini liczymy też faktyczne tokeny z `usage_metadata`; ceny Gemini w `cost.our_prices_per_1m_tokens` |
 | MCP | `mcp` SDK 1.x (FastMCP, `<2` jak w kursie), transport `stdio` + `streamable-http`; klient bezpośrednio na SDK, `langchain-mcp-adapters` tylko do porównania | kurs wyjaśnia, dlaczego nie `load_mcp_tools` (gubi `structuredContent`) |
 | API | FastAPI + `sse-starlette`, Uvicorn | |
 | UI | **Chainlit** | `cl.Step` do kroków agenta, `cl.AskActionMessage` do akceptacji |
@@ -30,7 +30,7 @@ llm:
   provider: google_genai          # google_genai | openai
   model: gemini-3.6-flash         # stabilna wersja, nie alias -latest; 3.8/3.7 dają 504 w darmowym tierze (ADR-0006)
   temperature: null               # domyślna dostawcy (Gemini 3: 1.0, zalecenie Google)
-  max_retries: 2
+  max_retries: 1
   timeout_s: 60
   params: {thinking_level: low}
   rate_limit: {requests_per_second: 0.15, check_every_n_seconds: 0.1, max_bucket_size: 1}
@@ -42,7 +42,9 @@ embeddings:
   dimensions: 1536                # PINNED
   batch_size: 64
   provider: fastembed
-  local: {model: intfloat/multilingual-e5-large, dimensions: 1024, models_dir: .cache/fastembed, cache_dir: .cache/embeddings}
+  local: {model: intfloat/multilingual-e5-large, dimensions: 1024, query_prefix: "query: ", passage_prefix: "passage: ",
+         threads: null, local_files_only: false, models_dir: .cache/fastembed, cache_dir: .cache/embeddings}
+  candidates: [...]               # E1, pełna lista: contracts/f1.md §4.1
 ```
 
 `.env`:
@@ -68,5 +70,6 @@ OPENAI_API_KEY=        # opcjonalny tryb zgodny z kursem
 | Ograniczenie | Gdzie | Powód | Kiedy usunąć |
 |---|---|---|---|
 | `cryptography>=46,<47` (zależność pośrednia: `google-auth`, `pyjwt[crypto]` przez `chainlit` i `mcp`) | `pyproject.toml`, `[tool.uv] constraint-dependencies` | `cryptography` 47.x kończy się `SIGILL` przy imporcie w kontenerze na Apple Silicon (Docker Desktop, jądro linuxkit z SVE/SME); sprawdzone na czystym `python:3.12-slim-bookworm`, 46.x działa | gdy nowe wydanie `cryptography` importuje się w tym samym obrazie na Apple Silicon: usunąć wpis, `uv lock --upgrade-package cryptography`, `make up` i `make first-call` |
+| `onnxruntime>=1.20,<1.23` (zależność pośrednia przez `fastembed`) | `pyproject.toml`, `[tool.uv] constraint-dependencies` | `onnxruntime` 1.23+ (kernele SME/KleidiAI) kończy się `SIGILL` (kod 132) przy liczeniu embeddingów w kontenerze na Apple M4/M5 (Docker Desktop ogłasza SME); 1.22.1 i 1.20.1 działają, na hoście macOS problem nie występuje | gdy nowe wydanie przechodzi `make ingest` w kontenerze na Apple Silicon: usunąć wpis, `uv lock --upgrade-package onnxruntime`, `make up`, `make ingest` |
 
 Ograniczenia pośrednich zależności zapisujemy tutaj; ADR jest potrzebny dopiero wtedy, gdy ograniczenie zmienia wybór technologii albo kontrakt.

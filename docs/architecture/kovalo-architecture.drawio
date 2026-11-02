@@ -22,7 +22,7 @@
                 <mxCell id="mcp" parent="compose" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="&lt;b&gt;mcp-server&lt;/b&gt;&lt;br&gt;FastMCP :8765 (streamable HTTP + stdio)&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;6+1 narzędzi read-only · zasoby: dokumenty · prompt&lt;/font&gt;" vertex="1">
                     <mxGeometry height="110" width="220" x="630" y="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="pg" parent="compose" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;" value="&lt;b&gt;postgres + pgvector&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;indeks wektorowy (PGVector)&lt;br&gt;checkpointy LangGraph (PostgresSaver)&lt;br&gt;agent_traces&lt;/font&gt;" vertex="1">
+                <mxCell id="pg" parent="compose" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;" value="&lt;b&gt;postgres + pgvector&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;indeks wektorowy (PGVectorStore)&lt;br&gt;checkpointy LangGraph (PostgresSaver)&lt;br&gt;agent_traces&lt;/font&gt;" vertex="1">
                     <mxGeometry height="120" width="200" x="320" y="290" as="geometry"/>
                 </mxCell>
                 <mxCell id="data" parent="compose" style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#ffffff;strokeColor=#666666;" value="&lt;b&gt;data/&lt;/b&gt; (wolumen tylko do odczytu)&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;corpus/ 18 dokumentów · company/ OTIF, faktury, warunki · eval/ zestawy testowe&lt;/font&gt;" vertex="1">
@@ -246,10 +246,10 @@
                 <mxCell id="ctx" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;nagłówek kontekstu&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;„tytuł &amp;gt; sekcja”, id doc_id#ctxNNN&lt;/font&gt;" vertex="1">
                     <mxGeometry height="70" width="170" x="840" y="110" as="geometry"/>
                 </mxCell>
-                <mxCell id="emb" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;CacheBackedEmbeddings&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;fastembed, model wielojęzyczny (lokalnie)&lt;/font&gt;" vertex="1">
+                <mxCell id="emb" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;CacheBackedEmbeddings&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;fastembed (lokalnie), osobny cache dokumentów i pytań&lt;/font&gt;" vertex="1">
                     <mxGeometry height="70" width="180" x="1050" y="110" as="geometry"/>
                 </mxCell>
-                <mxCell id="pgv" parent="1" style="shape=cylinder3;boundedLbl=1;size=10;fillColor=#fff2cc;strokeColor=#d6b656;whiteSpace=wrap;html=1;" value="&lt;b&gt;PGVector&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;kolekcja kovalo_ctx&lt;br&gt;(chunki + wektory)&lt;/font&gt;" vertex="1">
+                <mxCell id="pgv" parent="1" style="shape=cylinder3;boundedLbl=1;size=10;fillColor=#fff2cc;strokeColor=#d6b656;whiteSpace=wrap;html=1;" value="&lt;b&gt;PGVectorStore&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;tabela kovalo_ctx (F2)&lt;br&gt;kovalo_mp1 (F1)&lt;br&gt;+ kovalo_index_meta&lt;/font&gt;" vertex="1">
                     <mxGeometry height="100" width="140" x="1280" y="95" as="geometry"/>
                 </mxCell>
                 <mxCell id="q" parent="1" style="ellipse;fillColor=#f5f5f5;strokeColor=#666666;whiteSpace=wrap;html=1;" value="pytanie /&lt;br&gt;search_documents(question)" vertex="1">
@@ -258,7 +258,7 @@
                 <mxCell id="vec" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="&lt;b&gt;wyszukiwanie wektorowe&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;embedding pytania → cosine → top 3&lt;/font&gt;" vertex="1">
                     <mxGeometry height="70" width="200" x="560" y="300" as="geometry"/>
                 </mxCell>
-                <mxCell id="bm25" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;BM25Retriever&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;słowa kluczowe, dokładne id (SUP-114) → top 3; indeks w pamięci, budowany przy starcie z chunków PGVector&lt;/font&gt;" vertex="1">
+                <mxCell id="bm25" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;BM25Retriever&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;słowa kluczowe, dokładne id (SUP-114) → top 3; indeks w pamięci, budowany przy starcie z chunków z Postgresa&lt;/font&gt;" vertex="1">
                     <mxGeometry height="80" width="200" x="560" y="400" as="geometry"/>
                 </mxCell>
                 <mxCell id="ens" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="&lt;b&gt;EnsembleRetriever&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;fuzja rankingów (RRF): do 6 kandydatów, duplikaty łączone → top 3 (PINNED)&lt;/font&gt;" vertex="1">
@@ -282,7 +282,7 @@
                 <mxCell id="i5" edge="1" parent="1" source="ctx" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" target="emb" value="">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="i6" edge="1" parent="1" source="emb" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" target="pgv" value="upsert">
+                <mxCell id="i6" edge="1" parent="1" source="emb" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;" target="pgv" value="zapis">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="i8a" edge="1" parent="1" source="q" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;defaultLabelBackgroundColor=page;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="vec" value="">

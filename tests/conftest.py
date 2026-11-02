@@ -6,6 +6,7 @@ ani zmiennych środowiskowych użytkownika (autouse `isolated_env`).
 
 from __future__ import annotations
 
+import csv
 import importlib
 import os
 import shutil
@@ -13,9 +14,11 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 import yaml
 from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.embeddings import DeterministicFakeEmbedding, Embeddings
 from langchain_core.language_models import BaseChatModel
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, BaseMessage
@@ -43,7 +46,7 @@ def _reset_kovalo_state() -> None:
     """Czyści cache get_settings i rejestr limiterów (jeśli moduły już istnieją)."""
     for mod_name, attrs in (
         ("kovalo.config", ("get_settings",)),
-        ("kovalo.llm", ("reset_rate_limiters",)),
+        ("kovalo.llm", ("reset_rate_limiters", "reset_embeddings")),
     ):
         try:
             mod = importlib.import_module(mod_name)
@@ -52,7 +55,9 @@ def _reset_kovalo_state() -> None:
                 raise
             continue  # moduł jeszcze nie istnieje: testy i tak padną na własnym imporcie
         for attr in attrs:
-            obj = getattr(mod, attr)
+            obj = getattr(mod, attr, None)
+            if obj is None:
+                continue  # np. reset_embeddings przed A4; jego istnienie pilnuje test_llm
             if attr == "get_settings":
                 obj.cache_clear()
             else:
@@ -166,3 +171,205 @@ def failing_chat_model() -> Callable[[BaseException], FailingChatModel]:
         return FailingChatModel(exc=exc, calls=[])
 
     return _factory
+
+
+# ---------------------------------------------------------------------------
+# F1 (kontrakt: docs/contracts/f1.md, sekcja 10.1)
+# ---------------------------------------------------------------------------
+
+CATALOG_COLUMNS = [
+    "doc_id",
+    "file",
+    "title",
+    "doc_type",
+    "department",
+    "owner",
+    "effective_date",
+    "language",
+]
+
+
+@pytest.fixture(scope="session")
+def session_settings():  # type: ignore[no-untyped-def]
+    """Ustawienia z repozytoryjnego config.yaml (sesyjne: tylko do odczytu)."""
+    from kovalo.config import load_settings
+
+    return load_settings(google_api_key="test-key")
+
+
+@pytest.fixture(scope="session")
+def documents(session_settings):  # type: ignore[no-untyped-def]
+    """Prawdziwy korpus (18 dokumentów)."""
+    from kovalo.knowledge.corpus import load_corpus
+
+    return load_corpus(session_settings)
+
+
+@pytest.fixture(scope="session")
+def chunks(documents, session_settings):  # type: ignore[no-untyped-def]
+    """Chunki MP1 prawdziwego korpusu (47)."""
+    from kovalo.knowledge.chunking import chunk_documents
+
+    return chunk_documents(documents, session_settings.chunking)
+
+
+@pytest.fixture
+def toy_corpus(tmp_path: Path):  # type: ignore[no-untyped-def]
+    """Mały korpus w tmp_path: zwraca (add, corpus_dir, catalog_path)."""
+    corpus_dir = tmp_path / "corpus"
+    corpus_dir.mkdir()
+    catalog = corpus_dir / "catalog.csv"
+    with catalog.open("w", encoding="utf-8", newline="") as fh:
+        csv.writer(fh).writerow(CATALOG_COLUMNS)
+
+    def add(
+        file: str, text: str = "Przykładowy tekst.", in_catalog: bool = True, **fields: str
+    ) -> None:
+        (corpus_dir / file).write_text(text, encoding="utf-8")
+        if in_catalog:
+            row = {
+                "doc_id": "TST-001",
+                "file": file,
+                "title": "Dokument testowy",
+                "doc_type": "policy",
+                "department": "Testy",
+                "owner": "Kierownik testów",
+                "effective_date": "2026-01-01",
+                "language": "en",
+            }
+            row.update(fields)
+            with catalog.open("a", encoding="utf-8", newline="") as fh:
+                csv.writer(fh).writerow([row[c] for c in CATALOG_COLUMNS])
+
+    return add, corpus_dir, catalog
+
+
+class CountingFakeEmbeddings(DeterministicFakeEmbedding):
+    """Ten sam tekst -> ten sam wektor; zapisuje każdy tekst zamieniany na wektor."""
+
+    calls: list[str] = []  # noqa: RUF012
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        self.calls.extend(texts)
+        return super().embed_documents(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        self.calls.append(text)
+        return super().embed_query(text)
+
+
+class ForbiddenEmbeddings(Embeddings):
+    """Każde wywołanie to AssertionError: dowodzi, że wektor pochodzi z cache."""
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        raise AssertionError(f"{len(texts)} tekstów spoza cache, np. {texts[0][:60]!r}")
+
+    def embed_query(self, text: str) -> list[float]:
+        raise AssertionError(f"Pytania nie ma w cache: {text[:60]!r}")
+
+
+@pytest.fixture
+def fake_embeddings() -> CountingFakeEmbeddings:
+    return CountingFakeEmbeddings(size=16, calls=[])
+
+
+@pytest.fixture
+def forbidden_embeddings() -> ForbiddenEmbeddings:
+    return ForbiddenEmbeddings()
+
+
+# Modele znane atrapie fastembed: nazwa -> (wymiar, rozmiar GB)
+FAKE_FASTEMBED_MODELS: dict[str, tuple[int, float]] = {
+    "intfloat/multilingual-e5-large": (1024, 2.24),
+    "jinaai/jina-embeddings-v3": (1024, 2.29),
+    "sentence-transformers/paraphrase-multilingual-mpnet-base-v2": (768, 1.11),
+    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": (384, 0.22),
+}
+
+
+class FakeTextEmbeddingState:
+    """Co atrapa `fastembed.TextEmbedding` dostała."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []  # ("passage" | "query", tekst)
+        self.inits: list[dict[str, Any]] = []
+
+
+@pytest.fixture
+def fake_text_embedding(monkeypatch: pytest.MonkeyPatch) -> FakeTextEmbeddingState:
+    """Podmienia fastembed.TextEmbedding na atrapę (bez pobierania modeli i onnxruntime)."""
+    import fastembed
+
+    state = FakeTextEmbeddingState()
+
+    def _vector(text: str, dim: int) -> np.ndarray:
+        seed = int.from_bytes(text.encode("utf-8")[:8].ljust(8, b"\0"), "little") % (2**32)
+        return np.random.default_rng(seed).normal(size=dim).astype(np.float32)
+
+    class FakeTextEmbedding:
+        def __init__(
+            self,
+            model_name: str,
+            cache_dir: str | None = None,
+            threads: int | None = None,
+            local_files_only: bool = False,
+            **kwargs: Any,
+        ) -> None:
+            if model_name not in FAKE_FASTEMBED_MODELS:
+                raise ValueError(f"Model {model_name} is not supported in TextEmbedding.")
+            self.model_name = model_name
+            state.inits.append(
+                {
+                    "model_name": model_name,
+                    "cache_dir": cache_dir,
+                    "threads": threads,
+                    "local_files_only": local_files_only,
+                }
+            )
+
+        @classmethod
+        def get_embedding_size(cls, model_name: str) -> int:
+            if model_name not in FAKE_FASTEMBED_MODELS:
+                raise ValueError(f"Model {model_name} is not supported in TextEmbedding.")
+            return FAKE_FASTEMBED_MODELS[model_name][0]
+
+        @classmethod
+        def list_supported_models(cls) -> list[dict[str, Any]]:
+            return [
+                {"model": name, "dim": dim, "size_in_GB": size}
+                for name, (dim, size) in FAKE_FASTEMBED_MODELS.items()
+            ]
+
+        def passage_embed(self, texts: Any, batch_size: int = 256, **kwargs: Any) -> Any:
+            dim = FAKE_FASTEMBED_MODELS[self.model_name][0]
+            for text in texts:
+                state.calls.append(("passage", text))
+                yield _vector(text, dim)
+
+        def query_embed(self, query: Any, **kwargs: Any) -> Any:
+            dim = FAKE_FASTEMBED_MODELS[self.model_name][0]
+            for text in [query] if isinstance(query, str) else query:
+                state.calls.append(("query", text))
+                yield _vector("q:" + text, dim)
+
+    monkeypatch.setattr(fastembed, "TextEmbedding", FakeTextEmbedding)
+    return state
+
+
+@pytest.fixture
+def local_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):  # type: ignore[no-untyped-def]
+    """Ustawienia z cache embeddingów i katalogiem modeli w tmp_path (nic nie ląduje w repo)."""
+    from kovalo.config import load_settings
+
+    monkeypatch.setenv("KOVALO_EMBEDDINGS__LOCAL__CACHE_DIR", str(tmp_path / "emb-cache"))
+    monkeypatch.setenv("KOVALO_EMBEDDINGS__LOCAL__MODELS_DIR", str(tmp_path / "models"))
+    return load_settings(google_api_key="test-key")
+
+
+@pytest.fixture
+def reference_settings(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
+    """Tryb openai_cache (cache kursu z data/embeddings)."""
+    from kovalo.config import load_settings
+
+    monkeypatch.setenv("KOVALO_EMBEDDINGS__PROVIDER", "openai_cache")
+    return load_settings(google_api_key="test-key")

@@ -52,3 +52,22 @@ Jedno wywołanie na model (prompt jednozdaniowy, `thinking_level: low`, `timeout
 | `gemini-3.5-flash-lite` (fallback) | odpowiedź poprawna | ok. 10 s |
 
 Wniosek: główny model to `gemini-3.6-flash`. Do `gemini-3.8-flash` wracamy, gdy zacznie odpowiadać w darmowym tierze (sprawdzamy przy każdym etapie z ewaluacją na żywo).
+
+## Pomiar 2026-11-02 (drugi, F1 / E1)
+
+| Model | Wywołanie | Wynik | Czas |
+|---|---|---|---|
+| `gemini-3.8-flash` | jedno wywołanie testowe (A7) | `503 UNAVAILABLE` („high demand”) | 7,9 s |
+| `gemini-3.6-flash` | `kovalo eval e1 --with-llm` (prompt Q01 z top-3 chunkami) | odpowiedź poprawna, bez fallbacku | 10,9 s |
+
+Tokeny wywołania E1 (`gemini-3.6-flash`, `thinking_level: low`): wejście 804 według dostawcy wobec 833 z `o200k_base` (szacunek kursu zawyża wejście o ok. 4%); wyjście 677 wobec 350 w scenariuszu kosztów kursu.
+
+`langchain-google-genai` 4.4 liczy `usage_metadata.output_tokens` jako `candidates_token_count + thoughts_token_count` (tokeny myślenia osobno w `output_token_details.reasoning`). Odpowiedź ma ok. 600 znaków, więc większość z 677 tokenów to prawdopodobnie myślenie, także przy `thinking_level: low`.
+
+**Decyzja bez zmian:** główny `gemini-3.6-flash`, 3.8 nadal niedostępny w darmowym tierze.
+
+Wpływ na kalkulator kosztów:
+- Scenariusz `cost.scenario.output_tokens_per_answer: 350` jest PINNED i zostaje, bo kolumna referencyjna musi odtwarzać kurs ($17,78 / $69,86).
+- Kolumna Gemini w raporcie E1 jest **dolną granicą**, co raport już podaje. Przy 677 tokenach wyjścia koszt wariantu retrieval po cenach `gemini-3.6-flash` (0,75 / 3,75) rośnie z ok. $15,6 do ok. $25,9 miesięcznie (o ok. 66%). Wariant „cały korpus” rośnie o tę samą kwotę (ok. $10,3), więc przewaga retrieval maleje względnie, ale zostaje.
+- W darmowym tierze koszt jest zerowy, ale tokeny myślenia zużywają limit tokenów na minutę.
+- Rozdział tokenów odpowiedzi i myślenia zapisujemy w rekordzie wywołania (zadanie poprawki w [contracts/f1.md §12](../contracts/f1.md)). Gdyby w E2/E4 myślenie stale przekraczało tokeny odpowiedzi, rozważamy `thinking_level: minimal` dla celów bez rozumowania (np. `answer`), przez `llm.purposes`, bez zmian w kodzie.

@@ -36,11 +36,20 @@ embeddings:
   dimensions: 1536                # PINNED
   batch_size: 64
   provider: fastembed             # NASZE (ADR-0003): fastembed | openai_cache
-  local:                          # NASZE: model lokalny; ostateczny wybór w F1 po E1
+  local:                          # NASZE: model używany przez ingest, wyszukiwanie i E1 (ostateczny wybór po E1)
     model: intfloat/multilingual-e5-large
     dimensions: 1024
-    models_dir: .cache/fastembed       # pobrane modele ONNX (w obrazie: wypełnione przy budowaniu)
-    cache_dir: .cache/embeddings       # CacheBackedEmbeddings; data/ jest tylko do odczytu
+    query_prefix: "query: "       # E5 wymaga prefiksów (ADR-0007)
+    passage_prefix: "passage: "
+    threads: null                 # null = domyślne onnxruntime
+    local_files_only: false       # true w compose (model wbudowany w obraz, bez pobierania)
+    models_dir: .cache/fastembed  # pobrane modele ONNX (w obrazie: wypełnione przy budowaniu)
+    cache_dir: .cache/embeddings  # CacheBackedEmbeddings; data/ jest tylko do odczytu
+  candidates:                     # NASZE: modele porównywane w E1 (ADR-0007); local.model jest dodawany zawsze
+    - {model: intfloat/multilingual-e5-large, dimensions: 1024, query_prefix: "query: ", passage_prefix: "passage: "}
+    - {model: jinaai/jina-embeddings-v3, dimensions: 1024}   # zadania retrieval.query/passage przez fastembed; licencja CC BY-NC 4.0
+    - {model: sentence-transformers/paraphrase-multilingual-mpnet-base-v2, dimensions: 768}
+    - {model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2, dimensions: 384}
 
 retrieval:
   top_k: 3                        # PINNED
@@ -82,6 +91,13 @@ cost:
     questions_per_day: 400
     working_days_per_month: 21
     output_tokens_per_answer: 350
+  # NASZE (ADR-0007): drugi cennik w raportach. Płatny tier Gemini API (Standard), USD za 1M tokenów,
+  # wyjście razem z tokenami myślenia. Darmowy tier = 0 USD.
+  our_model: gemini-3.6-flash
+  our_prices_checked_on: 2026-11-02
+  our_prices_per_1m_tokens:
+    gemini-3.6-flash: {input: 0.75, output: 3.75}       # do 2026-12-31; od 2027-01-01: 1.50 / 7.50
+    gemini-3.5-flash-lite: {input: 0.30, output: 2.50}
 
 policy:
   # PINNED – polityka rabatowa POL-001 jako dane, z kursową interpretacją „course-v1”
@@ -190,8 +206,9 @@ db:
   connect_timeout_s: 5
   pool_min_size: 1
   pool_max_size: 5
-  vector_collection: kovalo_ctx
+  vector_collection: kovalo_ctx       # tabele PGVectorStore (ADR-0007)
   vector_collection_mp1: kovalo_mp1
+  index_meta_table: kovalo_index_meta # model i wymiar każdej tabeli indeksu
 
 services:
   # NASZE (ADR-0006)

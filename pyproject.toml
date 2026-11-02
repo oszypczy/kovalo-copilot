@@ -18,6 +18,13 @@ dependencies = [
     "chainlit>=2,<3",
     "mcp>=1.10,<2",
     "psycopg[binary]>=3.2,<4",
+    # F1 (wiedza)
+    "fastembed>=0.9,<0.10",
+    "langchain-postgres>=0.0.19,<0.1",
+    "langchain-classic>=1.0,<2",
+    "langchain-text-splitters>=1.1,<2",
+    "tiktoken>=0.12,<1",
+    "numpy>=2,<3",
 ]
 
 [project.optional-dependencies]
@@ -67,11 +74,13 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 markers = [
   "live: wywołuje prawdziwe API LLM-a (wymaga GOOGLE_API_KEY); uruchamiane ręcznie",
-  "integration: wymaga działającego docker compose",
+  "integration: wymaga działającego docker compose (Postgres na localhost:5432)",
+  "model: wymaga pobranego modelu fastembed (0,2-2,3 GB); uruchamiane ręcznie",
 ]
-addopts = "-m 'not live and not integration'"
+addopts = "-m 'not live and not integration and not model'"
 
 [tool.uv]
 # cryptography >=47 kończy się SIGILL na Apple Silicon z SVE/SME (Docker Desktop, linuxkit);
-# 46.x działa. Usunąć po naprawie upstream.
-constraint-dependencies = ["cryptography>=46,<47"]
+# 46.x działa. onnxruntime >=1.23 (kernele SME/KleidiAI) kończy się SIGILL w tym samym środowisku;
+# 1.22.x działa. Usunąć po naprawie upstream (docs/04-tech-stack.md).
+constraint-dependencies = ["cryptography>=46,<47", "onnxruntime>=1.20,<1.23"]

@@ -173,3 +173,109 @@ def test_override_chat_model(settings, fake_chat_model):
         assert get_resilient_chat_model(settings=settings) is fake_chat_model
         assert get_fallback_models(settings=settings) == []
     assert isinstance(get_chat_model(settings=settings), ChatGoogleGenerativeAI)
+
+
+# ---------------------------------------------------------------------------
+# F1: fabryka embeddingów (kontrakt F1, sekcja 6)
+# ---------------------------------------------------------------------------
+
+
+def test_reset_embeddings_exists():
+    import kovalo.llm as llm
+
+    assert callable(llm.reset_embeddings)
+    assert callable(llm.get_embeddings) and callable(llm.get_reference_embeddings)
+
+
+def test_get_embeddings_fastembed_wiring(local_settings, fake_text_embedding):
+    from langchain_classic.embeddings import CacheBackedEmbeddings
+
+    from kovalo.knowledge.embeddings import (
+        CountingEmbeddings,
+        FastEmbedEmbeddings,
+        cache_namespace,
+    )
+    from kovalo.llm import get_embeddings
+
+    emb = get_embeddings(settings=local_settings)  # bez klucza API
+    assert isinstance(emb, CacheBackedEmbeddings)
+    counting = emb.underlying_embeddings
+    assert isinstance(counting, CountingEmbeddings)
+    assert isinstance(counting.inner, FastEmbedEmbeddings)  # nazwa atrybutu z parametru `inner`
+    emb.embed_documents(["alpha"])
+    ns = cache_namespace(local_settings.embeddings.local.model)
+    cache_dir = local_settings.embeddings.local.cache_dir
+    assert len(list((cache_dir / ns / "passage").iterdir())) == 1
+    assert counting.documents_embedded == 1
+    init = fake_text_embedding.inits[-1]
+    assert init["cache_dir"] == str(local_settings.embeddings.local.models_dir)
+
+
+def test_get_embeddings_without_cache(local_settings, fake_text_embedding):
+    from langchain_classic.embeddings import CacheBackedEmbeddings
+
+    from kovalo.llm import get_embeddings
+
+    emb = get_embeddings(settings=local_settings, cache=False)
+    assert not isinstance(emb, CacheBackedEmbeddings)
+
+
+def test_get_embeddings_uses_given_spec(local_settings, fake_text_embedding):
+    from kovalo.config import EmbeddingModelSpec
+    from kovalo.llm import get_embeddings
+
+    spec = EmbeddingModelSpec(
+        model="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", dimensions=384
+    )
+    emb = get_embeddings(settings=local_settings, spec=spec, cache=False)
+    assert len(emb.embed_query("x")) == 384
+
+
+def test_get_embeddings_instances_are_registered(local_settings, fake_text_embedding):
+    from kovalo.llm import get_embeddings, reset_embeddings
+
+    get_embeddings(settings=local_settings, cache=False)
+    get_embeddings(settings=local_settings, cache=False)
+    assert len(fake_text_embedding.inits) == 1  # model ładowany raz na proces
+    reset_embeddings()
+    get_embeddings(settings=local_settings, cache=False)
+    assert len(fake_text_embedding.inits) == 2
+
+
+def test_get_embeddings_openai_cache(reference_settings):
+    from kovalo.config import ConfigError, EmbeddingModelSpec
+    from kovalo.llm import get_embeddings
+
+    emb = get_embeddings(settings=reference_settings)
+    question = "Kto musi zatwierdzić rabat 15% dla dużej sieci handlowej?"
+    assert len(emb.embed_query(question)) == 1536
+    spec = EmbeddingModelSpec(model="x/y", dimensions=8)
+    with pytest.raises(ConfigError, match="openai_cache"):
+        get_embeddings(settings=reference_settings, spec=spec)
+
+
+def test_get_reference_embeddings_ignores_provider(settings):
+    from kovalo.llm import get_reference_embeddings
+
+    assert settings.embeddings.provider == "fastembed"
+    emb = get_reference_embeddings(settings=settings)
+    question = "Kto musi zatwierdzić rabat 15% dla dużej sieci handlowej?"
+    assert len(emb.embed_query(question)) == 1536
+
+
+def test_override_embeddings(local_settings, fake_embeddings, fake_text_embedding):
+    from kovalo.llm import get_embeddings, override_embeddings
+
+    with override_embeddings(fake_embeddings):
+        assert get_embeddings(settings=local_settings) is fake_embeddings
+    assert get_embeddings(settings=local_settings, cache=False) is not fake_embeddings
+
+    seen: list[object] = []
+
+    def factory(spec):  # type: ignore[no-untyped-def]
+        seen.append(spec)
+        return fake_embeddings
+
+    with override_embeddings(factory):
+        assert get_embeddings(settings=local_settings) is fake_embeddings
+    assert seen == [None]

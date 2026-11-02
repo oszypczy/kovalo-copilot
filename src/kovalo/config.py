@@ -1,12 +1,14 @@
 """Ustawienia aplikacji: config.yaml (sekcje PINNED z kursu) + zmienne środowiskowe i .env.
 
-Kontrakt: docs/contracts/f0.md, sekcja 4.3. Moduł nie importuje LangChaina (musi być lekki).
+Kontrakt: docs/contracts/f0.md, sekcja 4.3; klucze F1: docs/contracts/f1.md, sekcja 4.
+Moduł nie importuje LangChaina (musi być lekki).
 Priorytet źródeł (od najwyższego): argumenty load_settings → env → .env (katalog bieżący)
 → config.yaml → wartości domyślne.
 """
 
 from __future__ import annotations
 
+import datetime
 import functools
 import os
 from contextvars import ContextVar
@@ -86,19 +88,56 @@ class ChunkingConfig(_Section):
     separators: list[str]
 
 
-class LocalEmbeddingsConfig(_Section):
-    model: str
-    dimensions: int
+EmbeddingProvider = Literal["fastembed", "openai_cache"]
+
+
+class EmbeddingModelSpec(_Section):
+    """Model embeddingów fastembed z prefiksami pytań i dokumentów (ADR-0007)."""
+
+    model: str = Field(min_length=1)
+    dimensions: int = Field(gt=0)
+    query_prefix: str = ""
+    passage_prefix: str = ""
+
+
+class LocalEmbeddingsConfig(EmbeddingModelSpec):
+    threads: int | None = None
+    local_files_only: bool = False
     models_dir: Path
     cache_dir: Path
+
+    def spec(self) -> EmbeddingModelSpec:
+        """Sam opis modelu (bez ścieżek i ustawień onnxruntime)."""
+        return EmbeddingModelSpec(
+            model=self.model,
+            dimensions=self.dimensions,
+            query_prefix=self.query_prefix,
+            passage_prefix=self.passage_prefix,
+        )
 
 
 class EmbeddingsConfig(_Section):
     model: str
     dimensions: int
-    batch_size: int
-    provider: Literal["fastembed", "openai_cache"]
+    batch_size: int = Field(gt=0)
+    provider: EmbeddingProvider
     local: LocalEmbeddingsConfig
+    candidates: list[EmbeddingModelSpec] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_candidates(self) -> EmbeddingsConfig:
+        names = [c.model for c in self.candidates]
+        duplicates = sorted({n for n in names if names.count(n) > 1})
+        if duplicates:
+            raise ValueError(f"candidates: powtórzone modele: {', '.join(duplicates)}")
+        local = self.local.spec()
+        for candidate in self.candidates:
+            if candidate.model == local.model and candidate != local:
+                raise ValueError(
+                    f"candidates: model {local.model} ma inny wymiar albo prefiksy niż "
+                    "embeddings.local"
+                )
+        return self
 
 
 class RetrievalConfig(_Section):
@@ -140,8 +179,8 @@ class LlmConfig(_Section):
 
 
 class TokenPrice(_Section):
-    input: float
-    output: float
+    input: float = Field(ge=0)
+    output: float = Field(ge=0)
 
 
 class CostScenario(_Section):
@@ -154,6 +193,19 @@ class CostConfig(_Section):
     reference_model: str
     prices_per_1m_tokens: dict[str, TokenPrice]
     scenario: CostScenario
+    our_model: str
+    our_prices_checked_on: datetime.date
+    our_prices_per_1m_tokens: dict[str, TokenPrice]
+
+    @model_validator(mode="after")
+    def _check_models_have_prices(self) -> CostConfig:
+        if self.reference_model not in self.prices_per_1m_tokens:
+            raise ValueError(
+                f"reference_model {self.reference_model!r} nie ma ceny w prices_per_1m_tokens"
+            )
+        if self.our_model not in self.our_prices_per_1m_tokens:
+            raise ValueError(f"our_model {self.our_model!r} nie ma ceny w our_prices_per_1m_tokens")
+        return self
 
 
 class PolicyBand(_Section):
@@ -193,14 +245,20 @@ class PromptsConfig(_Section):
     assistant_understand_system: str
 
 
+# Maks. 53 znaki: replace_table dokleja "__new" i "__new_pkey", a Postgres obcina nazwy do 63.
+_TABLE_NAME = r"^[a-z_][a-z0-9_]{0,52}$"
+
+
 class DbConfig(_Section):
     host: str = "localhost"
     port: int = 5432
     connect_timeout_s: float = 5
     pool_min_size: int = 1
     pool_max_size: int = 5
-    vector_collection: str = "kovalo_ctx"
-    vector_collection_mp1: str = "kovalo_mp1"
+    # nazwy tabel trafiają do SQL jako identyfikatory, więc tylko bezpieczne znaki
+    vector_collection: str = Field(default="kovalo_ctx", pattern=_TABLE_NAME)
+    vector_collection_mp1: str = Field(default="kovalo_mp1", pattern=_TABLE_NAME)
+    index_meta_table: str = Field(default="kovalo_index_meta", pattern=_TABLE_NAME)
 
 
 class ServicesConfig(_Section):
