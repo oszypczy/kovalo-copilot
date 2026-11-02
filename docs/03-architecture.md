@@ -10,7 +10,7 @@ Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-archit
 |---|---|---|---|
 | `ui` | Chainlit | 8000 | czat, kroki agenta, przyciski akceptacji, źródła; rozmawia tylko z `api` |
 | `api` | FastAPI + LangGraph | 8080 | graf copilota (`understand`, routing, workflow akceptacji, agent), checkpointy, koszty, trace |
-| `mcp-server` | FastMCP (`mcp` SDK), streamable HTTP | 8765 | 6 narzędzi tylko do odczytu, zasoby (dokumenty), prompt; dostęp do indeksu i danych firmy |
+| `mcp-server` | FastMCP (`mcp` SDK), streamable HTTP (`/mcp`) | 8765 | 6 narzędzi tylko do odczytu, zasoby (dokumenty), prompt; dostęp do indeksu i danych firmy |
 | `postgres` | `pgvector/pgvector:pg16` | 5432 | indeks wektorowy (`langchain-postgres`), checkpointy LangGraph (`langgraph-checkpoint-postgres`), zapisy przebiegów |
 
 Indeksowanie i ewaluacja to **nie osobne usługi**, tylko polecenia CLI (`kovalo ingest`, `kovalo eval`) uruchamiane jednorazowo w obrazie `api`: `make ingest` = `docker compose run --rm api kovalo ingest` (korpus → chunki z kontekstem → embeddingi → upsert do pgvector), `make eval STAGE=e2` = `docker compose run --rm api kovalo eval e2` (raport w `reports/`, montowanym jako wolumen).
@@ -30,8 +30,10 @@ make ingest ──> data/corpus ──> chunki ──> fastembed ──> pgvecto
 
 ```
 src/kovalo/
-  config.py          ustawienia: config.yaml (PINNED z kursu) + .env (pydantic-settings)
-  llm.py             fabryka modeli: init_chat_model(provider), rate limiter, fallback Flash → Flash-Lite; fabryka embeddingów
+  config.py          ustawienia: config.yaml (PINNED z kursu) + .env (pydantic-settings), get_settings()
+  llm.py             fabryka modeli: init_chat_model(provider), rate limiter, fallback Flash → Flash-Lite; fabryka embeddingów (F1)
+  health.py          wspólny format /health i sprawdzenia (Postgres, HTTP, klucz LLM-a)
+  cli.py             polecenie `kovalo`: first-call, ingest, eval
   knowledge/         MP1/MP2: loader, tokeny, chunking (zwykły i z kontekstem), embeddingi, vector store, retriever (+ hybryda BM25)
   cost/              MP1: tokenizer o200k_base, scenariusz kosztów, licznik kosztów per tura
   rag/               MP2: odpowiedź ze źródłami (structured output), rekord przebiegu
@@ -44,14 +46,18 @@ src/kovalo/
   mcp_client/        MP5: połączenie, limity czasu, klasy błędów, walidacja structuredContent
   eval/              MP1–MP5: retrieval, rag (4 poziomy + sędzia), dialogues, trace (5 testów), assistant
   api/               FastAPI: routery, schematy, zależności (graf, checkpointer)
-  ui/                Chainlit: app.py, renderowanie kroków, pauz i źródeł
+  ui/                Chainlit (app.py) zamontowany w FastAPI (server.py, /health); renderowanie kroków, pauz i źródeł
 ```
+
+Punkty wejścia: `kovalo` (CLI), `kovalo-api`, `kovalo-ui`, `kovalo-mcp`. Kontrakty modułów fundamentu (`config`, `llm`, `health`, `cli`) opisuje [contracts/f0.md](contracts/f0.md).
 
 Zasady zależności (sprawdzane w review):
 - `policy/`, `company/`, `cost/` nie importują LangChaina ani niczego z LLM-em: to deterministyczny rdzeń.
 - `tools/` to cienkie nakładki na `knowledge/`, `company/`, `policy/`. `mcp_server/` to cienkie nakładki na `tools/`.
 - `workflow/` nie zna transportu narzędzi: dostaje listę narzędzi (bezpośrednich albo z MCP) przez parametr.
-- `api/` i `ui/` nie zawierają logiki biznesowej.
+- `api/` i `ui/` nie zawierają logiki biznesowej. `ui/` nie importuje `llm`, `workflow`, `agents`, `tools`, `knowledge`, `rag`: rozmawia z `api` przez HTTP.
+- Tylko `llm.py` importuje integracje dostawców (`langchain_google_genai`, `langchain_openai`) i `init_chat_model`. `config.py` i `health.py` nie importują LangChaina.
+- Nazwy modeli są tylko w `config.yaml`. Część zasad sprawdza test `tests/architecture/test_dependencies.py`.
 
 ## 3. Graf copilota (LangGraph)
 
@@ -85,7 +91,7 @@ Każde narzędzie zwraca słownik z polem `status` (`ok / no_data / unknown_supp
 | POST | `/threads/{id}/resume` | `{value}` (liczba / `approved` / `rejected` / `cancel`) → jak wyżej |
 | GET | `/threads/{id}` | stan: status, aktywna pauza, wniosek |
 | GET | `/threads/{id}/trace` | ścieżka dowodowa ostatniej tury |
-| GET | `/health` | stan Postgresa, MCP i LLM-a |
+| GET | `/health` | `HealthReport`: `ok` / `degraded` (200) / `error` (503); sprawdzenia Postgresa (krytyczne), MCP i klucza LLM-a bez wywołania modelu ([contracts/f0.md §6](contracts/f0.md)) |
 
 ## 5. Przepływ indeksowania
 

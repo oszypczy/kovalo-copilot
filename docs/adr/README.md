@@ -7,5 +7,6 @@
 | [0003](0003-local-embeddings.md) | lokalne embeddingi fastembed | proponowany |
 | [0004](0004-postgres-pgvector-checkpointer.md) | Postgres + pgvector jako vector store i checkpointer | przyjęty |
 | [0005](0005-mcp-streamable-http.md) | MCP przez streamable HTTP w kontenerze + stdio | przyjęty |
+| [0006](0006-config-and-llm-factory.md) | kontrakt `config.yaml` i fabryki modeli: `gemini-3.8-flash` → `gemini-3.5-flash-lite`, temperatura dostawcy, fallback tylko przy błędach dostępności | przyjęty |
 
 Nowy ADR: skopiuj [0000-template.md](0000-template.md).
