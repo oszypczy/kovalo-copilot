@@ -201,3 +201,11 @@ def test_postgres_dsn_and_sqlalchemy_url(monkeypatch: pytest.MonkeyPatch):
     s = load_settings()
     assert s.postgres_dsn() == f"postgresql://u:pw@h:{s.db.port}/d"
     assert s.sqlalchemy_url() == f"postgresql+psycopg://u:pw@h:{s.db.port}/d"
+
+
+def test_unknown_override_rejected():
+    # extra="ignore" dotyczy tylko .env/env; literówka w argumencie load_settings ma dawać błąd.
+    from kovalo.config import ConfigError, DbConfig, load_settings
+
+    with pytest.raises(ConfigError, match="dbb"):
+        load_settings(dbb=DbConfig(host="x"))

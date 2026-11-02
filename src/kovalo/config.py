@@ -389,11 +389,29 @@ def _check_yaml_file(path: Path) -> None:
         raise ConfigError(f"Nieznane klucze główne w {path}: {', '.join(unknown)}")
 
 
+def _check_overrides(overrides: dict[str, Any]) -> None:
+    """Settings ma extra="ignore" (obce zmienne w .env), więc literówki w argumentach łapiemy tu."""
+    allowed: set[str] = set()
+    for name, field in Settings.model_fields.items():
+        allowed.add(name)
+        if isinstance(field.alias, str):
+            allowed.add(field.alias)
+        choices = getattr(field.validation_alias, "choices", None)
+        if choices:
+            allowed.update(c for c in choices if isinstance(c, str))
+        elif isinstance(field.validation_alias, str):
+            allowed.add(field.validation_alias)
+    unknown = sorted(set(overrides) - allowed)
+    if unknown:
+        raise ConfigError(f"Nieznane argumenty load_settings: {', '.join(unknown)}")
+
+
 def load_settings(config_file: Path | None = None, **overrides: Any) -> Settings:
     """Ładuje ustawienia bez cache (testy, CLI). Błędy: ConfigError z kluczem i plikiem."""
     path = Path(config_file) if config_file is not None else default_config_file()
     path = path.expanduser().resolve()
     _check_yaml_file(path)
+    _check_overrides(overrides)
     token = _yaml_file.set(path)
     try:
         return Settings(root=path.parent, **overrides)
