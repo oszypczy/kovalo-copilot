@@ -1,4 +1,4 @@
-"""Renderowanie tury dla Chainlita: czyste funkcje, bez chainlit (kontrakt F3, 9.2).
+"""Renderowanie tury dla Chainlita: czyste funkcje, bez chainlit (kontrakt F3, 9.2; F4, 10.2).
 
 UI nie formatuje logiki biznesowej: opis wniosku (`summary`), pytania i odpowiedzi przychodzą
 z api. Tu tylko układ wiadomości, przyciski pauzy i etykiety statusów po polsku.
@@ -6,20 +6,30 @@ z api. Tu tylko układ wiadomości, przyciski pauzy i etykiety statusów po pols
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
-from kovalo.ui.client import ApiCallError, PendingView, TurnView, pause_ref
+from kovalo.ui.client import ApiCallError, PendingView, ToolEventView, TurnView, pause_ref
 
 __all__ = [
     "ACTION_LABELS",
     "CLARIFY_HINT",
+    "EVIDENCE_LINK",
+    "EVIDENCE_STEP",
+    "INTERRUPTED",
     "RESUME_REJECTED",
     "STATUS_LABELS",
+    "TRACE_STATUS_LABELS",
     "UiAction",
     "UiMessage",
     "UiSource",
+    "UiStep",
+    "message_text",
     "render_error",
+    "render_evidence",
     "render_pending",
+    "render_tool_end",
+    "render_tool_start",
     "render_turn",
 ]
 
@@ -33,6 +43,15 @@ STATUS_LABELS = {
     "cancelled": "anulowany",
     "error": "błąd",
 }
+TRACE_STATUS_LABELS = {
+    "answered": "odpowiedź",
+    "error": "błąd",
+    "limit": "limit kroków lub czasu",
+}
+EVIDENCE_STEP = "Ścieżka dowodowa"
+# linia w treści odpowiedzi: Chainlit linkuje nazwę elementu bocznego (cl.Text display="side")
+EVIDENCE_LINK = f"Szczegóły: {EVIDENCE_STEP}"
+INTERRUPTED = "(przerwane)"
 CLARIFY_HINT = "Wpisz marżę w polu czatu (np. 7,5)."
 RESUME_REJECTED = (
     "Nie rozpoznałem odpowiedzi. Kliknij przycisk albo napisz „zatwierdź”, „odrzuć” lub "
@@ -58,6 +77,82 @@ class UiMessage:
     content: str
     actions: list[UiAction] = field(default_factory=list)
     sources: list[UiSource] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class UiStep:
+    """Krok agenta w UI: wywołanie narzędzia (cl.Step) albo ścieżka dowodowa (element boczny)."""
+
+    key: str  # call_id (rodzic: parent_call_id)
+    parent_key: str | None
+    name: str  # nazwa narzędzia; składowe: '↳ get_supplier_otif (odczyt narzędzia)'
+    input: str  # argumenty jako JSON (ensure_ascii=False, wcięcie 2)
+    output: str  # tool_end: brief, przy błędzie 'Błąd: …'; tool_start: ''
+    is_error: bool = False
+
+
+def _step_name(event: ToolEventView) -> str:
+    if event.parent_call_id is not None:
+        return f"↳ {event.tool} (odczyt narzędzia)"
+    return event.tool
+
+
+def _arguments(event: ToolEventView) -> str:
+    return json.dumps(event.arguments, ensure_ascii=False, indent=2)
+
+
+def render_tool_start(event: ToolEventView) -> UiStep:
+    """Początek wywołania narzędzia: nazwa i argumenty, wynik jeszcze pusty."""
+    return UiStep(
+        key=event.call_id,
+        parent_key=event.parent_call_id,
+        name=_step_name(event),
+        input=_arguments(event),
+        output="",
+    )
+
+
+def render_tool_end(event: ToolEventView) -> UiStep:
+    """Koniec wywołania: brief z api albo komunikat błędu („Błąd: …”)."""
+    is_error = event.status not in (None, "ok")
+    if is_error:
+        error = event.error or event.status or "nieznany błąd"
+        output = error if error.startswith("Błąd: ") else f"Błąd: {error}"
+    else:
+        output = event.brief or ""
+    return UiStep(
+        key=event.call_id,
+        parent_key=event.parent_call_id,
+        name=_step_name(event),
+        input=_arguments(event),
+        output=output,
+        is_error=is_error,
+    )
+
+
+def render_evidence(view: TurnView) -> UiStep | None:
+    """„Ścieżka dowodowa” z evidence_path (w UI: panel boczny podlinkowany w odpowiedzi);
+    None, gdy w turze nie było agenta."""
+    if not view.evidence_path:
+        return None
+    return UiStep(
+        key="evidence",
+        parent_key=None,
+        name=EVIDENCE_STEP,
+        input="",
+        output=view.evidence_path,
+    )
+
+
+def message_text(message: UiMessage, evidence: UiStep | None = None) -> str:
+    """Treść wiadomości w czacie: odpowiedź, potem nazwy elementów bocznych (źródła i ścieżka
+    dowodowa), żeby Chainlit podlinkował ich panele."""
+    parts = [message.content] if message.content else []
+    if message.sources:
+        parts.append("Fragmenty: " + ", ".join(s.name for s in message.sources))
+    if evidence is not None:
+        parts.append(EVIDENCE_LINK)
+    return "\n\n".join(parts)
 
 
 def render_pending(pending: PendingView) -> UiMessage:
@@ -94,7 +189,10 @@ def render_turn(view: TurnView) -> list[UiMessage]:
         messages.append(render_pending(view.pending))
         return messages
     if view.status is not None:
-        status = f"Status: {STATUS_LABELS.get(view.status, view.status)}"
+        label = STATUS_LABELS.get(view.status, view.status)
+        if view.trace is not None and view.trace.get("status") == "limit":
+            label = TRACE_STATUS_LABELS["limit"]
+        status = f"Status: {label}"
         if messages:
             last = messages[-1]
             messages[-1] = UiMessage(

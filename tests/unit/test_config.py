@@ -535,3 +535,97 @@ def test_workflow_config_rejected(tmp_config: Path, patch_config, workflow):
     patch_config(tmp_config, "workflow", workflow)
     with pytest.raises(ConfigError):
         load_settings(tmp_config, google_api_key="test-key")
+
+
+# ---------------------------------------------------------------------------
+# F4 (kontrakt: docs/contracts/f4.md, sekcja 4)
+# ---------------------------------------------------------------------------
+
+
+def test_f4_config_keys_load():
+    from decimal import Decimal
+
+    from kovalo.config import load_settings
+
+    s = load_settings(google_api_key="test-key")
+    assert s.tools.variant == "ours"
+    assert s.workflow.answerer == "agent"
+    assert s.workflow.understand_prompt == "assistant_understand_system"
+    assert s.services.sse_ping_s == 15
+    terms = s.company.termination_terms["SUP-114"]
+    assert terms.otif_below_pct == Decimal(94) and terms.consecutive_months == 3
+    assert terms.notice_days == 60 and terms.source_doc_id == "CON-101"
+    assert s.company.termination_version == "termination-v1"
+    assert set(s.company.termination_terms) == {"SUP-114"}
+    assert (s.agent.max_steps, s.agent.timeout_s) == (24, 180), "PINNED"
+    assert s.paths.company_data_dir == s.root / "data" / "company"
+
+
+def test_termination_terms_match_con101():
+    """Wartości z config.yaml są przepisane z tekstu umowy: test pilnuje zgodności (ADR-0011)."""
+    from kovalo.config import load_settings
+
+    s = load_settings(google_api_key="test-key")
+    terms = s.company.termination_terms["SUP-114"]
+    path = next((s.paths.corpus_dir).glob("CON-101*.md"))
+    text = path.read_text(encoding="utf-8")
+    assert "trzy kolejne miesiące wynosi mniej niż 94%" in text
+    assert "60-dniowym" in text
+    assert terms.consecutive_months == 3 and terms.notice_days == 60
+    assert terms.source_doc_id == "CON-101" and terms.otif_below_pct == 94
+
+
+def test_prompts_by_name():
+    from kovalo.config import load_settings
+
+    prompts = load_settings(google_api_key="test-key").prompts
+    assert prompts.by_name("assistant_understand_system") == prompts.assistant_understand_system
+    assert prompts.by_name("understand_system") == prompts.understand_system
+    assert prompts.by_name("understand_system") != prompts.by_name("assistant_understand_system")
+    with pytest.raises(KeyError):
+        prompts.by_name("nie_ma_takiego")
+
+
+_TERMS = {
+    "SUP-114": {
+        "source_doc_id": "CON-101",
+        "otif_below_pct": 94,
+        "consecutive_months": 3,
+        "notice_days": 60,
+    }
+}
+
+
+@pytest.mark.parametrize(
+    ("dotted", "good", "bad"),
+    [
+        ("tools.variant", "course", "all"),
+        ("workflow.answerer", "rag", "mcp"),
+        ("workflow.understand_prompt", "understand_system", "answer_system"),
+        ("services.sse_ping_s", 5, 0),
+        ("company.termination_terms", _TERMS, {"SUP-114": {**_TERMS["SUP-114"], "otif_below_pct": 0}}),  # noqa: E501
+        (
+            "company.termination_terms",
+            _TERMS,
+            {"SUP-114": {**_TERMS["SUP-114"], "consecutive_months": 0}},
+        ),
+        ("company.termination_terms", _TERMS, {"SUP-114": {**_TERMS["SUP-114"], "notice_days": -1}}),  # noqa: E501
+    ],
+)  # fmt: skip
+def test_f4_config_validation(tmp_config: Path, patch_config, dotted, good, bad):
+    from kovalo.config import ConfigError
+
+    patch_config(tmp_config, dotted, good)
+    _f1_settings(tmp_config)  # poprawna wartość się wczytuje (klucz istnieje)
+    patch_config(tmp_config, dotted, bad)
+    with pytest.raises(ConfigError):
+        _f1_settings(tmp_config)
+
+
+def test_f4_env_overrides(monkeypatch: pytest.MonkeyPatch):
+    from kovalo.config import load_settings
+
+    monkeypatch.setenv("KOVALO_WORKFLOW__ANSWERER", "rag")
+    monkeypatch.setenv("KOVALO_TOOLS__VARIANT", "course")
+    s = load_settings(google_api_key="test-key")
+    assert (s.workflow.answerer, s.tools.variant) == ("rag", "course")

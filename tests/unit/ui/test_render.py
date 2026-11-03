@@ -145,3 +145,116 @@ async def test_render_error_messages():
     unreachable = render_error(await _api_error(0, "api_unreachable", "timeout"))
     assert "api nie odpowiada" in unreachable.content.lower()
     assert not unavailable.actions and not unreachable.actions
+
+
+# ---------------------------------------------------------------------------
+# F4: kroki agenta (kontrakt F4, 10.2)
+# ---------------------------------------------------------------------------
+
+
+def tool_view(**fields):
+    from kovalo.ui.client import ToolEventView
+
+    base = {
+        "call_id": "c1",
+        "tool": "get_contract_terms",
+        "arguments": {"supplier": "Mleczna Dolina"},
+        "origin": "data",
+    }
+    base.update(fields)
+    return ToolEventView(**base)
+
+
+def test_render_tool_steps():
+    import json
+
+    from kovalo.ui.render import UiStep, render_tool_end, render_tool_start
+
+    start = render_tool_start(tool_view())
+    assert isinstance(start, UiStep)
+    assert (start.key, start.parent_key, start.name) == ("c1", None, "get_contract_terms")
+    assert json.loads(start.input) == {"supplier": "Mleczna Dolina"}
+    assert start.output == "" and start.is_error is False
+    assert start.input == json.dumps({"supplier": "Mleczna Dolina"}, ensure_ascii=False, indent=2)
+
+    unicode_args = render_tool_start(tool_view(arguments={"question": "wypowiedzenie umowy żółć"}))
+    assert "żółć" in unicode_args.input, "ensure_ascii=False"
+
+    end = render_tool_end(tool_view(status="ok", brief='ok: {"supplier_id": "SUP-114"}'))
+    assert (end.key, end.output, end.is_error) == ("c1", 'ok: {"supplier_id": "SUP-114"}', False)
+
+    derived = render_tool_start(
+        tool_view(
+            call_id="c2#get_supplier_otif",
+            parent_call_id="c2",
+            tool="get_supplier_otif",
+            agent="check_termination_condition",
+        )
+    )
+    assert derived.parent_key == "c2" and derived.key == "c2#get_supplier_otif"
+    assert derived.name == "↳ get_supplier_otif (odczyt narzędzia)"
+    derived_end = render_tool_end(
+        tool_view(
+            call_id="c2#get_supplier_otif",
+            parent_call_id="c2",
+            tool="get_supplier_otif",
+            brief="ok: x",
+        )
+    )
+    assert derived_end.parent_key == "c2" and derived_end.name == derived.name
+
+    failed = render_tool_end(
+        tool_view(status="error", error="Błąd: RuntimeError: embedding service unavailable")
+    )
+    assert failed.is_error is True
+    assert "RuntimeError: embedding service unavailable" in failed.output
+    assert failed.output.startswith("Błąd: ") and not failed.output.startswith("Błąd: Błąd:")
+
+
+def test_render_evidence():
+    from kovalo.ui.render import render_evidence
+
+    agent_turn = view(
+        replies=["Kara wynosi 7296,00 PLN."],
+        evidence_path="P1  Ile wynosi kara?\nstatus: answered",
+        trace={"status": "answered"},
+    )
+    step = render_evidence(agent_turn)
+    assert step is not None and step.name == "Ścieżka dowodowa"
+    assert step.output == "P1  Ile wynosi kara?\nstatus: answered"
+    assert render_evidence(view(replies=["Odpowiedź RAG."])) is None, "tylko tura z agentem"
+    assert render_evidence(view(status="pending_approval", pending=APPROVAL)) is None
+
+
+def test_trace_status_labels_and_limit_line():
+    from kovalo.ui.render import TRACE_STATUS_LABELS, render_turn
+
+    assert TRACE_STATUS_LABELS == {
+        "answered": "odpowiedź",
+        "error": "błąd",
+        "limit": "limit kroków lub czasu",
+    }
+    limited = render_turn(
+        view(status="error", replies=["Przerwałem pracę."], trace={"status": "limit"})
+    )
+    assert limited[-1].content.splitlines()[-1] == "Status: limit kroków lub czasu"
+    normal = render_turn(
+        view(status="answered", replies=["Odpowiedź."], trace={"status": "answered"})
+    )
+    assert normal[-1].content.splitlines()[-1] == "Status: odpowiedź"
+
+
+def test_message_text_links_side_elements():
+    from kovalo.ui.render import EVIDENCE_LINK, UiMessage, UiSource, UiStep, message_text
+
+    evidence = UiStep(
+        key="evidence", parent_key=None, name="Ścieżka dowodowa", input="", output="x"
+    )
+    plain = UiMessage(content="Odpowiedź.\n\nStatus: odpowiedź")
+    assert message_text(plain) == plain.content
+    source = UiSource(name="CON-114#ctx002", content="t")
+    sourced = UiMessage(content="Odpowiedź.", sources=[source])
+    assert message_text(sourced) == "Odpowiedź.\n\nFragmenty: CON-114#ctx002"
+    assert message_text(sourced, evidence).endswith("\n\nSzczegóły: Ścieżka dowodowa")
+    assert EVIDENCE_LINK == "Szczegóły: Ścieżka dowodowa"
+    assert message_text(UiMessage(content=""), evidence) == EVIDENCE_LINK

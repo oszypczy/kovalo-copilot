@@ -71,7 +71,7 @@ class Turn(BaseModel):
 class LlmCall(BaseModel):
     """NASZE: jedno wywołanie modelu w turze (FR-6.5)."""
 
-    purpose: Literal["understand", "answer"]
+    purpose: Literal["understand", "answer", "agent"]
     model: str | None = None  # response_metadata['model_name'] (fallback widoczny)
     usage: TokenUsage | None = None
     seconds: float | None = None

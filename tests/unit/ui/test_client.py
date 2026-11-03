@@ -126,3 +126,163 @@ async def test_turn_view_accepts_turn_result():
     )
     view = TurnView.model_validate(clarification.model_dump(mode="json"))
     assert view.pending.field == "margin_after_pct" and view.pending.question == "Jaka marża?"
+
+
+# ---------------------------------------------------------------------------
+# F4: strumień tury i /trace (kontrakt F4, 10.1; ADR-0012)
+# ---------------------------------------------------------------------------
+
+from tests.unit.ui.conftest import sse_body, tool_end, tool_start  # noqa: E402
+
+
+async def collect(client, text="Ile wynosi kara?"):
+    return [item async for item in client.stream_message("T1", text)]
+
+
+async def test_stream_message_parses_events(mock_stream):
+    from kovalo.ui.client import ToolEventView, TurnView
+
+    final = turn_result(
+        status="answered",
+        replies=["Kara wynosi 7296,00 PLN."],
+        trace={"status": "answered", "events": []},
+        evidence_path="P1  Ile wynosi kara?\nstatus: answered",
+    )
+    body = sse_body(
+        ("tool_start", tool_start()),
+        ("tool_end", tool_end()),
+        (
+            "tool_start",
+            tool_start("c2#get_supplier_otif", "get_supplier_otif", parent_call_id="c2"),
+        ),
+        ("final", final),
+        ping=True,
+    )
+    recorder = mock_stream(("sse", body))
+    items = await collect(make_client(recorder))
+    assert [kind for kind, _ in items] == ["tool_start", "tool_end", "tool_start", "final"]
+    start, end, derived, last = (item for _, item in items)
+    assert isinstance(start, ToolEventView) and start.tool == "get_contract_terms"
+    assert start.arguments == {"supplier": "Mleczna Dolina"} and start.origin == "data"
+    assert start.parent_call_id is None and start.agent == "agent"
+    assert end.status == "ok" and end.brief.startswith("ok:") and end.error is None
+    assert derived.parent_call_id == "c2"
+    assert isinstance(last, TurnView) and last.replies == ["Kara wynosi 7296,00 PLN."]
+    assert last.trace["status"] == "answered" and last.evidence_path.startswith("P1")
+    method, path, sent, headers = recorder.requests[0]
+    assert (method, path) == ("POST", "/threads/T1/messages/stream")
+    assert sent == {"text": "Ile wynosi kara?"}
+    assert "text/event-stream" in headers.get("accept", "")
+
+
+async def test_stream_error_event_is_api_call_error(mock_stream):
+    from kovalo.ui.client import ApiCallError
+
+    body = sse_body(
+        ("tool_start", tool_start()),
+        ("error", {"error": "copilot_unavailable", "detail": "Postgres niedostępny"}),
+    )
+    client = make_client(mock_stream(("sse", body)))
+    seen = []
+    with pytest.raises(ApiCallError) as info:
+        async for item in client.stream_message("T1", "x"):
+            seen.append(item[0])
+    assert seen == ["tool_start"]
+    assert (info.value.status, info.value.error) == (200, "copilot_unavailable")
+    assert "Postgres" in info.value.detail
+
+
+async def test_truncated_stream_is_interrupted(mock_stream):
+    from kovalo.ui.client import ApiCallError
+
+    body = sse_body(("tool_start", tool_start()), ("tool_end", tool_end()))  # bez final
+    client = make_client(mock_stream(("sse", body)))
+    with pytest.raises(ApiCallError) as info:
+        await collect(client)
+    assert info.value.status == 0 and info.value.error == "stream_interrupted"
+
+
+async def test_stream_http_errors_before_the_stream(mock_stream):
+    from kovalo.ui.client import ApiCallError
+
+    pending = approval_pending()
+    recorder = mock_stream(
+        (409, {"error": "thread_paused", "detail": "Wątek czeka: CFO.", "pending": pending}),
+        (503, {"error": "copilot_unavailable", "detail": "Brak klucza", "pending": None}),
+        (422, {"error": "invalid_request", "detail": "Wiadomość jest pusta.", "pending": None}),
+        httpx.ConnectError("odmowa połączenia"),
+    )
+    client = make_client(recorder)
+    with pytest.raises(ApiCallError) as paused:
+        await collect(client)
+    assert paused.value.status == 409 and paused.value.error == "thread_paused"
+    assert paused.value.pending["role"] == "CFO"
+    with pytest.raises(ApiCallError) as unavailable:
+        await collect(client)
+    assert unavailable.value.status == 503 and unavailable.value.error == "copilot_unavailable"
+    with pytest.raises(ApiCallError) as invalid:
+        await collect(client)
+    assert invalid.value.status == 422
+    with pytest.raises(ApiCallError) as unreachable:
+        await collect(client)
+    assert unreachable.value.status == 0 and unreachable.value.error == "api_unreachable"
+
+
+async def test_stream_without_events_is_interrupted(mock_stream):
+    from kovalo.ui.client import ApiCallError
+
+    client = make_client(mock_stream(("sse", b"")))
+    with pytest.raises(ApiCallError) as info:
+        await collect(client)
+    assert info.value.error == "stream_interrupted"
+
+
+async def test_get_trace(mock_stream):
+    from kovalo.ui.client import TraceView
+
+    recorder = mock_stream(
+        (
+            200,
+            {
+                "thread_id": "T1",
+                "trace_id": "abc",
+                "trace": {"status": "answered"},
+                "evidence_path": "P1 ...",
+                "created_at": None,
+                "question": "Q",
+            },
+        ),
+        (200, {"thread_id": "T2", "trace": None, "evidence_path": None}),
+    )
+    client = make_client(recorder)
+    view = await client.get_trace("T1")
+    assert isinstance(view, TraceView) and view.thread_id == "T1"
+    assert view.trace["status"] == "answered" and view.evidence_path == "P1 ..."
+    assert (await client.get_trace("T2")).trace is None
+    assert [(m, p) for m, p, *_ in recorder.requests] == [
+        ("GET", "/threads/T1/trace"),
+        ("GET", "/threads/T2/trace"),
+    ]
+
+
+async def test_turn_view_accepts_f4_turn_result():
+    """Kontrakt UI ↔ API: TurnResult z `trace` i `evidence_path` waliduje się w TurnView."""
+    from kovalo.ui.client import TurnView
+    from kovalo.workflow.service import TurnResult
+
+    result = TurnResult(
+        thread_id="T1",
+        status="answered",
+        replies=["Kara wynosi 7296,00 PLN."],
+        pending=None,
+        trace={"status": "limit", "events": [], "answer": None},
+        evidence_path="P1  Ile wynosi kara?",
+    )
+    view = TurnView.model_validate(result.model_dump(mode="json"))
+    assert view.evidence_path == "P1  Ile wynosi kara?" and view.trace["status"] == "limit"
+    plain = TurnView.model_validate(
+        TurnResult(thread_id="T1", status="answered", replies=[], pending=None).model_dump(
+            mode="json"
+        )
+    )
+    assert plain.trace is None and plain.evidence_path is None

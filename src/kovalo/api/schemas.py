@@ -1,6 +1,7 @@
 """Modele żądań i błędów API wątków (kontrakt F3, 8.2; ADR-0010).
 
-Odpowiedzi 200 to modele serwisu (`TurnResult`, `ThreadState` z kovalo.workflow.service);
+Odpowiedzi 200 to modele serwisu (`TurnResult`, `ThreadState`, `TraceView` z
+kovalo.workflow.service);
 tu są tylko wejścia i wspólne ciało błędu.
 """
 
@@ -10,9 +11,12 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, StrictFloat, StrictInt, model_validator
 
-from kovalo.workflow.service import PauseRef, PendingPause
+from kovalo.workflow.service import PauseRef, PendingPause, TraceView
 
-__all__ = ["ApiError", "MessageIn", "PauseRef", "ResumeIn", "ThreadCreated"]
+__all__ = ["ApiError", "MessageIn", "PauseRef", "ResumeIn", "ThreadCreated", "TraceOut"]
+
+# GET /threads/{id}/trace: ostatni trace agenta w wątku i jego ścieżka dowodowa (F4, sekcja 9)
+TraceOut = TraceView
 
 
 class ThreadCreated(BaseModel):

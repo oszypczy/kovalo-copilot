@@ -1,8 +1,11 @@
-"""Router /threads: cienka warstwa nad CopilotService (FR-6.1; kontrakt F3, 8.1; ADR-0010).
+"""Router /threads: cienka warstwa nad CopilotService (FR-6.1; kontrakt F3, 8.1; F4, 9;
+ADR-0010, ADR-0012).
 
 Bez reguł biznesowych: walidacja wejścia, wywołanie serwisu, mapowanie błędów serwisu na
 kody HTTP. Endpointy są synchroniczne (`def`): graf i PostgresSaver są synchroniczne, więc
-FastAPI uruchamia je w puli wątków.
+FastAPI uruchamia je w puli wątków. Ścieżki `/stream` zgłaszają błędy wykrywalne przed turą
+jako zwykły JSON ApiError, a potem zwracają text/event-stream (tool_start, tool_end, final
+albo error).
 """
 
 from __future__ import annotations
@@ -12,10 +15,14 @@ from collections.abc import Callable
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 
-from kovalo.api.deps import get_copilot_service
-from kovalo.api.schemas import ApiError, MessageIn, ResumeIn, ThreadCreated
+from kovalo.api.deps import get_copilot_service, get_settings
+from kovalo.api.schemas import ApiError, MessageIn, ResumeIn, ThreadCreated, TraceOut
+from kovalo.api.sse import SSE_HEADERS, sse_body
+from kovalo.config import Settings
 from kovalo.workflow import (
+    CheckpointerUnavailableError,
     CopilotService,
     NotPausedError,
     PendingPause,
@@ -36,8 +43,17 @@ _ERRORS: dict[int | str, dict[str, Any]] = {
     503: {"model": ApiError, "description": "Copilot niedostępny (klucz LLM-a, Postgres)"},
 }
 
+_SSE: dict[int | str, dict[str, Any]] = {
+    200: {
+        "content": {"text/event-stream": {}},
+        "description": "Strumień SSE: tool_start*, tool_end*, final albo error",
+    },
+    **_ERRORS,
+}
+
 router = APIRouter(prefix="/threads", tags=["threads"])
 Service = Annotated[CopilotService, Depends(get_copilot_service)]
+AppSettings = Annotated[Settings, Depends(get_settings)]
 
 
 class ApiProblem(Exception):
@@ -69,8 +85,20 @@ def _call[T](fn: Callable[[], T]) -> T:
             "thread_stuck",
             f"{exc} Ten wątek nie przyjmie już wiadomości; zacznij nową rozmowę.",
         ) from exc
+    except CheckpointerUnavailableError as exc:  # R1-2: utrata Postgresa w trakcie pracy
+        raise ApiProblem(503, "copilot_unavailable", str(exc)) from exc
     except ValueError as exc:  # pusta / za długa wiadomość, value i text razem
         raise ApiProblem(422, "invalid_request", str(exc)) from exc
+
+
+def _event_stream(stream: Any, settings: Settings) -> StreamingResponse:
+    """text/event-stream z gotowych bajtów sse_body (StreamingResponse zamiast
+    fastapi.sse.EventSourceResponse: ta druga oczekuje generatora w samym endpoincie)."""
+    return StreamingResponse(
+        sse_body(stream, ping_s=settings.services.sse_ping_s),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
+    )
 
 
 @router.post("", status_code=201, response_model=ThreadCreated)
@@ -93,6 +121,34 @@ def resume(thread_id: uuid.UUID, body: ResumeIn, service: Service) -> TurnResult
             str(thread_id), value=body.value, text=body.text, pause_ref=body.pause_ref
         )
     )
+
+
+@router.post("/{thread_id}/messages/stream", response_model=None, responses=_SSE)
+def send_message_stream(
+    thread_id: uuid.UUID, body: MessageIn, service: Service, settings: AppSettings
+) -> StreamingResponse:
+    """Nowa wiadomość jako strumień SSE kroków agenta i wyniku tury (ADR-0012)."""
+    stream = _call(lambda: service.start_message(str(thread_id), body.text))
+    return _event_stream(stream, settings)
+
+
+@router.post("/{thread_id}/resume/stream", response_model=None, responses=_SSE)
+def resume_stream(
+    thread_id: uuid.UUID, body: ResumeIn, service: Service, settings: AppSettings
+) -> StreamingResponse:
+    """Odpowiedź na pauzę jako strumień SSE (zwykle sam `final`)."""
+    stream = _call(
+        lambda: service.start_resume(
+            str(thread_id), value=body.value, text=body.text, pause_ref=body.pause_ref
+        )
+    )
+    return _event_stream(stream, settings)
+
+
+@router.get("/{thread_id}/trace", response_model=TraceOut, responses=_ERRORS)
+def get_trace(thread_id: uuid.UUID, service: Service) -> TraceOut:
+    """Ostatni trace agenta w wątku (z historii checkpointów); bez tury agenta → trace null."""
+    return _call(lambda: service.get_trace(str(thread_id)))
 
 
 @router.get("/{thread_id}", response_model=ThreadState, responses=_ERRORS)

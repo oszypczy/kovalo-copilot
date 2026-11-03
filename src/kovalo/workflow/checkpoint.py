@@ -24,6 +24,7 @@ from kovalo.config import Settings
 
 __all__ = [
     "CHECKPOINT_TYPES",
+    "CONNECTION_ERRORS",
     "CheckpointerUnavailableError",
     "memory_checkpointer",
     "open_checkpointer",
@@ -39,7 +40,8 @@ CHECKPOINT_TYPES: list[tuple[str, str]] = [
 
 
 class CheckpointerUnavailableError(RuntimeError):
-    """Postgres niedostępny przy otwieraniu puli albo setup(). Komunikat bez DSN i hasła."""
+    """Postgres niedostępny przy otwieraniu puli, setup() albo w trakcie pracy (odczyt stanu,
+    zapis checkpointu). Komunikat bez DSN i hasła."""
 
 
 def serializer() -> JsonPlusSerializer:
@@ -52,8 +54,10 @@ def memory_checkpointer() -> InMemorySaver:
     return InMemorySaver(serde=serializer())
 
 
-_CONNECTION_ERRORS: tuple[type[BaseException], ...] = (
+# Utrata połączenia z Postgresem przy otwieraniu i w trakcie pracy (R1-2, ADR-0012 pkt 7).
+CONNECTION_ERRORS: tuple[type[BaseException], ...] = (
     psycopg.OperationalError,
+    psycopg.InterfaceError,
     PoolTimeout,
     OSError,
     TimeoutError,
@@ -87,7 +91,7 @@ def postgres_checkpointer(settings: Settings, *, setup: bool = True) -> Iterator
             saver = PostgresSaver(cast(Any, pool), serde=serializer())
             if setup:
                 saver.setup()
-        except _CONNECTION_ERRORS as exc:
+        except CONNECTION_ERRORS as exc:
             # komunikaty sterownika mogą zawierać DSN, więc zostaje tylko klasa błędu
             raise CheckpointerUnavailableError(
                 f"Postgres niedostępny dla checkpointów ({type(exc).__name__}). "

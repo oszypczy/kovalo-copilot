@@ -217,3 +217,26 @@ def test_all_live_errors_raise_with_report(session_settings, fake_embeddings):
     report = info.value.report
     assert all("ValueError: sztuczny błąd" in e["error"] for e in report.live.transcript)
     assert report.replay.score["route"] == [3, 3]
+
+
+def test_e3_ignores_workflow_answerer_and_prompt(session_settings, monkeypatch, e3_replay_report):
+    """F4 (kontrakt 8.2): E3 podaje jawnie document_answerer i prompt understand_system, więc
+    `workflow.answerer: agent` i `understand_prompt: assistant_understand_system` niczego
+    nie zmieniają i nie uruchamiają agenta."""
+    from kovalo.config import load_settings
+    from kovalo.eval.workflow.e3 import run_e3
+    from kovalo.llm import override_chat_model
+    from tests.workflow_fakes import ExplodingChatModel
+
+    monkeypatch.setenv("KOVALO_WORKFLOW__ANSWERER", "agent")
+    monkeypatch.setenv("KOVALO_WORKFLOW__UNDERSTAND_PROMPT", "assistant_understand_system")
+    settings = load_settings(google_api_key="test-key")
+    assert settings.workflow.answerer == "agent"
+    assert settings.workflow.understand_prompt == "assistant_understand_system"
+    exploding = ExplodingChatModel()
+    with override_chat_model(exploding):
+        report = run_e3(settings)
+    assert exploding.calls == [], "zero wywołań modelu, także agenta"
+    assert stage_text(report.replay.score) == stage_text(e3_replay_report.replay.score)
+    assert stage_text(report.replay.score) == {k: [n, n] for k, n in COURSE.items()}
+    assert report.replay.calls.understand == 0 and report.replay.calls.answer == 0

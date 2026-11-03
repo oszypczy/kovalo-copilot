@@ -52,6 +52,10 @@ repozytorium danych firmy, kalkulator kary (Decimal/grosze), 6 narzędzi + `chec
 
 **Gotowe, gdy:** P1–P3 dają dokładnie 729 600 / 362 400 / 0 groszy; raport E4; T1 poprawne.
 
+**Kontrakt i zadania:** [contracts/f4.md](contracts/f4.md) (zadania D1, T1, A0–A10, T2, D2, R1; w tym R1-2, R1-3, R1-5 i odłożone SSE z F3); decyzje: [ADR-0011](adr/0011-agent-tools-f4.md) (agent, narzędzia, trace, E4) i [ADR-0012](adr/0012-sse-agent-steps-f4.md) (SSE, kroki w UI), oba zaakceptowane. Budżet: testy, przeliczenie i odtworzenie E4 bez LLM-a; `eval e4 --live` ≈ 22–25 wywołań w dwóch dniach (`--ids`, `--max-calls 20`), powtórka z cache 0, test na żywo ≤ 4, UI i compose ≈ 14 (zamknięcie F4 ≈ 40).
+
+**Status (2026-11-03):** kod, testy bez LLM-a, `-m integration` (20/20) i `-m live` (`test_e4_live.py`) zielone; przegląd R1 bez naruszeń i bez problemów blokujących ([contracts/f4.md §18](contracts/f4.md)). E4 ([raport](../reports/mp4/2026-11-03-e4.md)): przeliczenie kursu zgodne z README, odtworzenie 21 wywołań z argumentami 3/3; na żywo `gemini-3.5-flash-lite` (24 tury, 0 błędów): narzędzia 8/9, argumenty 3/3, fakty 8/9, 0 liczb bez źródła, 0/9 twierdzeń o zatwierdzeniu; P1–P3 = 729 600 / 362 400 / 0 groszy; **T1 poprawne** (kurs: błędne). Znana słabość: B1 (odmowa bez sprawdzenia polityki), kandydat na `agent_system_v2` w F5. W compose: SSE z krokami agenta, `/trace` po restarcie, rozłączenie bez `thread_stuck`; UI z krokami, ścieżką dowodową i lokalizacją pl-PL przeklikane (P1, D2). ADR-0011 i ADR-0012 zaakceptowane. Zużycie Gemini w F4: około 47 wywołań.
+
 ## F5: MCP i końcowy asystent (MP5)
 
 serwer FastMCP (stdio + streamable HTTP) jako kontener, klient MCP z limitami i 4 klasami błędów, podmiana węzła `answer_with_tools`, prompt `assistant_understand_system`, ewaluacja E5, test w MCP Inspector i Claude Desktop/Claude Code.

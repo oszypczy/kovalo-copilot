@@ -1,7 +1,14 @@
-"""Chainlit: czat copilota przez HTTP do api (FR-6.2, część; kontrakt F3, 9.3; ADR-0010).
+"""Chainlit: czat copilota przez HTTP do api (FR-6.2; kontrakt F3, 9.3; F4, 10.3; ADR-0010,
+ADR-0012).
 
 UI nie importuje backendu (workflow, api): tylko kovalo.ui.client i kovalo.ui.render.
 - Odświeżenie strony = nowa sesja = nowy wątek (decyzja U9: stary wątek zostaje w Postgresie).
+- Nowa wiadomość idzie strumieniem (SSE): każde wywołanie narzędzia agenta to cl.Step
+  zagnieżdżony w kroku `on_message` tury (zdarzenie składowe pod krokiem rodzica). Odpowiedź
+  idzie po `final`, więc stoi pod krokami. Chainlit 2.12 rysuje kroki-dzieci wiadomości POD jej
+  treścią, dlatego kroki nie są dziećmi wiadomości odpowiedzi.
+- „Ścieżka dowodowa” to element boczny (cl.Text display="side") podlinkowany w odpowiedzi,
+  nie cl.Step: nagłówek kroku zawsze ma prefiks „Używam/Użyto”, a ścieżka nie jest narzędziem.
 - Gdy wątek czeka na pauzę, tekst wpisany w czacie idzie do /resume jako `text` (marża „7,5”,
   „zatwierdź”, „odrzuć”, „anuluj”), jak chat.py kursu; przyciski to cl.Action z callbackiem.
 """
@@ -14,14 +21,19 @@ import chainlit as cl
 
 from kovalo.config import get_settings
 from kovalo.ui.client import ApiCallError, CopilotApiClient, PendingView, TurnView, pause_ref
-from kovalo.ui.render import UiMessage, render_error, render_pending, render_turn
-
-WELCOME = (
-    "Dzień dobry, tu Kovalo Decision Copilot. Mogę:\n"
-    "- odpowiedzieć na pytania o dokumenty Kovalo (ze źródłami),\n"
-    "- sprawdzić, kto zatwierdza rabat według polityki course-v1,\n"
-    "- przesłać wniosek rabatowy do akceptacji."
+from kovalo.ui.render import (
+    INTERRUPTED,
+    UiMessage,
+    UiStep,
+    message_text,
+    render_error,
+    render_evidence,
+    render_pending,
+    render_tool_end,
+    render_tool_start,
+    render_turn,
 )
+
 STALE = "Ta decyzja jest nieaktualna: wątek czeka już na inną odpowiedź."
 RESUME_ACTION = "resume"
 
@@ -32,7 +44,7 @@ def _client() -> CopilotApiClient:
     return client
 
 
-async def _send(message: UiMessage) -> cl.Message:
+async def _send(message: UiMessage, evidence: UiStep | None = None) -> cl.Message:
     actions = [
         cl.Action(
             name=RESUME_ACTION,
@@ -44,12 +56,12 @@ async def _send(message: UiMessage) -> cl.Message:
     elements: list[Any] = [
         cl.Text(name=s.name, content=s.content, display="side") for s in message.sources
     ]
-    if elements:  # nazwy źródeł w treści, żeby Chainlit podlinkował panele boczne
-        names = ", ".join(s.name for s in message.sources)
-        content = f"{message.content}\n\nFragmenty: {names}"
-    else:
-        content = message.content
-    msg = cl.Message(content=content, actions=actions, elements=elements)
+    if evidence is not None:  # tekst z wcięciami: blok bez formatowania markdown
+        elements.append(
+            cl.Text(name=evidence.name, content=evidence.output, display="side", language="text")
+        )
+    # nazwy elementów w treści (message_text): Chainlit podlinkuje ich panele boczne
+    msg = cl.Message(content=message_text(message, evidence), actions=actions, elements=elements)
     await msg.send()
     return msg
 
@@ -65,12 +77,81 @@ async def _clear_pause_actions() -> None:
 async def _show(view: TurnView) -> None:
     """Renderuje turę i zapamiętuje bieżącą pauzę (albo jej brak) w sesji."""
     await _clear_pause_actions()
+    messages = render_turn(view)
+    evidence = render_evidence(view)
+    if evidence is not None and not messages:
+        messages = [UiMessage(content="")]
     last: cl.Message | None = None
-    for message in render_turn(view):
-        last = await _send(message)
+    for n, message in enumerate(messages, start=1):  # ścieżka dowodowa przy ostatniej
+        last = await _send(message, evidence if n == len(messages) else None)
     cl.user_session.set("pending", view.pending)
     if view.pending is not None:
         cl.user_session.set("pause_message", last)
+
+
+class _ToolSteps:
+    """cl.Step na każde wywołanie narzędzia: tool_start tworzy krok, tool_end go uzupełnia.
+
+    Krok wywołania agenta ma rodzica `root_id` (krok `on_message` tury): Chainlit rysuje go
+    w kolejności przyjścia, z awatarem asystenta, a odpowiedź wysłana po `final` stoi pod nim.
+    Zdarzenie składowe (np. get_supplier_otif) idzie pod krok rodzica.
+    """
+
+    def __init__(self, root_id: str | None) -> None:
+        self.root_id = root_id
+        self.steps: dict[str, cl.Step] = {}
+        self.open: set[str] = set()
+
+    async def start(self, ui: UiStep) -> None:
+        parent = self.steps.get(ui.parent_key) if ui.parent_key else None
+        step = cl.Step(
+            name=ui.name,
+            type="tool",
+            parent_id=parent.id if parent is not None else self.root_id,
+            show_input="json",
+            language="json",
+        )
+        step.input = ui.input
+        await step.send()
+        self.steps[ui.key] = step
+        self.open.add(ui.key)
+
+    async def end(self, ui: UiStep) -> None:
+        step = self.steps.get(ui.key)
+        if step is None:  # tool_end bez tool_start (nie powinno się zdarzyć)
+            await self.start(ui)
+            step = self.steps[ui.key]
+        step.output = ui.output
+        step.is_error = ui.is_error
+        await step.update()
+        self.open.discard(ui.key)
+
+    async def interrupt(self) -> None:
+        """Kroki z tool_start bez tool_end dostają „(przerwane)”."""
+        for key in sorted(self.open):
+            step = self.steps[key]
+            step.output = INTERRUPTED
+            await step.update()
+        self.open.clear()
+
+
+async def _stream_turn(thread_id: str, text: str) -> TurnView:
+    run = cl.context.current_run  # krok `on_message`: bez rodzica kroki byłyby osierocone
+    steps = _ToolSteps(run.id if run is not None else None)
+    try:
+        async for kind, item in _client().stream_message(thread_id, text):
+            if kind == "tool_start":
+                await steps.start(render_tool_start(item))  # type: ignore[arg-type]
+            elif kind == "tool_end":
+                await steps.end(render_tool_end(item))  # type: ignore[arg-type]
+            elif kind == "final":
+                assert isinstance(item, TurnView)
+                return item
+    except ApiCallError:
+        await steps.interrupt()
+        raise
+    await steps.interrupt()
+    raise ApiCallError(0, "stream_interrupted", "Strumień api skończył się bez wyniku tury.")
 
 
 async def _refresh_pending(thread_id: str) -> None:
@@ -102,7 +183,7 @@ async def on_chat_start() -> None:
     cl.user_session.set("pending", None)
     cl.user_session.set("pause_message", None)
     cl.user_session.set("thread_id", None)
-    await cl.Message(content=WELCOME).send()
+    # bez powitania: domyślny pusty ekran Chainlita; możliwości opisuje OTHER_REPLY
     try:
         cl.user_session.set("thread_id", await client.create_thread())
     except ApiCallError as error:
@@ -135,7 +216,7 @@ async def on_message(message: cl.Message) -> None:
                 thread_id, text=message.content, pause_ref=pause_ref(pending)
             )
         else:
-            view = await _client().send_message(thread_id, message.content)
+            view = await _stream_turn(thread_id, message.content)
     except ApiCallError as error:
         await _handle_error(error, thread_id)
         return

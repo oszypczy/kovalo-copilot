@@ -1,4 +1,5 @@
-"""Polecenie `kovalo`: first-call (F0, 7), ingest, eval e1 (F1, 7), e2 (F2, 8.7), e3 (F3, 10.6)."""
+"""Polecenie `kovalo`: first-call (F0, 7), ingest, eval e1 (F1, 7), e2 (F2, 8.7), e3 (F3, 10.6),
+eval e4, ask, show-trace (F4, 11.6)."""
 
 from __future__ import annotations
 
@@ -25,6 +26,7 @@ EXIT_PROVIDER = 3
 EXIT_EMPTY = 4
 EXIT_CORPUS = 5
 EXIT_DB = 6
+EXIT_MAX_CALLS = 7
 
 
 def _decimal(value: float) -> str:
@@ -215,11 +217,13 @@ def _e1_specs(
 def eval_command(
     settings: Settings, *, stage: str, args: argparse.Namespace, out: TextIO, err: TextIO
 ) -> int:
-    """`kovalo eval <stage>`: E1 (reports/mp1), E2 (reports/mp2), E3 (reports/mp3)."""
+    """`kovalo eval <stage>`: E1 (reports/mp1), E2 (reports/mp2), E3 (reports/mp3), E4 (mp4)."""
     if stage == "e2":
         return eval_e2(settings, args=args, out=out, err=err)
     if stage == "e3":
         return eval_e3(settings, args=args, out=out, err=err)
+    if stage == "e4":
+        return eval_e4(settings, args=args, out=out, err=err)
     if stage != "e1":
         phase = f"F{stage[1:]}" if stage[:1] == "e" and stage[1:].isdigit() else "?"
         print(f"Etap {stage} jeszcze nie istnieje ({phase}).", file=err)
@@ -567,6 +571,238 @@ def eval_e3(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: T
     return EXIT_OK
 
 
+_E4_TESTS = (("tools", "narzędzia"), ("args", "argumenty"), ("facts", "fakty"))
+
+
+def _e4_line(name: str, summary: dict[str, object]) -> str:
+    parts = [f"{word} {summary[key][0]}/{summary[key][1]}" for key, word in _E4_TESTS]  # type: ignore[index]
+    approval = summary["approval"]
+    return (
+        f"{name}: {', '.join(parts)}, bez źródła {summary['uncovered']}, twierdzenia o "
+        f"zatwierdzeniu {approval[0]}/{approval[1]}, wywołania narzędzi {summary['tool_calls']} "  # type: ignore[index]
+        f"(nieudane {summary['failed']})"
+    )
+
+
+def eval_e4(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    """`kovalo eval e4`: przeliczenie przebiegów kursu i odtworzenie (zawsze, 0 wywołań),
+    przebieg na żywo (--live, z cache i --max-calls), raporty w reports/mp4 (kontrakt F4, 11.6).
+    Kody: 2 konfiguracja, 4 port ≠ kurs, 7 limit --max-calls, 3 każde pytanie na żywo z błędem."""
+    from kovalo.eval.datasets import load_agent_gold
+    from kovalo.eval.llm_cache import JsonFileLlmCache
+    from kovalo.eval.review import REVIEW_FILE, check_review_keys, load_review
+    from kovalo.eval.trace import reference
+    from kovalo.eval.trace.e4 import (
+        E4AllErrorsError,
+        E4Report,
+        plan_llm_calls,
+        replay_problems,
+        run_e4,
+        select_questions,
+    )
+    from kovalo.eval.trace.report import REVIEW_LABELS, write_reports
+    from kovalo.knowledge.corpus import CorpusError
+    from kovalo.knowledge.pgvector import IndexUnavailableError
+
+    if args.no_cache and args.cache_only:
+        print("--no-cache i --cache-only wykluczają się.", file=err)
+        return EXIT_CONFIG
+    if args.max_calls is not None and args.max_calls < 0:
+        print("--max-calls musi być liczbą ≥ 0 (0 = bez limitu).", file=err)
+        return EXIT_CONFIG
+    live = bool(args.live)
+    max_calls = 20 if args.max_calls is None else (args.max_calls or None)
+    try:
+        ids = _split(args.ids) or None
+        gold = load_agent_gold(settings.paths.mini_project_4_questions)
+        questions = select_questions(gold, ids)
+    except (ConfigError, FileNotFoundError, ValueError) as exc:
+        print(str(exc), file=err)
+        return EXIT_CONFIG
+
+    out_dir = Path(args.out) if args.out else settings.paths.mini_project_4_output_dir
+    review_path = out_dir / REVIEW_FILE
+    try:
+        review = load_review(review_path)
+        if review is not None:
+            known = [g.id for g in gold] + [f"Q{n}" for n in range(1, 5)]
+            check_review_keys(review, variants=REVIEW_LABELS, ids=known)
+    except ConfigError as exc:
+        message = str(exc)
+        print(message if str(review_path) in message else f"{review_path}: {message}", file=err)
+        return EXIT_CONFIG
+
+    plan = plan_llm_calls(questions, max_steps=settings.agent.max_steps)
+    if live:
+        limit = str(max_calls) if max_calls is not None else "brak"
+        print(
+            f"Plan: szacunek {plan['estimate']}, górna granica {plan['upper_bound']}, limit "
+            f"{limit} (wywołania sieciowe modelu; bez cache: {'tak' if args.no_cache else 'nie'}; "
+            f"tylko cache: {'tak' if args.cache_only else 'nie'})",
+            file=out,
+        )
+    else:
+        print("Plan: 0 wywołań LLM-a (przeliczenie i odtworzenie; na żywo: --live)", file=out)
+    if args.plan:
+        return EXIT_OK
+
+    cache = None
+    if live and not args.no_cache:
+        cache = JsonFileLlmCache(
+            settings.paths.llm_cache_dir, mode="strict" if args.cache_only else "read_write"
+        )
+    config_error: ConfigError | None = None
+    all_errors: E4AllErrorsError | None = None
+    report: E4Report
+    try:
+        try:
+            report = run_e4(
+                settings, live=live, ids=ids, cache=cache, offline=bool(args.cache_only),
+                max_calls=max_calls, backend=args.backend, variant=args.tools,
+            )  # fmt: skip
+        except E4AllErrorsError as exc:
+            all_errors, report = exc, exc.report
+        except ConfigError as exc:
+            if not live:
+                raise
+            config_error = exc  # brak klucza: odtworzenie i tak zapisujemy
+            report = run_e4(settings, ids=ids, backend=args.backend)
+    except reference.E4ReferenceMismatch as exc:
+        print(f"Przeliczenie przebiegu kursu ≠ zapis kursu (błąd portu): {exc}", file=err)
+        return EXIT_EMPTY
+    except ConfigError as exc:
+        print(str(exc), file=err)
+        return EXIT_CONFIG
+    except CorpusError as exc:
+        print(str(exc), file=err)
+        return EXIT_CORPUS
+    except IndexUnavailableError as exc:
+        return _db_unavailable(settings, exc, err)
+
+    paths = write_reports(report, out_dir, review=review)
+    print(_e4_line("kurs, jeden agent", report.course.summary), file=out)
+    print(_e4_line("kurs, zespół", report.course_supervisor.summary), file=out)
+    print(_e4_line("odtworzenie", report.replay.summary), file=out)
+    if report.live is not None:
+        c = report.live.calls
+        models = ", ".join(f"{m}: {n}" for m, n in report.live.answered_by.items()) or "brak"
+        print(
+            f"{_e4_line('na żywo', report.live.summary)}; wywołania modelu sieciowo {c.network}, "
+            f"z cache {c.from_cache}, błędy {c.errors}, modele: {models}",
+            file=out,
+        )
+    print("Raporty:", file=out)
+    for path in paths:
+        print(f"  {path}", file=out)
+
+    if config_error is not None:
+        print(f"{config_error}\nZapisano tylko przeliczenie i odtworzenie.", file=err)
+        return EXIT_CONFIG
+    problems = replay_problems(report)
+    if problems:
+        print(
+            "Odtworzenie przebiegu kursu nie spełnia wymagań (błąd portu): " + "; ".join(problems),
+            file=err,
+        )
+        return EXIT_EMPTY
+    if report.stopped_by_max_calls:
+        print(
+            f"Przerwano: wyczerpany limit --max-calls {max_calls}. Raport częściowy zapisany; "
+            "uruchom ponownie (np. następnego dnia), cache odtworzy wykonane pytania.",
+            file=err,
+        )
+        return EXIT_MAX_CALLS
+    if all_errors is not None:
+        print(
+            f"Żadne pytanie na żywo się nie udało (przebieg {all_errors.run_id}), np.: "
+            f"{all_errors.first_error}\nSprawdź klucz i model (kovalo first-call) albo uzupełnij "
+            "cache (bez --cache-only).",
+            file=err,
+        )
+        return EXIT_PROVIDER
+    return EXIT_OK
+
+
+def ask(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    """`kovalo ask "pytanie"`: jedno pytanie do agenta bez rozmowy (port ask_agent.py):
+    odpowiedź i ścieżka dowodowa na stdout; 0 answered, 3 error/limit, 2 konfiguracja."""
+    from kovalo.agents.show import format_trace
+    from kovalo.eval.llm_cache import JsonFileLlmCache
+    from kovalo.eval.trace.e4 import LazySearch
+    from kovalo.workflow.factory import build_agent_runner
+
+    question = args.question.strip()
+    if not question:
+        print("Pytanie jest puste.", file=err)
+        return EXIT_CONFIG
+    if args.no_cache and args.cache_only:
+        print("--no-cache i --cache-only wykluczają się.", file=err)
+        return EXIT_CONFIG
+    cache = None
+    if not args.no_cache:
+        cache = JsonFileLlmCache(
+            settings.paths.llm_cache_dir, mode="strict" if args.cache_only else "read_write"
+        )
+    try:
+        runner = build_agent_runner(
+            settings,
+            retriever=LazySearch(settings, "memory"),
+            cache=cache,
+            offline=bool(args.cache_only),
+            variant=args.tools,
+        )
+    except ConfigError as exc:
+        print(str(exc).replace("\n", " "), file=err)
+        return EXIT_CONFIG
+    trace = runner(question)
+    if trace.answer:
+        print(trace.answer, file=out)
+        print("", file=out)
+    print(format_trace(trace), file=out)
+    if trace.status != "answered":
+        print(f"Agent zakończył pracę ze statusem {trace.status}: {trace.error}", file=err)
+        return EXIT_PROVIDER
+    return EXIT_OK
+
+
+_SHOW_RUNS = {"live": "agent_run.live.json", "replay": "agent_run.replay.json"}
+
+
+def show_trace(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    """`kovalo show-trace ID --run ...`: ścieżka dowodowa jednego pytania z zapisanego przebiegu
+    (port show_trace.py), bez API i bez LLM-a."""
+    from kovalo.agents.show import architecture_label, format_trace
+    from kovalo.agents.trace import load_traces
+    from kovalo.eval.trace.reference import course_run_path
+
+    if args.run == "course":
+        path = course_run_path(settings, "single")
+    elif args.run == "course-supervisor":
+        path = course_run_path(settings, "supervisor")
+    else:
+        folder = Path(args.out) if args.out else settings.paths.mini_project_4_output_dir
+        path = folder / _SHOW_RUNS[args.run]
+    if not path.is_file():
+        print(
+            f"Nie znaleziono {path}: najpierw uruchom kovalo eval e4 (z --live dla --run live).",
+            file=err,
+        )
+        return EXIT_CONFIG
+    run, rows = load_traces(path)
+    row = next((r for r in rows if r["trace"].question_id == args.question_id), None)
+    if row is None:
+        known = ", ".join(str(r["trace"].question_id) for r in rows)
+        print(f"W {path.name} nie ma pytania {args.question_id!r}; są: {known}", file=err)
+        return EXIT_CONFIG
+    print(
+        f"przebieg {run.get('run_id')}: {architecture_label(str(run.get('architecture')))}, "
+        f"{run.get('provider')} / {run.get('model')}\n",
+        file=out,
+    )
+    print(format_trace(row["trace"], row.get("score")), file=out)
+    return EXIT_OK
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kovalo", description="Kovalo Decision Copilot.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -583,8 +819,8 @@ def _parser() -> argparse.ArgumentParser:
         help="wariant chunków (domyślnie oba: mp1, potem ctx)",
     )
     ing.add_argument("--table", default=None, help="tabela indeksu (tylko z --chunks mp1 albo ctx)")
-    ev = sub.add_parser("eval", help="ewaluacja etapu (e1, e2, e3), raporty w reports/")
-    ev.add_argument("stage", help="etap ewaluacji: e1, e2 albo e3")
+    ev = sub.add_parser("eval", help="ewaluacja etapu (e1–e4), raporty w reports/")  # noqa: RUF001
+    ev.add_argument("stage", help="etap ewaluacji: e1, e2, e3 albo e4")
     ev.add_argument("--candidates", action="store_true", help="e1: także embeddings.candidates")
     ev.add_argument("--model", action="append", help="e1: tylko wskazany model (można powtórzyć)")
     ev.add_argument(
@@ -599,7 +835,18 @@ def _parser() -> argparse.ArgumentParser:
         help="e1: jedno wywołanie z promptem Q01; e2: poziomy 3–4 (odpowiedzi i sędzia)",  # noqa: RUF001
     )
     ev.add_argument(
-        "--live", action="store_true", help="e3: także przebieg z modelem z configu (≤ 14 wywołań)"
+        "--live",
+        action="store_true",
+        help="e3: także przebieg z modelem z configu (≤ 14 wywołań); e4: nasz agent na żywo",
+    )
+    ev.add_argument(
+        "--max-calls",
+        type=int,
+        default=None,
+        help="e4: limit wywołań sieciowych modelu na żywo (domyślnie 20; 0 = bez limitu)",
+    )
+    ev.add_argument(
+        "--tools", choices=["course", "ours"], default=None, help="e4: wariant narzędzi na żywo"
     )
     ev.add_argument("--variants", default=None, help="e2: warianty z LLM-em (domyślnie ctx,hybrid)")
     ev.add_argument("--llm-side", choices=["ours", "reference"], default="ours", help="e2")
@@ -615,6 +862,22 @@ def _parser() -> argparse.ArgumentParser:
     )
     ev.add_argument("--plan", action="store_true", help="e2, e3: wypisz plan wywołań i zakończ")
     ev.add_argument("--out", default=None, help="katalog raportów")
+    ask_p = sub.add_parser("ask", help="jedno pytanie do agenta z narzędziami (bez rozmowy)")
+    ask_p.add_argument("question", help="pytanie po polsku")
+    ask_p.add_argument("--tools", choices=["course", "ours"], default=None, help="wariant narzędzi")
+    ask_p.add_argument("--no-cache", action="store_true", help="bez cache LLM-a")
+    ask_p.add_argument(
+        "--cache-only", action="store_true", help="tylko cache LLM-a, bez sieci i bez klucza"
+    )
+    st = sub.add_parser("show-trace", help="ścieżka dowodowa jednego pytania z zapisanego E4")
+    st.add_argument("question_id", help="np. P1")
+    st.add_argument(
+        "--run",
+        choices=["live", "replay", "course", "course-supervisor"],
+        default="live",
+        help="który przebieg (domyślnie live z reports/mp4)",
+    )
+    st.add_argument("--out", default=None, help="katalog raportów E4 (domyślnie reports/mp4)")
     return parser
 
 
@@ -639,6 +902,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     if args.command == "eval":
         return eval_command(settings, stage=args.stage, args=args, out=sys.stdout, err=sys.stderr)
+    if args.command == "ask":
+        return ask(settings, args=args, out=sys.stdout, err=sys.stderr)
+    if args.command == "show-trace":
+        return show_trace(settings, args=args, out=sys.stdout, err=sys.stderr)
     return EXIT_CONFIG  # pragma: no cover (argparse wymusza polecenie)
 
 

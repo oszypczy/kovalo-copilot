@@ -68,7 +68,7 @@ Przypadki testowe (muszą przejść w 100%):
 | `get_supplier_otif(supplier, from_month, to_month)` | obserwacje + lista brakujących miesięcy + `complete` | data |
 | `get_invoice_value(supplier, month)` | `invoiced_grosze` | data |
 | `calculate_otif_penalty(otif_pct, target_pct, rate_per_full_point_pct, cap_pct, invoice_grosze)` | wszystkie wartości pośrednie + `penalty_grosze` | calculation |
-| `check_discount_policy(discount_pct, margin_pct, clearance, strategic_account, competitor_offer)` | wymagane role + uzasadnienie (tylko informacja) | calculation |
+| `check_discount_policy(discount_pct, margin_after_pct, clearance, strategic_account, competitor_offer, contractual_volume_rebate)` | wymagane role + uzasadnienie (tylko informacja) | calculation |
 | `check_termination_condition(supplier, as_of_month)` *(nasze)* | trzy miesiące, próg, wynik porównania | calculation |
 
 Każdy wynik ma `status`: `ok`, `no_data`, `unknown_supplier`, `not_applicable`, `out_of_scope`, `invalid_request`. **Żadne** narzędzie nie zatwierdza, nie zapisuje i nie obiecuje.

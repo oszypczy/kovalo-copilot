@@ -275,3 +275,23 @@ def test_models_match_course_defaults():
     assert request.revision == 1 and request.discount_pct is None
     assert (request.clearance, request.strategic_account, request.competitor_offer) == (False,) * 3
     assert request.customer is None and request.product is None
+
+
+def test_last_band_wording(settings):
+    """A0 (kontrakt F4, 6.1): ostatni przedział to „powyżej 20%”, nie „do 100%”; reszta bez zmian."""  # noqa: E501
+    from kovalo.policy import required_approvers
+
+    top = required_approvers(R(discount_pct=22, margin_after_pct=10), settings.policy)
+    # P5 (kontrakt F4, 17): role łączone jak w silniku F3, czyli „CEO, CFO”
+    assert top.reasons[0] == (
+        "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-001)"
+    )
+    assert not any("do 100%" in reason for reason in top.reasons)
+    low = required_approvers(R(discount_pct=7, margin_after_pct=10), settings.policy)
+    assert "rabat 7% mieści się w przedziale do 12%" in low.reasons[0]
+    edge = required_approvers(R(discount_pct=100, margin_after_pct=10), settings.policy)
+    assert "przedziale powyżej 20%" in edge.reasons[0]
+    just_over = required_approvers(R(discount_pct=20.01, margin_after_pct=10), settings.policy)
+    assert "przedziale powyżej 20%" in just_over.reasons[0]
+    at_limit = required_approvers(R(discount_pct=20, margin_after_pct=10), settings.policy)
+    assert "przedziale do 20%" in at_limit.reasons[0]
