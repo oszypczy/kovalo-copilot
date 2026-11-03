@@ -429,3 +429,89 @@ def gold_dialogues(session_settings):  # type: ignore[no-untyped-def]
     from kovalo.eval.datasets import load_dialogues
 
     return load_dialogues(session_settings.paths.mini_project_3_dialogues)
+
+
+# ---------------------------------------------------------------------------
+# F4 (kontrakt: docs/contracts/f4.md, sekcja 15.1). Importy kodu produkcyjnego wewnątrz fixture'ów.
+# Atrapy: tests/agent_fakes.py. Fixture `gold` z F2 to pytania MP2, więc pytania agenta to `agent_gold`.  # noqa: E501
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def company_data(session_settings):  # type: ignore[no-untyped-def]
+    """Prawdziwe dane firmy (data/company/), sprawdzone przy wczytaniu."""
+    from kovalo.company.data import load_company_data
+
+    return load_company_data(session_settings.paths.company_data_dir)
+
+
+@pytest.fixture(scope="session")
+def agent_gold(session_settings):  # type: ignore[no-untyped-def]
+    """9 pytań MP4 z wzorcem: {id: AgentGold}."""
+    from kovalo.eval.datasets import load_agent_gold
+
+    return {g.id: g for g in load_agent_gold(session_settings.paths.mini_project_4_questions)}
+
+
+@pytest.fixture
+def small_data():  # type: ignore[no-untyped-def]
+    """Dane zrobione ręcznie (luka w lipcu, dostawca bez warunków, TransBałt)."""
+    from tests.agent_fakes import make_small_data
+
+    return make_small_data()
+
+
+@pytest.fixture
+def retriever():  # type: ignore[no-untyped-def]
+    """CountingRetriever na trzech chunkach kursu (zapisuje `k`)."""
+    from tests.agent_fakes import CountingRetriever
+
+    return CountingRetriever()
+
+
+@pytest.fixture
+def deps_for(settings, small_data, retriever):  # type: ignore[no-untyped-def]
+    """deps_for(script) -> (ScriptedModel, ToolContext) na small_data i CountingRetriever."""
+    from tests.agent_fakes import deps_for_script
+
+    def make(script):  # type: ignore[no-untyped-def]
+        return deps_for_script(settings, small_data, retriever, script)
+
+    return make
+
+
+@pytest.fixture
+def agent_for(settings, small_data, retriever):  # type: ignore[no-untyped-def]
+    """agent_for(script, variant='course', **kw) -> (AgentRunner, ScriptedModel)."""
+    from tests.agent_fakes import agent_runner
+
+    def make(script, variant="course", **kwargs):  # type: ignore[no-untyped-def]
+        data = kwargs.pop("data", small_data)
+        retr = kwargs.pop("retriever", retriever)
+        return agent_runner(settings, data, retr, script, variant=variant, **kwargs)
+
+    return make
+
+
+@pytest.fixture
+def agent_graph(settings, small_data, retriever):  # type: ignore[no-untyped-def]
+    """agent_graph(script, variant='course', **kw) -> (skompilowany agent, ScriptedModel)."""
+    from tests.agent_fakes import compiled_agent
+
+    def make(script, variant="course", **kwargs):  # type: ignore[no-untyped-def]
+        data = kwargs.pop("data", small_data)
+        retr = kwargs.pop("retriever", retriever)
+        return compiled_agent(settings, data, retr, script, variant=variant, **kwargs)
+
+    return make
+
+
+@pytest.fixture
+def e4_fakes(ctx_chunks) -> Callable[..., Any]:
+    """ideal(ids=None, **model_kwargs) -> ScriptedModel z idealnymi skryptami (T1 przez FR-4.7)."""
+    from tests.agent_fakes import ideal_e4_model
+
+    def ideal(ids=None, **kwargs):  # type: ignore[no-untyped-def]
+        return ideal_e4_model(ctx_chunks, ids, **kwargs)
+
+    return ideal

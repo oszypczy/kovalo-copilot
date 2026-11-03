@@ -333,6 +333,39 @@ class PromptsConfig(_Section):
     assistant_understand_system: str
     judge_system: str  # NASZE (ADR-0008), wersja 1: rubryka sędziego E2
 
+    def by_name(self, name: str) -> str:
+        """Tekst promptu o tej nazwie (np. 'understand_system'); nieznana nazwa → KeyError."""
+        if name not in type(self).model_fields:
+            raise KeyError(name)
+        value = getattr(self, name)
+        assert isinstance(value, str)
+        return value
+
+
+class TerminationTerms(_Section):
+    """NASZE (ADR-0011): warunek rozwiązania umowy z powodu OTIF, przepisany z tekstu umowy."""
+
+    source_doc_id: str = Field(min_length=1)
+    otif_below_pct: Decimal = Field(gt=0, le=100)  # warunek: OTIF MNIEJSZY niż ten próg
+    consecutive_months: int = Field(ge=1, le=12)
+    notice_days: int = Field(ge=0)
+
+
+class CompanyConfig(_Section):
+    """NASZE (ADR-0011): warunki spoza contract_terms.yaml (data/ jest tylko do odczytu)."""
+
+    termination_version: str = "termination-v1"
+    termination_terms: dict[str, TerminationTerms] = Field(default_factory=dict)
+
+
+ToolsVariant = Literal["course", "ours"]
+
+
+class ToolsConfig(_Section):
+    """NASZE (ADR-0011): course = 6 narzędzi kursu; ours = + check_termination_condition."""
+
+    variant: ToolsVariant = "ours"
+
 
 # Maks. 53 znaki: replace_table dokleja "__new" i "__new_pkey", a Postgres obcina nazwy do 63.
 _TABLE_NAME = r"^[a-z_][a-z0-9_]{0,52}$"
@@ -358,6 +391,9 @@ class ServicesConfig(_Section):
     mcp_url: str = "http://localhost:8765/mcp"
     health_timeout_s: float = 2
     ui_api_timeout_s: float = Field(default=180, gt=0)  # NASZE (ADR-0010): jedno żądanie ui → api
+    sse_ping_s: float = Field(
+        default=15, gt=0
+    )  # NASZE (ADR-0012): komentarz „ping” w strumieniu SSE
 
 
 class WorkflowConfig(_Section):
@@ -365,6 +401,12 @@ class WorkflowConfig(_Section):
 
     checkpointer: Literal["postgres", "memory"] = "postgres"
     max_message_chars: int = Field(default=4000, ge=1)
+    # NASZE (ADR-0011): kto odpowiada na document_question w aplikacji (E3 zawsze rag)
+    answerer: Literal["agent", "rag"] = "agent"
+    # NASZE (ADR-0011): prompt „understand” w aplikacji (E3 zawsze understand_system)
+    understand_prompt: Literal["understand_system", "assistant_understand_system"] = (
+        "assistant_understand_system"
+    )
 
 
 _API_KEY_ENV: dict[str, str] = {"google_genai": "GOOGLE_API_KEY", "openai": "OPENAI_API_KEY"}
@@ -415,6 +457,8 @@ class Settings(BaseSettings):
     db: DbConfig = DbConfig()
     services: ServicesConfig = ServicesConfig()
     workflow: WorkflowConfig = WorkflowConfig()
+    company: CompanyConfig = CompanyConfig()
+    tools: ToolsConfig = ToolsConfig()
     root: Path
 
     # sekrety i zmienne z env / .env (nazwy bez prefiksu, jak w .env.example)

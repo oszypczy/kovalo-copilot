@@ -33,6 +33,14 @@ def _roles(roles: list[str]) -> str:
     return ", ".join(roles)
 
 
+def _band_label(policy: PolicyConfig, index: int) -> str:
+    """„do 12%”; ostatni przedział (do 100%) jako „powyżej 20%” (kontrakt F4, 6.1)."""
+    bands = policy.bands
+    if bands[index].up_to == 100 and index > 0:
+        return f"powyżej {number(bands[index - 1].up_to)}%"
+    return f"do {number(bands[index].up_to)}%"
+
+
 def required_approvers(request: DiscountRequest, policy: PolicyConfig) -> Decision:
     """Kursowa interpretacja course-v1 (krok 1 MP3), w tej kolejności:
 
@@ -58,7 +66,7 @@ def required_approvers(request: DiscountRequest, policy: PolicyConfig) -> Decisi
     bands = policy.bands
     base = next(i for i, band in enumerate(bands) if discount <= band.up_to)
     reasons = [
-        f"rabat {number(discount)}% mieści się w przedziale do {number(bands[base].up_to)}%; "
+        f"rabat {number(discount)}% mieści się w przedziale {_band_label(policy, base)}; "
         f"zatwierdza: {_roles(bands[base].roles)} (tabela POL-001)"
     ]
 

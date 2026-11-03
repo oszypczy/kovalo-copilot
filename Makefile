@@ -51,11 +51,13 @@ ingest-local:
 
 # STAGE=e1|e2|e3...; ARGS przekazuje opcje, np. make eval STAGE=e1 ARGS="--backend pgvector"
 # F3: make eval STAGE=e3 (odtworzenie D1-D8, zero wywołań LLM-a)
+# F4: make eval STAGE=e4 (przeliczenie i odtworzenie przebiegów kursu, zero wywołań LLM-a)
 eval:
 	docker compose run --rm api kovalo eval $(STAGE) $(ARGS)
 
 # Lokalnie (bez Dockera), np. make eval-local STAGE=e2 ARGS="--with-llm" albo
 # make eval-local STAGE=e3 ARGS="--live" (wymaga GOOGLE_API_KEY w .env)
+# F4: make eval-local STAGE=e4 ARGS="--live --ids P1,T1"; pojedyncze pytanie do agenta: uv run kovalo ask "..."
 eval-local:
 	uv run --env-file .env kovalo eval $(STAGE) $(ARGS)
 

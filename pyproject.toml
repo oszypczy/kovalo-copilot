@@ -30,6 +30,7 @@ dependencies = [
     # F3 (workflow, checkpointy w Postgresie)
     "langgraph-checkpoint-postgres>=3.2,<4",
     "psycopg-pool>=3.2,<4",
+    "httpx-sse>=0.4,<0.5",
 ]
 
 [project.optional-dependencies]

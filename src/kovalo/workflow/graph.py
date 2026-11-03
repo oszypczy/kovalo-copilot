@@ -1,6 +1,7 @@
 """Graf copilota: węzły, kierowanie, pauzy (FR-3.3, FR-3.4; kroki 3-4 MP3 kursu).
 
-Kontrakt: docs/contracts/f3.md, sekcja 6.5; decyzja: ADR-0009 pkt 4-5.
+Kontrakt: docs/contracts/f3.md, sekcja 6.5; decyzja: ADR-0009 pkt 4-5. F4: węzeł
+answer_documents z agentem (docs/contracts/f4.md, sekcja 8.1; ADR-0011 pkt 6, ADR-0012 pkt 4).
 
     START → understand ─route_by_kind─┬─ document_question → answer_documents → END
                                       ├─ policy_question   → answer_policy    → END
@@ -11,12 +12,14 @@ Kontrakt: docs/contracts/f3.md, sekcja 6.5; decyzja: ADR-0009 pkt 4-5.
 Zasady LangGraph: jedno interrupt() na wywołanie węzła, bez try/except wokół niego, ponowne
 pytanie przez krawędź warunkową; przed interrupt() tylko odczyt stanu (węzeł po wznowieniu
 startuje od początku). Model wywołuje wyłącznie `understand` (przed pauzami) oraz
-document_answerer. Reguły polityki liczy kovalo.policy, nie model.
+document_answerer albo agent. Reguły polityki liczy kovalo.policy, nie model.
 """
 
 from __future__ import annotations
 
+import contextvars
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Final, Literal, Protocol
 
@@ -24,14 +27,17 @@ from langchain_core.language_models import LanguageModelInput
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import Runnable
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
 
+from kovalo.agents.trace import Trace, TraceEvent, trace_envelope
 from kovalo.config import PolicyConfig
 from kovalo.policy import required_approvers
 from kovalo.policy.models import DiscountRequest
 from kovalo.rag.answer import DocumentAnswerer, error_text
+from kovalo.rag.records import TokenUsage
 from kovalo.workflow import replies
 from kovalo.workflow.schemas import TERMINAL_APPROVAL_STATUSES, LlmCall, Turn
 from kovalo.workflow.state import CopilotState
@@ -40,6 +46,7 @@ from kovalo.workflow.understand import FIELDS, FLAGS, understand_turn, update_re
 __all__ = [
     "APPROVAL_OPTIONS",
     "NODES",
+    "AgentAnswerer",
     "CopilotDeps",
     "Node",
     "build_conversation_graph",
@@ -74,14 +81,27 @@ class Node(Protocol):
     def __call__(self, state: CopilotState) -> dict[str, Any]: ...
 
 
+# (question, *, on_event=...) -> Trace; produkcja: AgentRunner / LazyAgentRunner (F4)
+AgentAnswerer = Callable[..., Trace]
+
+
 @dataclass(frozen=True)
 class CopilotDeps:
-    """Czego potrzebują węzły. Testy podają atrapy, produkcja: workflow.factory."""
+    """Czego potrzebują węzły. Testy podają atrapy, produkcja: workflow.factory.
+
+    Dokładnie jedno z `document_answerer` (RAG z F2/F3, zawsze w E3) i `agent` (F4: agent
+    z narzędziami, aplikacja); inaczej ValueError.
+    """
 
     understand_model: Runnable[LanguageModelInput, Any]  # get_structured_model(Turn, 'understand')
-    document_answerer: DocumentAnswerer  # F3: RAG; F5: agent przez MCP
     policy: PolicyConfig
-    understand_prompt: str  # settings.prompts.understand_system
+    understand_prompt: str  # settings.prompts.by_name(workflow.understand_prompt)
+    document_answerer: DocumentAnswerer | None = None
+    agent: AgentAnswerer | None = None
+
+    def __post_init__(self) -> None:
+        if (self.document_answerer is None) == (self.agent is None):
+            raise ValueError("CopilotDeps: podaj dokładnie jedno z document_answerer i agent.")
 
 
 def is_valid_margin(value: Any) -> bool:
@@ -141,10 +161,63 @@ def conversation_nodes(deps: CopilotDeps) -> dict[str, Node]:
             "calls": [result.call.model_dump(mode="json")],
         }
 
-    def answer_documents(state: CopilotState) -> dict[str, Any]:
+    def answer_with_agent(state: CopilotState, agent: AgentAnswerer) -> dict[str, Any]:
+        """Port `answer_with_tools` (krok 3 MP5): odpowiedź agenta albo krótkie przeprosiny,
+        koperta trace w `record`; kroki agenta do strumienia `custom` (ADR-0012 pkt 4)."""
         turn = _turn(state)
+        writer = get_stream_writer()
+        node_context = contextvars.copy_context()  # writer działa tylko w kontekście węzła
+
+        def on_event(phase: str, event: TraceEvent) -> None:
+            payload = {
+                "kind": "agent_event",
+                "phase": phase,
+                "event": event.model_dump(mode="json"),
+            }
+            node_context.run(writer, payload)
+
         try:
-            record = deps.document_answerer(turn.standalone)
+            # Pusty kontekst: agent (create_agent, checkpointer=False) nie dziedziczy konfiguracji
+            # zewnętrznego grafu (durability="sync", przestrzeń checkpointów), więc biegnie jak
+            # zwykła funkcja; zdarzenia idą do strumienia przez writer pobrany wyżej.
+            trace = contextvars.Context().run(agent, turn.standalone, on_event=on_event)
+        except Exception as exc:  # run_question nie zgłasza wyjątków; to tylko zabezpieczenie
+            trace = Trace(question=turn.standalone, status="error", error=error_text(exc))
+        if trace.answer is not None:
+            text = trace.answer
+        elif trace.status == "limit":
+            text = replies.AGENT_LIMIT_REPLY
+        else:
+            text = replies.AGENT_ERROR_REPLY
+        calls = [
+            LlmCall(
+                purpose="agent",
+                model=c.model,
+                usage=TokenUsage(
+                    input_tokens=c.input_tokens,
+                    output_tokens=c.output_tokens,
+                    reasoning_tokens=c.reasoning_tokens,
+                ),
+            ).model_dump(mode="json")
+            for c in trace.model_calls
+        ]
+        return {
+            "status": "answered" if trace.status == "answered" else "error",
+            "error": trace.error,
+            "record": trace_envelope(trace),
+            "calls": [*(state.get("calls") or []), *calls],
+            "messages": [_say(text)],
+        }
+
+    def answer_documents(state: CopilotState) -> dict[str, Any]:
+        if deps.agent is not None:
+            return answer_with_agent(state, deps.agent)
+        turn = _turn(state)
+        answerer = deps.document_answerer
+        if answerer is None:  # CopilotDeps.__post_init__ pilnuje, że jest jedno z dwóch
+            raise RuntimeError("Brak document_answerer i agenta w CopilotDeps")
+        try:
+            record = answerer(turn.standalone)
         except Exception as exc:  # np. IndexUnavailableError: tura 'error', nie awaria
             return {
                 "status": "error",

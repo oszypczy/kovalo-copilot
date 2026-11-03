@@ -311,6 +311,7 @@ def test_policy_allowlist():
 
 
 def test_workflow_allowlist():
+    """F3 + F4 (kontrakt F4, 2.3). R1-5: `kovalo.rag.citations` zniknęło z listy dozwolonych."""
     files = _py_files("workflow")
     for module in (
         "schemas",
@@ -333,15 +334,26 @@ def test_workflow_allowlist():
         "kovalo.workflow",
         "kovalo.rag.records",
         "kovalo.rag.answer",
-        "kovalo.rag.citations",
+        "kovalo.agents.trace",
+        "kovalo.agents.show",
+        "kovalo.agents.agent",
     )
     extra = {
-        # jedyny moduł workflow/ z modelem, RAG i indeksem
-        "workflow/factory.py": ("kovalo.llm", "kovalo.rag", "kovalo.knowledge"),
+        # jedyny moduł workflow/ z modelem, RAG, indeksem, narzędziami i danymi firmy
+        "workflow/factory.py": (
+            "kovalo.llm",
+            "kovalo.rag",
+            "kovalo.knowledge",
+            "kovalo.tools",
+            "kovalo.company",
+            "kovalo.agents",
+        ),
         # jedyny moduł z Postgresem
         "workflow/checkpoint.py": ("psycopg", "psycopg_pool", "langgraph.checkpoint.postgres"),
     }
-    assert _allowlist_violations(files, allowed, exact=("kovalo.rag",), extra=extra) == []
+    exact = ("kovalo.rag", "kovalo.agents")
+    assert _allowlist_violations(files, allowed, exact=exact, extra=extra) == []
+    assert not any("kovalo.rag.citations" in _import_targets(f) for f in files), "R1-5"
 
 
 def test_rag_allowlist():
@@ -377,6 +389,7 @@ def test_ui_allowlist():
     allowed = (
         "chainlit",
         "httpx",
+        "httpx_sse",
         "pydantic",
         "kovalo.config",
         "kovalo.health",
@@ -441,15 +454,10 @@ def test_read_path_does_not_import_ingest():
 
 
 def test_workflow_and_policy_do_not_import_ui_api_eval():
-    forbidden = (
-        "kovalo.api",
-        "kovalo.ui",
-        "kovalo.eval",
-        "kovalo.cli",
-        "kovalo.agents",
-        "kovalo.tools",
-    )
+    # F4: workflow/ może importować kovalo.agents (i factory: kovalo.tools, kovalo.company), policy/ nie  # noqa: E501
+    forbidden = ("kovalo.api", "kovalo.ui", "kovalo.eval", "kovalo.cli")
     assert _violations(_py_files("workflow", "policy"), forbidden) == []
+    assert _violations(_py_files("policy"), ("kovalo.agents", "kovalo.tools")) == []
     assert _violations(_py_files("workflow"), ("fastapi", "chainlit", "httpx", "mcp")) == []
 
 
@@ -484,3 +492,147 @@ def test_f3_modules_exist():
         "eval/workflow/report.py",
     ):
         assert (SRC / rel).is_file(), f"brak src/kovalo/{rel}"
+
+
+# ---------------------------------------------------------------------------
+# F4 (kontrakt: docs/contracts/f4.md, sekcja 2.3). Listy DOZWOLONYCH importów.
+# ---------------------------------------------------------------------------
+
+
+def test_f4_modules_exist():
+    for rel in (
+        "quantities.py",
+        "company/__init__.py",
+        "company/data.py",
+        "company/records.py",
+        "company/lookup.py",
+        "company/penalty.py",
+        "company/termination.py",
+        "policy/check.py",
+        "tools/__init__.py",
+        "tools/search.py",
+        "tools/specs.py",
+        "tools/langchain.py",
+        "agents/__init__.py",
+        "agents/trace.py",
+        "agents/middleware.py",
+        "agents/agent.py",
+        "agents/show.py",
+        "api/sse.py",
+        "eval/trace/__init__.py",
+        "eval/trace/scoring.py",
+        "eval/trace/reference.py",
+        "eval/trace/replay.py",
+        "eval/trace/e4.py",
+        "eval/trace/report.py",
+    ):
+        assert (SRC / rel).is_file(), f"brak src/kovalo/{rel}"
+
+
+def test_quantities_allowlist():
+    path = SRC / "quantities.py"
+    assert path.is_file(), "brak src/kovalo/quantities.py"
+    assert _allowlist_violations([path], ()) == [], "tylko biblioteka standardowa"
+
+
+def test_company_allowlist():
+    files = _py_files("company")
+    for module in ("data", "records", "lookup", "penalty", "termination"):
+        assert (SRC / "company" / f"{module}.py").is_file(), f"brak company/{module}.py"
+    allowed = ("pydantic", "yaml", "kovalo.config", "kovalo.quantities", "kovalo.company")
+    assert _allowlist_violations(files, allowed) == []
+    forbidden = ("langchain", "langchain_core", "langgraph", "kovalo.llm", "kovalo.knowledge")
+    assert _violations(files, forbidden) == []
+    assert _violations(files, ("kovalo.text_pl",)) == [], "komunikaty formatuje company/ sam"
+
+
+def test_tools_allowlist():
+    files = _py_files("tools")
+    for module in ("search", "specs", "langchain"):
+        assert (SRC / "tools" / f"{module}.py").is_file(), f"brak tools/{module}.py"
+    allowed = ("pydantic", "kovalo.config", "kovalo.company", "kovalo.policy", "kovalo.tools")
+    extra = {
+        "tools/langchain.py": ("langchain_core",),
+        "tools/search.py": ("kovalo.knowledge",),  # tylko typy Retriever / ScoredChunk
+    }
+    assert _allowlist_violations(files, allowed, extra=extra) == []
+    forbidden = ("kovalo.llm", "kovalo.agents", "kovalo.workflow", "kovalo.eval", "mcp")
+    assert _violations(files, (*forbidden, "fastapi", "chainlit")) == []
+    plain = [SRC / "tools" / "specs.py", SRC / "tools" / "search.py"]
+    assert _violations(plain, ("langchain", "langchain_core", "langgraph")) == [], (
+        "specs.py i search.py bez LangChaina (F5 rejestruje te same funkcje w FastMCP)"
+    )
+
+
+def test_agents_allowlist():
+    files = _py_files("agents")
+    for module in ("trace", "middleware", "agent", "show"):
+        assert (SRC / "agents" / f"{module}.py").is_file(), f"brak agents/{module}.py"
+    allowed = (
+        "pydantic",
+        "langchain.agents",
+        "langchain_core",
+        "langgraph",
+        "kovalo.config",
+        "kovalo.quantities",
+        "kovalo.agents",
+    )
+    assert _allowlist_violations(files, allowed) == []
+    forbidden = (
+        "kovalo.tools",
+        "kovalo.llm",
+        "kovalo.knowledge",
+        "kovalo.company",
+        "kovalo.workflow",
+        "mcp",
+    )
+    assert _violations(files, forbidden) == [], "narzędzia i model przez parametr"
+
+
+def test_create_agent_isolated():
+    """`langchain.agents` (create_agent, middleware) importuje tylko agents/."""
+    agents = set(_py_files("agents"))
+    assert agents, "brak src/kovalo/agents/"
+    others = [f for f in sorted(SRC.rglob("*.py")) if f not in agents]
+    assert _violations(others, ("langchain.agents",)) == []
+    assert any(n.startswith("langchain.agents") for f in agents for n in _import_targets(f)), (
+        "agents/ używa create_agent"
+    )
+
+
+def test_stream_writer_isolated():
+    """`get_stream_writer` wywołuje tylko workflow/graph.py."""
+    graph = SRC / "workflow" / "graph.py"
+    assert graph.is_file()
+    others = [f for f in sorted(SRC.rglob("*.py")) if f != graph]
+    assert _violations(others, ("langgraph.config",)) == []
+    assert [
+        str(f.relative_to(SRC))
+        for f in others
+        if "get_stream_writer" in f.read_text(encoding="utf-8")
+    ] == []
+    assert "get_stream_writer" in graph.read_text(encoding="utf-8")
+
+
+def test_tools_only_in_factory():
+    """`kovalo.tools`, `kovalo.company` i `agents.agent.build_agent` w workflow/ tylko w factory.py."""  # noqa: E501
+    factory = SRC / "workflow" / "factory.py"
+    others = [f for f in _py_files("workflow") if f != factory]
+    assert _violations(others, ("kovalo.tools", "kovalo.company", "kovalo.agents.middleware")) == []
+    assert _violations(others, ("kovalo.llm", "kovalo.knowledge")) == []
+    imported = _import_targets(factory)
+    assert any(n == "kovalo.tools" or n.startswith("kovalo.tools.") for n in imported)
+    assert any(n == "kovalo.company" or n.startswith("kovalo.company.") for n in imported)
+
+
+def test_api_does_not_import_agents_tools_company():
+    """Trace i ścieżka dowodowa przychodzą z CopilotService (ADR-0012)."""
+    forbidden = ("kovalo.agents", "kovalo.tools", "kovalo.company", "kovalo.llm", "kovalo.eval")
+    assert _violations(_py_files("api"), forbidden) == []
+    assert (SRC / "api" / "sse.py").is_file()
+
+
+def test_eval_may_use_agents_tools_company_but_not_entrypoints():
+    # eval/ może importować kovalo.agents, kovalo.tools, kovalo.company, kovalo.quantities
+    assert _violations(_py_files("eval"), ("kovalo.cli", "kovalo.api", "kovalo.ui")) == []
+    assert (SRC / "eval" / "trace" / "e4.py").is_file()

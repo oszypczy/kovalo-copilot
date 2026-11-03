@@ -239,7 +239,22 @@ services:
   mcp_url: http://localhost:8765/mcp      # w compose: KOVALO_SERVICES__MCP_URL=http://mcp-server:8765/mcp
   health_timeout_s: 2
   ui_api_timeout_s: 180             # NASZE (ADR-0010): limit jednego żądania ui → api (tura z fallbackiem i limiterem)
+  sse_ping_s: 15                    # NASZE (ADR-0012): komentarz „ping” w strumieniu SSE, gdy tura długo milczy
 
-workflow:                           # NASZE (ADR-0009)
+workflow:                           # NASZE (ADR-0009, ADR-0011)
   checkpointer: postgres            # postgres | memory (memory: lokalnie bez Postgresa; pauzy znikają po restarcie)
   max_message_chars: 4000           # dłuższa wiadomość → 422 w API, ValueError w serwisie
+  answerer: agent                   # agent | rag: kto odpowiada na document_question w aplikacji (E3 zawsze rag)
+  understand_prompt: assistant_understand_system   # understand_system | assistant_understand_system (E3 zawsze understand_system)
+
+tools:                              # NASZE (ADR-0011)
+  variant: ours                     # course (6 narzędzi kursu) | ours (+ check_termination_condition)
+
+company:                            # NASZE (ADR-0011): warunki spoza contract_terms.yaml (data/ jest tylko do odczytu)
+  termination_version: termination-v1
+  termination_terms:                # klucz: supplier_id; wartości przepisane z tekstu umowy, sprawdzane testem
+    SUP-114:
+      source_doc_id: CON-101        # „jeśli OTIF przez trzy kolejne miesiące wynosi mniej niż 94%”
+      otif_below_pct: 94            # warunek: OTIF < próg (94,0 NIE spełnia)
+      consecutive_months: 3
+      notice_days: 60               # „z 60-dniowym okresem wypowiedzenia”

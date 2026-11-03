@@ -159,8 +159,8 @@ def test_eval_unknown_stage_or_model_exit_2(capsys, fake_embeddings, tmp_path):
     from kovalo.cli import main
     from kovalo.llm import override_embeddings
 
-    assert main(["eval", "e4"]) == 2
-    assert "Etap e4 jeszcze nie istnieje (F4)." in capsys.readouterr().err
+    assert main(["eval", "e5"]) == 2
+    assert "Etap e5 jeszcze nie istnieje (F5)." in capsys.readouterr().err
     with override_embeddings(fake_embeddings):
         assert main(["eval", "e1", "--model", "nieznany", "--out", str(tmp_path)]) == 2
     assert "nieznany" in capsys.readouterr().err
@@ -341,9 +341,9 @@ def test_eval_e2_errors_exit_codes(capsys, tmp_path, fake_embeddings):
         assert main([*base, "--variants", "nieznany"]) == 2
         assert main([*base, "--with-llm", "--ids", "X99"]) == 2
         assert main([*base, "--no-cache", "--cache-only"]) == 2
-        assert main(["eval", "e4"]) == 2
+        assert main(["eval", "e5"]) == 2
         err = capsys.readouterr().err
-        assert "nieznany" in err and "X99" in err and "Etap e4 jeszcze nie istnieje (F4)." in err
+        assert "nieznany" in err and "X99" in err and "Etap e5 jeszcze nie istnieje (F5)." in err
 
         failing = FakeStructuredChatModel(error=ValueError("sztuczny błąd"))
         with override_chat_model(failing):
@@ -511,8 +511,8 @@ def test_eval_e3_exit_codes(capsys, tmp_path, monkeypatch, fake_embeddings):
         assert "GOOGLE_API_KEY" not in err, "--cache-only nie wymaga klucza"
         assert "dialogues.live.json" in _e3_names(out_dir), "raporty zapisane mimo błędów"
 
-        assert main(["eval", "e4"]) == 2
-        assert "Etap e4 jeszcze nie istnieje (F4)." in capsys.readouterr().err
+        assert main(["eval", "e5"]) == 2
+        assert "Etap e5 jeszcze nie istnieje (F5)." in capsys.readouterr().err
 
 
 def test_eval_e3_plan(capsys, tmp_path):
@@ -553,3 +553,251 @@ def test_eval_e2_cache_only_without_key(capsys, tmp_path, monkeypatch, fake_embe
     err = capsys.readouterr().err
     assert code != 2 and "GOOGLE_API_KEY" not in err
     assert code == 3, err
+
+
+# ---------------------------------------------------------------------------
+# F4: `kovalo eval e4`, `kovalo ask`, `kovalo show-trace` (kontrakt F4, 11.6 i 15.2)
+# ---------------------------------------------------------------------------
+
+
+def _names(out_dir) -> set[str]:
+    return {p.name for p in out_dir.iterdir()}
+
+
+def test_eval_e4_offline_ok(capsys, tmp_path, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+    from tests.workflow_fakes import ExplodingChatModel
+
+    out_dir = tmp_path / "mp4"
+    exploding = ExplodingChatModel()
+    with override_chat_model(exploding), override_embeddings(fake_embeddings):
+        assert main(["eval", "e4", "--out", str(out_dir)]) == 0
+    assert exploding.calls == [], "zero wywołań LLM-a"
+    names = _names(out_dir)
+    assert any(n.endswith("-e4.md") for n in names) and any(n.endswith("-e4.json") for n in names)
+    assert "agent_run.replay.json" in names and "agent_run.live.json" not in names
+    assert str(out_dir) in capsys.readouterr().out  # ścieżki raportów
+
+
+def test_eval_e4_exit_codes(capsys, tmp_path, monkeypatch, fake_embeddings, e4_fakes):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+
+    monkeypatch.setenv("KOVALO_PATHS__LLM_CACHE_DIR", str(tmp_path / "llm-cache"))
+    out_dir = tmp_path / "mp4"
+    base = ["eval", "e4", "--out", str(out_dir)]
+    with override_embeddings(fake_embeddings):
+        assert main([*base, "--ids", "X9"]) == 2
+        assert "X9" in capsys.readouterr().err
+        assert main([*base, "--no-cache", "--cache-only"]) == 2
+        capsys.readouterr()
+        assert not out_dir.exists() or not list(out_dir.iterdir()), "błąd argumentów przed zapisem"
+
+        # brak klucza przy --live (bez --cache-only): kod 2, odtworzenie zapisane
+        assert main([*base, "--live", "--no-cache", "--ids", "P1"]) == 2
+        assert "GOOGLE_API_KEY" in capsys.readouterr().err
+        names = _names(out_dir)
+        assert "agent_run.replay.json" in names and "agent_run.live.json" not in names
+
+        # --live --cache-only bez klucza i z pustym cache: pytanie kończy się błędem -> 3
+        assert main([*base, "--live", "--cache-only", "--ids", "P1"]) == 3
+        err = capsys.readouterr().err
+        assert "GOOGLE_API_KEY" not in err, "--cache-only nie wymaga klucza"
+        assert "agent_run.live.json" in _names(out_dir), "raporty zapisane mimo błędów"
+
+        # wyczerpany --max-calls: kod 7, raport częściowy zapisany
+        model = e4_fakes()
+        with override_chat_model(model):
+            assert main([*base, "--live", "--no-cache", "--max-calls", "3"]) == 7
+        assert model.calls == 3
+        assert "agent_run.live.json" in _names(out_dir)
+        capsys.readouterr()
+
+        assert main(["eval", "e5"]) == 2
+        assert "Etap e5 jeszcze nie istnieje (F5)." in capsys.readouterr().err
+
+
+def test_eval_e4_cache_only_with_key_never_touches_network(
+    capsys, tmp_path, monkeypatch, fake_embeddings
+):
+    """Ochrona limitu: nawet z kluczem `--live --cache-only` z pustym cache kończy się
+    LlmCacheMiss (kod 3), a próba połączenia z siecią byłaby błędem testu."""
+    import socket
+
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    def no_network(*args, **kwargs):
+        raise AssertionError("połączenie sieciowe w trybie --cache-only")
+
+    monkeypatch.setattr(socket.socket, "connect", no_network)
+    monkeypatch.setenv("GOOGLE_API_KEY", "klucz-testowy-nieprawdziwy")
+    monkeypatch.setenv("KOVALO_PATHS__LLM_CACHE_DIR", str(tmp_path / "llm-cache"))
+    out_dir = tmp_path / "mp4"
+    with override_embeddings(fake_embeddings):
+        code = main(["eval", "e4", "--live", "--cache-only", "--ids", "P1", "--out", str(out_dir)])
+    assert code == 3, capsys.readouterr().err
+    live = next(p for p in out_dir.iterdir() if p.name.endswith("-e4.json")).read_text("utf-8")
+    assert "LlmCacheMiss" in live
+
+
+def test_eval_e4_live_fake_and_unlimited_calls(capsys, tmp_path, fake_embeddings, e4_fakes):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+
+    out_dir = tmp_path / "mp4"
+    model = e4_fakes()
+    with override_chat_model(model), override_embeddings(fake_embeddings):
+        code = main(
+            ["eval", "e4", "--live", "--no-cache", "--max-calls", "0", "--out", str(out_dir)]
+        )
+    assert code == 0, capsys.readouterr().err
+    assert len(model.script) == model.calls, "0 = bez limitu: skrypt wykonany do końca"
+    assert "agent_run.live.json" in _names(out_dir)
+
+
+def test_eval_e4_default_max_calls_is_20(capsys, tmp_path, fake_embeddings, e4_fakes):
+    """Bez --max-calls pełny przebieg (22 tury) staje po 20 wywołaniach sieciowych (kod 7)."""
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+
+    model = e4_fakes()
+    assert len(model.script) > 20
+    with override_chat_model(model), override_embeddings(fake_embeddings):
+        code = main(["eval", "e4", "--live", "--no-cache", "--out", str(tmp_path / "mp4")])
+    assert code == 7, capsys.readouterr().err
+    assert model.calls == 20
+
+
+def test_eval_e4_reference_mismatch_exit_4(capsys, tmp_path, monkeypatch, fake_embeddings):
+    """Przeliczenie ≠ kurs to błąd portu (kod 4), nie modelu."""
+    from kovalo.cli import main
+    from kovalo.eval.trace import reference
+    from kovalo.llm import override_embeddings
+
+    def mismatch(*args, **kwargs):
+        raise reference.E4ReferenceMismatch("T1: tool_coverage: 1.0 != 0.6667")
+
+    monkeypatch.setattr(reference, "rescore_course", mismatch)
+    monkeypatch.setattr("kovalo.eval.trace.e4.rescore_course", mismatch, raising=False)
+    with override_embeddings(fake_embeddings):
+        assert main(["eval", "e4", "--out", str(tmp_path / "mp4")]) == 4
+    assert "T1" in capsys.readouterr().err
+
+
+def test_eval_e4_plan(capsys, tmp_path):
+    from kovalo.cli import main
+
+    out_dir = tmp_path / "mp4"
+    assert main(["eval", "e4", "--live", "--plan", "--out", str(out_dir)]) == 0
+    out = capsys.readouterr().out
+    assert "szacunek 22, górna granica 108, limit 20" in out
+    assert not out_dir.exists() or not list(out_dir.iterdir())
+
+
+def test_eval_e4_plan_variants(capsys, tmp_path):
+    """`--plan` odzwierciedla --ids i --max-calls, nie wymaga klucza i nie zapisuje;
+    bez --live: 0 wywołań; ujemny limit to kod 2."""
+    from kovalo.cli import main
+
+    out_dir = tmp_path / "mp4"
+    base = ["eval", "e4", "--plan", "--out", str(out_dir)]
+    assert main([*base, "--live", "--ids", "T1", "--max-calls", "5"]) == 0
+    assert "szacunek 3, górna granica 12, limit 5" in capsys.readouterr().out
+    assert main([*base, "--live", "--max-calls", "0"]) == 0
+    assert "limit brak" in capsys.readouterr().out
+    assert main([*base]) == 0
+    assert "0 wywołań" in capsys.readouterr().out
+    assert main([*base, "--live", "--max-calls", "-1"]) == 2
+    assert main([*base, "--live", "--ids", "X9"]) == 2
+    assert not out_dir.exists() or not list(out_dir.iterdir())
+
+
+def test_eval_e4_reads_review(capsys, tmp_path, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    out_dir = tmp_path / "mp4"
+    out_dir.mkdir()
+    (out_dir / "review.yaml").write_text(
+        "version: 1\nreviewed_on: 2026-11-03\nintro: Wstęp przeglądu E4 z CLI.\nitems: []\n",
+        encoding="utf-8",
+    )
+    with override_embeddings(fake_embeddings):
+        assert main(["eval", "e4", "--out", str(out_dir)]) == 0
+    md = next(p for p in out_dir.iterdir() if p.name.endswith("-e4.md")).read_text(encoding="utf-8")
+    assert "Wstęp przeglądu E4 z CLI." in md
+    (out_dir / "review.yaml").write_text("version: 7\nitems: zły\n", encoding="utf-8")
+    with override_embeddings(fake_embeddings):
+        assert main(["eval", "e4", "--out", str(out_dir)]) == 2, "zły review.yaml"
+
+
+def test_ask_and_show_trace(capsys, tmp_path, monkeypatch, fake_embeddings, session_settings):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+    from tests.agent_fakes import ScriptedModel, p1_script
+
+    monkeypatch.setenv("KOVALO_PATHS__LLM_CACHE_DIR", str(tmp_path / "llm-cache"))
+    question = "Ile wynosi kara, którą Mleczna Dolina jest winna Kovalo za lipiec 2026 r.?"
+    model = ScriptedModel(script=p1_script())
+    with override_chat_model(model), override_embeddings(fake_embeddings):
+        assert main(["ask", question]) == 0
+    out = capsys.readouterr().out
+    assert "729 600" in out or "7296,00" in out, "odpowiedź agenta"
+    assert "calculate_otif_penalty(" in out and "odpowiedź:" in out, "ścieżka dowodowa"
+    assert "729600" in out, "wynik narzędzia na prawdziwych danych"
+    assert len(model.bound) == 7, "domyślnie 7 narzędzi (tools.variant: ours)"
+
+    model = ScriptedModel(script=p1_script())
+    with override_chat_model(model), override_embeddings(fake_embeddings):
+        assert main(["ask", question, "--tools", "course"]) == 0
+    assert len(model.bound) == 6
+    capsys.readouterr()
+
+    # show-trace: przebieg kursu bez API
+    assert main(["show-trace", "P1", "--run", "course"]) == 0
+    shown = capsys.readouterr().out
+    assert "get_contract_terms(supplier='Mleczna Dolina')" in shown
+    assert "calculate_otif_penalty(otif_pct=94.6" in shown and "penalty_grosze" in shown
+    assert main(["show-trace", "P1", "--run", "course-supervisor"]) == 0
+    assert "ask_data_analyst" in capsys.readouterr().out
+    assert main(["show-trace", "ZZ", "--run", "course"]) == 2
+    assert "ZZ" in capsys.readouterr().err
+    assert main(["show-trace", "P1", "--run", "live", "--out", str(tmp_path / "pusto")]) == 2
+    assert capsys.readouterr().err.strip(), "brak pliku: komunikat, kod 2"
+
+
+def test_ask_errors(capsys, tmp_path, monkeypatch, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+    from tests.agent_fakes import ScriptedModel
+
+    monkeypatch.setenv("KOVALO_PATHS__LLM_CACHE_DIR", str(tmp_path / "llm-cache"))
+    with override_embeddings(fake_embeddings):
+        assert main(["ask", "Ile wynosi kara?"]) == 2, "brak klucza"
+        err = capsys.readouterr().err
+        assert "GOOGLE_API_KEY" in err and "Traceback" not in err
+        assert len(err.strip().splitlines()) == 1, "jedna linia"
+        assert main(["ask", "   "]) == 2
+        capsys.readouterr()
+        assert main(["ask", "x", "--no-cache", "--cache-only"]) == 2
+        capsys.readouterr()
+        with override_chat_model(ScriptedModel(script=[RuntimeError("provider unavailable")])):
+            assert main(["ask", "Ile wynosi kara?"]) == 3, "agent zakończył błędem"
+        captured = capsys.readouterr()
+        assert "provider unavailable" in captured.err, "P7: komunikat błędu na stderr"
+        assert captured.out.strip(), "P7: ścieżka dowodowa także przy kodzie 3, na stdout"
+
+
+def test_show_trace_reads_replay_report(capsys, tmp_path, fake_embeddings):
+    """`show-trace --run replay` czyta agent_run.replay.json z --out (format `save_traces` kursu)."""  # noqa: E501
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    out_dir = tmp_path / "mp4"
+    with override_embeddings(fake_embeddings):
+        assert main(["eval", "e4", "--out", str(out_dir)]) == 0
+    capsys.readouterr()
+    assert main(["show-trace", "T1", "--run", "replay", "--out", str(out_dir)]) == 0
+    assert "search_documents(" in capsys.readouterr().out

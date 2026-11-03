@@ -92,6 +92,9 @@ def test_fixed_texts():
     assert "anuluj" in replies.CLARIFY_QUESTION
     assert replies.MISSING_DISCOUNT.startswith("Podaj wysokość rabatu")
     assert "dokumenty Kovalo" in replies.OTHER_REPLY
+    # pytanie spoza zakresu dostaje listę możliwości (dawne powitanie UI)
+    assert replies.OTHER_REPLY.startswith("Jestem Kovalo Decision Copilot. Mogę:\n- ")
+    assert replies.OTHER_REPLY.count("\n- ") == 3
     assert "Nie zrozumiałem wiadomości" in replies.ERROR_REPLY
 
 

@@ -26,3 +26,21 @@ def test_threads_roundtrip_in_compose():
 
     assert httpx.get(f"{API}/threads/nie-uuid", timeout=10).status_code == 422
     assert httpx.post(f"{API}/threads/{thread_id}/resume", json={}, timeout=10).status_code == 422
+
+
+def test_trace_and_stream_routes_in_compose():
+    """F4 (kontrakt 15.2): nowy wątek ma `trace: null`; pusty tekst w strumieniu to 422 JSON (bez LLM-a)."""  # noqa: E501
+    thread_id = httpx.post(f"{API}/threads", timeout=10).json()["thread_id"]
+
+    trace = httpx.get(f"{API}/threads/{thread_id}/trace", timeout=10)
+    assert trace.status_code == 200
+    body = trace.json()
+    assert body["thread_id"] == thread_id and body["trace"] is None
+    assert httpx.get(f"{API}/threads/nie-uuid/trace", timeout=10).status_code == 422
+
+    empty = httpx.post(f"{API}/threads/{thread_id}/messages/stream", json={"text": ""}, timeout=10)
+    assert empty.status_code == 422
+    assert empty.headers["content-type"].startswith("application/json")
+    paths = httpx.get(f"{API}/openapi.json", timeout=10).json()["paths"]
+    assert "post" in paths["/threads/{thread_id}/messages/stream"]
+    assert "get" in paths["/threads/{thread_id}/trace"]

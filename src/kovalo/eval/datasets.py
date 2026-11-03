@@ -13,10 +13,14 @@ import yaml
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 __all__ = [
+    "AgentGold",
     "Dialogue",
     "DialogueTurn",
     "EvalQuery",
+    "GoldCalculation",
     "GoldQuestion",
+    "Need",
+    "load_agent_gold",
     "load_dialogues",
     "load_eval_queries",
     "load_gold",
@@ -123,3 +127,52 @@ def load_dialogues(path: Path) -> list[Dialogue]:
         return [Dialogue.model_validate(d) for d in items]
     except ValidationError as exc:
         raise ValueError(f"{path}: niepoprawny dialog ({exc})") from exc
+
+
+# --- wzorzec agenta MP4 (kontrakt F4, 11.1; port helpers/agent_trace.py 1:1) --------------------
+
+
+class Need(BaseModel):
+    """Udane wywołanie, którego wymaga pytanie: narzędzie i to, co musi obejmować jego wynik.
+    Albo, z any_of, kilka alternatywnych dróg: potrzeba jest spełniona, gdy spełniona jest jedna
+    z nich."""
+
+    tool: str | None = None
+    any_of: list[Need] = Field(default_factory=list)
+    supplier_id: str | None = None  # dostawca rozpoznany w wynikach
+    months: list[str] = Field(default_factory=list)  # miesiące z danymi we wszystkich wywołaniach
+    missing: list[str] = Field(default_factory=list)  # miesiące ZGŁOSZONE jako brakujące
+    doc_id: str | None = None  # wyszukiwanie: fragment z tego dokumentu
+
+
+class GoldCalculation(BaseModel):
+    """Obliczenie kary wykonane ręcznie, z dostawcą i miesiącem, do których należą jego dane."""
+
+    supplier_id: str
+    month: str
+    otif_pct: float
+    target_pct: float
+    rate_per_full_point_pct: float
+    cap_pct: float
+    invoice_grosze: int
+
+
+class AgentGold(BaseModel):
+    id: str
+    question: str
+    kind: str  # penalty, termination, no_clause, policy, document, no_data, boundary
+    needs: list[Need] = Field(default_factory=list)
+    calculations: list[GoldCalculation] = Field(default_factory=list)  # jedyne poprawne obliczenia
+    key_facts: list[list[str]] = Field(default_factory=list)  # każdy: akceptowane warianty
+    reference: str = ""  # ręcznie napisana oczekiwana odpowiedź, dla ludzi
+    approval_claim_phrases: list[str] = Field(default_factory=list)  # z najwyższego poziomu pliku
+
+
+def load_agent_gold(path: Path) -> list[AgentGold]:
+    """data/eval/mini_project_4_questions.yaml → lista AgentGold; brak pliku → FileNotFoundError."""
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Nie znaleziono pliku z pytaniami agenta: {path}")
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    phrases = raw["approval_claim_phrases"]
+    return [AgentGold(**q, approval_claim_phrases=phrases) for q in raw["questions"]]

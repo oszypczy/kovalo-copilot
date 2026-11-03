@@ -60,5 +60,11 @@ CMD ["kovalo-api"]
 
 # --- ui: Chainlit ---
 FROM runtime-base AS ui
+# konfiguracja Chainlita (language = "pl-PL") i polskie tłumaczenie UI; Chainlit czyta
+# .chainlit/ z katalogu roboczego (/app), brakujące tłumaczenia dogeneruje przy starcie
+# (stąd katalog tworzony przez użytkownika kovalo, z prawem zapisu)
+RUN mkdir -p /app/.chainlit/translations
+COPY --chown=kovalo:kovalo .chainlit/config.toml ./.chainlit/config.toml
+COPY --chown=kovalo:kovalo .chainlit/translations/pl-PL.json ./.chainlit/translations/pl-PL.json
 EXPOSE 8000
 CMD ["kovalo-ui"]

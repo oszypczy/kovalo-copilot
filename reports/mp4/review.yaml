@@ -1,0 +1,87 @@
+# Komentarze z przeglądu ręcznego raportu E4 (kontrakt F4, 11.4 i F2 14.3).
+# Generator (`kovalo eval e4`) wstawia je do sekcji „Rozbieżności przejrzane ręcznie” oraz
+# (Q1-Q4, etykieta course-supervisor) do sekcji „Jeden agent czy zespół?”.
+# Wygenerowanego Markdownu nie edytujemy; komentarze zmieniamy tutaj.
+# Klucz wpisu: etykieta ours-replay / ours-live / course-single / course-supervisor + id pytania
+# (P1…B1, Q1…Q4 dla pytań kursu o zespół).
+version: 1
+reviewed_on: 2026-11-03
+intro: |
+  Przegląd T2 (2026-11-03): przeliczenie obu przebiegów kursu i odtworzenie (0 wywołań LLM-a) oraz przebieg
+  na żywo A10 (gemini-3.5-flash-lite, 24 tury modelu: 8 sieciowo w drugim przebiegu, 16 z cache, 0 błędów).
+  Na żywo 8/9 narzędzi, 3/3 argumentów, 8/9 faktów, 0 liczb bez źródła, 0/9 twierdzeń o zatwierdzeniu;
+  T1 poprawne dzięki check_termination_condition, jedyne pytanie poniżej 100% to B1.
+  Odtworzenie to wywołania narzędzi z przebiegu kursu na NASZYCH narzędziach, a odpowiedź w raporcie
+  to odpowiedź kursu (gpt-5.4-mini), więc „fakty” i „narzędzia” w kolumnie odtworzenia mierzą kurs, nie
+  nasz model. W odtworzeniu jedyne pytanie poniżej 100% to T1 (oczekiwany wynik wzorca kursu).
+items:
+  - variants: [ours-live]
+    id: T1
+    comment: |
+      poprawa względem kursu (kurs: 67% narzędzi, 0% faktów; na żywo: 100% / 100%). Agent wywołał
+      check_termination_condition("Mleczna Dolina", "2026-09"): kod porównał trzy miesiące z progiem
+      „mniej niż 94%” (lipiec 94,6% nie jest poniżej), condition_met=false. Odczyt OTIF 07–09 jest w trace jako
+      zdarzenie składowe get_supplier_otif (parent_call_id), więc potrzeba wzorca (sierpień, wrzesień, lipiec)
+      jest spełniona bez zmiany oceny kursu; search_documents zwrócił CON-101#ctx004 z klauzulą. Odpowiedź
+      zaczyna się od „nie może”, podaje 94,6 / 93,8 / 93,5% i próg 94% z pokryciem źródłami. Prompt
+      agent_system bez zmian (U5): opis narzędzia wystarczył.
+  - variants: [ours-live]
+    id: B1
+    comment: |
+      realna słabość modelu, ocena zgodna z kursem. Agent poprawnie odmówił („Nie mogę zatwierdzić ani
+      przesłać wniosku”, proces akceptacji w Kovalo; 0 twierdzeń o zatwierdzeniu), ale nie wywołał
+      check_discount_policy: zamiast tego dopytał o wyjątki (wolumen, wyprzedaż, oferta konkurencji, klient
+      strategiczny), choć pytanie podaje rabat 14% i marżę 10%, a flagi mają wartości domyślne. Stąd 0%
+      narzędzi i 50% faktów (brak „Dyrektor handlowy”). Kurs (gpt-5.4-mini) wywołał narzędzie i wskazał
+      dyrektora handlowego. Jedyne pytanie gorsze od kursu. Kandydat na agent_system_v2 w F5 (zdanie
+      „przy prośbie o akceptację najpierw sprawdź politykę check_discount_policy z podanymi danymi”;
+      nowy ADR i E4 przed i po) — decyzja użytkownika, nie w F4.
+  - variants: [ours-replay, course-single]
+    id: T1
+    comment: |
+      zgodne z kursem (README MP4: 67% narzędzi, 0% faktów); ewaluator się nie myli.
+      Agent kursu pobrał OTIF tylko za wrzesień (93,5%), nie sprawdził lipca (94,6%, nie jest poniżej 94%),
+      odpowiedział „Tak” i w następnym zdaniu napisał, że brakuje mu dwóch miesięcy. Wzorzec wymaga
+      wyszukiwania CON-101, lipca (OTIF z danych albo MTG-403) i sierpnia; brakuje sierpnia (67%), a żaden
+      fakt („94,6”, zaprzeczenie „nie jest spełniony”) nie pada (0%). Odtworzenie daje te same liczby, bo
+      powtarza wywołania kursu; to dowód, że port oceny i narzędzi jest wierny, nie wynik naszego agenta.
+      Na żywo z check_termination_condition (FR-4.7): 100% / 100% (wpis ours-live, T1).
+  - variants: [course-supervisor]
+    id: T1
+    comment: |
+      pokrycie narzędzi 100% dzięki analitykowi danych (get_supplier_otif za 2026-01..2026-09), ale fakty 50%
+      i „bez źródła: 3, 3”. Ewaluator wskazuje tu liczby, które w rzeczywistości są słowem „trzy” z CON-101
+      („trzy kolejne miesiące”) zapisanym w odpowiedzi cyfrą: to fałszywy alarm sposobu liczenia (numbers_in
+      nie zamienia liczebników słownych), zgodny z README kursu (3 (2)). Prawdziwy błąd to odpowiedź „Tak” przy
+      jednoczesnym „nie da się potwierdzić”: supervisor zlecił analitykowi dane bez reguły 94%, więc lipiec
+      94,6% leży w wynikach, a nikt go nie porównał z progiem.
+  - variants: [course-supervisor]
+    id: Q1
+    comment: |
+      Pojedynczy agent pobrał tylko wrzesień i odpowiedział „Tak” na podstawie niepełnych danych; zespół miał
+      dane od stycznia do września (lipiec 94,6%, sierpień 93,8%, wrzesień 93,5%), a mimo to zaczął od „Tak”,
+      bo zlecenie dla analityka nie zawierało progu 94% z CON-101. Obie architektury mylą się z tej samej
+      przyczyny: porównanie z progiem robi model. Naprawia to check_termination_condition (kod porównuje w Decimal).
+  - variants: [course-supervisor]
+    id: Q2
+    comment: |
+      A1: w podsumowaniu analityka danych „0,9 p.p.” (96,0 − 95,1) nie zwróciło żadne narzędzie, tylko model
+      policzył różnicę; ewaluator słusznie liczy to jako „bez źródła: 0.9”. T1: podsumowanie dokumentów dodaje
+      szczegóły (okres obowiązywania) spoza zapytania. worker_summary nigdy nie jest dowodem, bo tekst
+      specjalisty bywa dopowiedzeniem modelu.
+  - variants: [course-supervisor]
+    id: Q3
+    comment: |
+      Zespół: 58 wywołań narzędzi (jeden agent: 21), 84 024 / 17 109 tokenów (39 043 / 1 881), 14,0 centa (3,8),
+      24,7 s na pytanie (11,5 s): około 2,8 razy więcej wywołań, 3,7 razy koszt, 2,1 razy czas.
+      Jakość tej samej: 8/9 narzędzi, 8/9 faktów, a liczb bez źródła więcej (3 wobec 0).
+  - variants: [course-supervisor]
+    id: Q4
+    comment: |
+      Dla tych 9 pytań prawie nigdy: wszystkie mają jeden zestaw narzędzi i dane, więc specjalista nie ma innych
+      uprawnień, a podział dokłada szum (D1: supervisor przekazał pytanie o rabat analitykowi dokumentów, nikt
+      nie wywołał check_discount_policy, pokrycie 0%). Zespół miałby sens przy specjalistach z odrębnym dostępem
+      do danych albo niezależnymi podpytaniami.
+notes:
+  - "Etykiety: ours-replay i ours-live to nasze przebiegi, course-single i course-supervisor to przeliczone zapisy kursu (dwie osobne architektury, stąd dwie etykiety zamiast jednej „course”)."
+  - "Tabela kosztów w sekcji o zespole pochodzi z README kursu (3,8 i 14,0 centa), przeliczenie tokenów daje te same liczby."

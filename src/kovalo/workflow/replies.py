@@ -15,6 +15,8 @@ from kovalo.text_pl import number
 from kovalo.workflow.schemas import Status
 
 __all__ = [
+    "AGENT_ERROR_REPLY",
+    "AGENT_LIMIT_REPLY",
     "CANCELLED_REPLY",
     "CLARIFY_QUESTION",
     "DOCUMENT_ERROR_REPLY",
@@ -32,14 +34,24 @@ __all__ = [
     "rejected_reply",
 ]
 
+# F4 (kontrakt F4, 8.1): agent bez odpowiedzi
+AGENT_ERROR_REPLY = (
+    "Nie udało się odpowiedzieć na to pytanie. Spróbuj ponownie za chwilę albo zadaj je inaczej."
+)
+AGENT_LIMIT_REPLY = (
+    "Przerwałem pracę: pytanie wymagało więcej kroków albo czasu, niż pozwala limit. "
+    "Zadaj węższe pytanie."
+)
 MISSING_DISCOUNT = "Podaj wysokość rabatu w procentach, a sprawdzę, kto go zatwierdza."
 CANCELLED_REPLY = "Wniosek anulowany. Nic nie zostało złożone."
 CLARIFY_QUESTION = (
     "Jaka będzie marża brutto po rabacie (w procentach)? Wpisz liczbę, np. 7,5, albo „anuluj”."
 )
 OTHER_REPLY = (
-    "Mogę odpowiedzieć na pytania o dokumenty Kovalo, sprawdzić, kto zatwierdza rabat, "
-    "albo przesłać wniosek rabatowy do akceptacji."
+    "Jestem Kovalo Decision Copilot. Mogę:\n"
+    "- odpowiedzieć na pytania o dokumenty Kovalo (ze źródłami),\n"
+    "- sprawdzić, kto zatwierdza rabat według polityki course-v1,\n"
+    "- przesłać wniosek rabatowy do akceptacji."
 )
 ERROR_REPLY = (
     "Nie zrozumiałem wiadomości. Napisz ją inaczej, np. "

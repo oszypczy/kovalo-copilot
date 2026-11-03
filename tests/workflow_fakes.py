@@ -123,16 +123,21 @@ def make_deps(
     llm: Any = None,
     answerer: Callable[[str], Any] | None = None,
     understand_model: Runnable[Any, Any] | None = None,
+    agent: Callable[..., Any] | None = None,
 ) -> tuple[Any, Any]:
+    """`agent` (F4): AgentAnswerer zamiast document_answerer (kontrakt F4, 8.1: dokładnie jedno)."""
     from kovalo.workflow.graph import CopilotDeps
     from kovalo.workflow.schemas import Turn
 
     llm = llm or ReplayLLM(turns)
+    answering: dict[str, Any] = (
+        {"agent": agent} if agent is not None else {"document_answerer": answerer or NoAnswerer()}
+    )
     deps = CopilotDeps(
         understand_model=understand_model or llm.with_structured_output(Turn),
-        document_answerer=answerer or NoAnswerer(),
         policy=settings.policy,
         understand_prompt=settings.prompts.understand_system,
+        **answering,
     )
     return deps, llm
 
@@ -143,13 +148,15 @@ def graph_with(
     *,
     llm: Any = None,
     answerer: Callable[[str], Any] | None = None,
+    agent: Callable[..., Any] | None = None,
+    checkpointer: Any = None,
 ) -> tuple[Any, Any]:
     """(pełny graf copilota na memory_checkpointer, atrapa modelu)."""
     from kovalo.workflow.checkpoint import memory_checkpointer
     from kovalo.workflow.graph import build_copilot_graph
 
-    deps, llm = make_deps(settings, turns, llm=llm, answerer=answerer)
-    return build_copilot_graph(deps, checkpointer=memory_checkpointer()), llm
+    deps, llm = make_deps(settings, turns, llm=llm, answerer=answerer, agent=agent)
+    return build_copilot_graph(deps, checkpointer=checkpointer or memory_checkpointer()), llm
 
 
 def service_and_llm(
@@ -158,10 +165,11 @@ def service_and_llm(
     *,
     llm: Any = None,
     answerer: Callable[[str], Any] | None = None,
+    agent: Callable[..., Any] | None = None,
 ) -> tuple[Any, Any]:
     from kovalo.workflow.service import CopilotService
 
-    graph, llm = graph_with(settings, turns, llm=llm, answerer=answerer)
+    graph, llm = graph_with(settings, turns, llm=llm, answerer=answerer, agent=agent)
     service = CopilotService(graph, max_message_chars=settings.workflow.max_message_chars)
     return service, llm
 
@@ -172,8 +180,9 @@ def service_with(
     *,
     llm: Any = None,
     answerer: Callable[[str], Any] | None = None,
+    agent: Callable[..., Any] | None = None,
 ) -> Any:
-    return service_and_llm(settings, turns, llm=llm, answerer=answerer)[0]
+    return service_and_llm(settings, turns, llm=llm, answerer=answerer, agent=agent)[0]
 
 
 def answers(*values: Any) -> Callable[[dict], Any]:

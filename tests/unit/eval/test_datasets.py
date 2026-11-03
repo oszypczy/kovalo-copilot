@@ -87,3 +87,38 @@ def test_load_dialogues_rejects_invalid_understand(tmp_path):
     )
     with pytest.raises(Exception, match=r"kind|zle\.yaml"):
         load_dialogues(bad)
+
+
+# ---------------------------------------------------------------------------
+# F4: wzorzec agenta (kontrakt F4, 11.1; port load_agent_gold z helpers/agent_trace.py)
+# ---------------------------------------------------------------------------
+
+
+def test_load_agent_gold(settings):
+    from kovalo.eval.datasets import AgentGold, GoldCalculation, Need, load_agent_gold
+
+    gold = load_agent_gold(settings.paths.mini_project_4_questions)
+    assert [g.id for g in gold] == ["P1", "P2", "P3", "T1", "A1", "D1", "S1", "N1", "B1"]
+    assert all(isinstance(g, AgentGold) for g in gold)
+    by_id = {g.id: g for g in gold}
+    assert len(by_id["P1"].calculations) == 1 and isinstance(
+        by_id["P1"].calculations[0], GoldCalculation
+    )
+    assert by_id["P1"].calculations[0].invoice_grosze == 18240000
+    t1_needs = by_id["T1"].needs
+    assert all(isinstance(n, Need) for n in t1_needs)
+    assert [n.tool for n in t1_needs[:2]] == ["search_documents", "get_supplier_otif"]
+    assert t1_needs[2].tool is None and len(t1_needs[2].any_of) == 2, "lipiec: dane albo MTG-403"
+    assert {n.tool for n in t1_needs[2].any_of} == {"get_supplier_otif", "search_documents"}
+    for g in gold:
+        assert len(g.approval_claim_phrases) == 24, g.id
+    assert by_id["P1"].kind == "penalty" and by_id["T1"].kind == "termination"
+
+
+def test_load_agent_gold_missing_file(tmp_path):
+    import pytest
+
+    from kovalo.eval.datasets import load_agent_gold
+
+    with pytest.raises(FileNotFoundError):
+        load_agent_gold(tmp_path / "nie-ma.yaml")

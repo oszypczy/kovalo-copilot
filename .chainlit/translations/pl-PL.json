@@ -1,0 +1,260 @@
+{
+  "common": {
+    "actions": {
+      "cancel": "Anuluj",
+      "confirm": "Potwierdź",
+      "continue": "Dalej",
+      "goBack": "Wróć",
+      "reset": "Resetuj",
+      "submit": "Wyślij"
+    },
+    "status": {
+      "loading": "Ładowanie...",
+      "error": {
+        "default": "Wystąpił błąd",
+        "serverConnection": "Brak połączenia z serwerem"
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Zaloguj się, aby korzystać z aplikacji",
+      "form": {
+        "email": {
+          "label": "Adres e-mail",
+          "required": "adres e-mail jest wymagany",
+          "placeholder": "ja@example.com"
+        },
+        "password": {
+          "label": "Hasło",
+          "required": "hasło jest wymagane"
+        },
+        "actions": {
+          "signin": "Zaloguj się"
+        },
+        "alternativeText": {
+          "or": "LUB"
+        }
+      },
+      "errors": {
+        "default": "Nie udało się zalogować",
+        "signin": "Spróbuj zalogować się innym kontem",
+        "oauthSignin": "Logowanie nie powiodło się. Spróbuj ponownie albo wybierz inną metodę logowania.",
+        "redirectUriMismatch": "Adres przekierowania nie zgadza się z konfiguracją aplikacji OAuth",
+        "oauthCallback": "Spróbuj zalogować się innym kontem",
+        "oauthCreateAccount": "Spróbuj zalogować się innym kontem",
+        "emailCreateAccount": "Spróbuj zalogować się innym kontem",
+        "callback": "Spróbuj zalogować się innym kontem",
+        "oauthAccountNotLinked": "Aby potwierdzić tożsamość, zaloguj się tym samym kontem co poprzednio",
+        "emailSignin": "Nie udało się wysłać wiadomości e-mail",
+        "emailVerify": "Potwierdź adres e-mail; wysłaliśmy nową wiadomość",
+        "credentialsSignin": "Logowanie nie powiodło się. Sprawdź podane dane",
+        "sessionRequired": "Zaloguj się, aby zobaczyć tę stronę"
+      }
+    },
+    "provider": {
+      "continue": "Kontynuuj przez {{provider}}"
+    }
+  },
+  "chat": {
+    "input": {
+      "placeholder": "Napisz wiadomość...",
+      "actions": {
+        "send": "Wyślij wiadomość",
+        "stop": "Zatrzymaj",
+        "attachFiles": "Dołącz pliki"
+      }
+    },
+    "favorites": {
+      "use": "Użyj ulubionej wiadomości",
+      "headline": "Ulubione wiadomości",
+      "remove": "Usuń z ulubionych",
+      "empty": {
+        "title": "Brak zapisanych wiadomości",
+        "description": "Wyślij wiadomość i oznacz ją gwiazdką albo oznacz wiadomość z poprzednich rozmów"
+      }
+    },
+    "commands": {
+      "button": "Narzędzia",
+      "changeTool": "Zmień narzędzie",
+      "availableTools": "Dostępne narzędzia"
+    },
+    "speech": {
+      "start": "Rozpocznij nagrywanie",
+      "stop": "Zatrzymaj nagrywanie",
+      "connecting": "Łączenie"
+    },
+    "fileUpload": {
+      "dragDrop": "Przeciągnij i upuść pliki tutaj",
+      "browse": "Przeglądaj pliki",
+      "sizeLimit": "Limit:",
+      "errors": {
+        "failed": "Nie udało się przesłać",
+        "cancelled": "Anulowano przesyłanie"
+      },
+      "actions": {
+        "cancelUpload": "Anuluj przesyłanie",
+        "removeAttachment": "Usuń załącznik"
+      }
+    },
+    "messages": {
+      "status": {
+        "using": "Wywołuję",
+        "used": "Wywołano"
+      },
+      "actions": {
+        "copy": {
+          "button": "Kopiuj do schowka",
+          "success": "Skopiowano!"
+        }
+      },
+      "feedback": {
+        "positive": "Pomocne",
+        "negative": "Niepomocne",
+        "edit": "Edytuj opinię",
+        "dialog": {
+          "title": "Dodaj komentarz",
+          "submit": "Wyślij opinię",
+          "yourFeedback": "Twoja opinia..."
+        },
+        "status": {
+          "updating": "Aktualizowanie",
+          "updated": "Opinia zaktualizowana"
+        }
+      }
+    },
+    "history": {
+      "title": "Ostatnie wiadomości",
+      "empty": "Pusto...",
+      "show": "Pokaż historię"
+    },
+    "settings": {
+      "title": "Panel ustawień",
+      "customize": "Tu dostosujesz ustawienia czatu"
+    },
+    "watermark": "Model językowy może się mylić. Sprawdzaj ważne informacje."
+  },
+  "threadHistory": {
+    "sidebar": {
+      "title": "Poprzednie rozmowy",
+      "filters": {
+        "search": "Szukaj",
+        "placeholder": "Szukaj rozmów..."
+      },
+      "timeframes": {
+        "today": "Dzisiaj",
+        "yesterday": "Wczoraj",
+        "previous7days": "Ostatnie 7 dni",
+        "previous30days": "Ostatnie 30 dni"
+      },
+      "empty": "Brak rozmów",
+      "actions": {
+        "close": "Zamknij panel boczny",
+        "open": "Otwórz panel boczny"
+      }
+    },
+    "thread": {
+      "untitled": "Rozmowa bez tytułu",
+      "menu": {
+        "rename": "Zmień nazwę",
+        "share": "Udostępnij",
+        "delete": "Usuń"
+      },
+      "actions": {
+        "share": {
+          "title": "Udostępnij link do rozmowy",
+          "button": "Udostępnij",
+          "status": {
+            "copied": "Skopiowano link",
+            "created": "Utworzono link!",
+            "unshared": "Udostępnianie tej rozmowy wyłączone"
+          },
+          "error": {
+            "create": "Nie udało się utworzyć linku",
+            "unshare": "Nie udało się wyłączyć udostępniania"
+          }
+        },
+        "delete": {
+          "title": "Potwierdź usunięcie",
+          "description": "Rozmowa zostanie usunięta razem z wiadomościami i elementami. Tej operacji nie można cofnąć",
+          "success": "Rozmowa usunięta",
+          "inProgress": "Usuwanie rozmowy"
+        },
+        "rename": {
+          "title": "Zmień nazwę rozmowy",
+          "description": "Wpisz nową nazwę rozmowy",
+          "form": {
+            "name": {
+              "label": "Nazwa",
+              "placeholder": "Wpisz nową nazwę"
+            }
+          },
+          "success": "Zmieniono nazwę!",
+          "inProgress": "Zmiana nazwy"
+        }
+      }
+    }
+  },
+  "navigation": {
+    "header": {
+      "chat": "Czat",
+      "readme": "Opis",
+      "theme": {
+        "light": "Motyw jasny",
+        "dark": "Motyw ciemny",
+        "system": "Motyw systemowy"
+      }
+    },
+    "newChat": {
+      "button": "Nowa rozmowa",
+      "dialog": {
+        "title": "Nowa rozmowa",
+        "description": "Bieżąca rozmowa zniknie z ekranu. Czy na pewno chcesz kontynuować?",
+        "tooltip": "Nowa rozmowa"
+      }
+    },
+    "user": {
+      "menu": {
+        "settings": "Ustawienia",
+        "settingsKey": "S",
+        "apiKeys": "Klucze API",
+        "logout": "Wyloguj"
+      }
+    }
+  },
+  "apiKeys": {
+    "title": "Wymagane klucze API",
+    "description": "Aplikacja wymaga poniższych kluczy API. Klucze są przechowywane lokalnie w przeglądarce.",
+    "success": {
+      "saved": "Zapisano"
+    }
+  },
+  "alerts": {
+    "info": "Informacja",
+    "note": "Uwaga",
+    "tip": "Wskazówka",
+    "important": "Ważne",
+    "warning": "Ostrzeżenie",
+    "caution": "Ostrożnie",
+    "debug": "Debugowanie",
+    "example": "Przykład",
+    "success": "Sukces",
+    "help": "Pomoc",
+    "idea": "Pomysł",
+    "pending": "Oczekuje",
+    "security": "Bezpieczeństwo",
+    "beta": "Beta",
+    "best-practice": "Dobra praktyka"
+  },
+  "components": {
+    "MultiSelectInput": {
+      "placeholder": "Wybierz..."
+    },
+    "DatePickerInput": {
+      "placeholder": {
+        "single": "Wybierz datę",
+        "range": "Wybierz zakres dat"
+      }
+    }
+  }
+}

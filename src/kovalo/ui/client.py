@@ -1,15 +1,19 @@
-"""Klient HTTP UI → api (kontrakt F3, 9.1; ADR-0010 pkt 6).
+"""Klient HTTP UI → api (kontrakt F3, 9.1; F4, 10.1; ADR-0010 pkt 6, ADR-0012 pkt 6).
 
 UI nie importuje backendu: ma własne, minimalne modele widoku (`extra="ignore"`), a zgodność
 z `TurnResult` pilnuje test kontraktu. Każda odpowiedź spoza 2xx → ApiCallError z ciała
 ApiError; brak połączenia albo przekroczony limit → ApiCallError(status=0, 'api_unreachable').
+F4: strumień tury (SSE, httpx-sse) i ostatni trace agenta w wątku.
 """
 
 from __future__ import annotations
 
+import json
+from collections.abc import AsyncIterator
 from typing import Any, Literal
 
 import httpx
+from httpx_sse import SSEError, aconnect_sse
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 __all__ = [
@@ -17,6 +21,9 @@ __all__ = [
     "CopilotApiClient",
     "PendingView",
     "SourceView",
+    "StreamItem",
+    "ToolEventView",
+    "TraceView",
     "TurnView",
     "pause_ref",
 ]
@@ -64,6 +71,33 @@ class TurnView(_View):
     resume_rejected: bool = False
     sources: list[SourceView] = []
     error: str | None = None
+    evidence_path: str | None = None  # F4: ścieżka dowodowa tury z agentem
+    trace: dict[str, Any] | None = None  # F4: nieprzezroczysty dla UI poza trace["status"]
+
+
+class ToolEventView(_View):
+    """Zdarzenie tool_start / tool_end strumienia tury."""
+
+    call_id: str
+    parent_call_id: str | None = None
+    agent: str = "agent"
+    tool: str
+    arguments: dict[str, Any] = {}
+    origin: str | None = None
+    status: str | None = None
+    brief: str | None = None
+    error: str | None = None
+
+
+class TraceView(_View):
+    thread_id: str
+    trace: dict[str, Any] | None = None
+    evidence_path: str | None = None
+
+
+StreamItem = (
+    tuple[Literal["tool_start", "tool_end"], ToolEventView] | tuple[Literal["final"], TurnView]
+)
 
 
 def pause_ref(pending: PendingView) -> dict[str, Any]:
@@ -86,13 +120,27 @@ class CopilotApiClient:
         self.timeout_s = timeout_s
         self.transport = transport
 
+    def _client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            base_url=self.base_url, timeout=self.timeout_s, transport=self.transport
+        )
+
+    @staticmethod
+    def _error_from(response: httpx.Response, data: Any) -> ApiCallError:
+        payload = data if isinstance(data, dict) else {}
+        detail = payload.get("detail")
+        return ApiCallError(
+            response.status_code,
+            str(payload.get("error") or f"http_{response.status_code}"),
+            detail if isinstance(detail, str) else (response.text or response.reason_phrase),
+            payload.get("pending") if isinstance(payload.get("pending"), dict) else None,
+        )
+
     async def _request(
         self, method: str, path: str, *, body: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         try:
-            async with httpx.AsyncClient(
-                base_url=self.base_url, timeout=self.timeout_s, transport=self.transport
-            ) as client:
+            async with self._client() as client:
                 response = await client.request(method, path, json=body)
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             raise ApiCallError(
@@ -103,14 +151,7 @@ class CopilotApiClient:
         except ValueError:
             data = None
         if not response.is_success:
-            payload = data if isinstance(data, dict) else {}
-            detail = payload.get("detail")
-            raise ApiCallError(
-                response.status_code,
-                str(payload.get("error") or f"http_{response.status_code}"),
-                detail if isinstance(detail, str) else (response.text or response.reason_phrase),
-                payload.get("pending") if isinstance(payload.get("pending"), dict) else None,
-            )
+            raise self._error_from(response, data)
         if not isinstance(data, dict):
             raise ApiCallError(response.status_code, "bad_response", "Odpowiedź api nie jest JSON.")
         return data
@@ -146,3 +187,68 @@ class CopilotApiClient:
         """Stan wątku (ThreadState) jako TurnView: bez odpowiedzi tej tury (replies puste)."""
         data = await self._request("GET", f"/threads/{thread_id}")
         return self._view({**data, "replies": []})
+
+    async def get_trace(self, thread_id: str) -> TraceView:
+        """Ostatni trace agenta w wątku (GET /threads/{id}/trace)."""
+        data = await self._request("GET", f"/threads/{thread_id}/trace")
+        try:
+            return TraceView.model_validate(data)
+        except ValidationError as exc:
+            raise ApiCallError(200, "bad_response", f"Nieoczekiwana odpowiedź api: {exc}") from exc
+
+    async def stream_message(self, thread_id: str, text: str) -> AsyncIterator[StreamItem]:
+        """POST /threads/{id}/messages/stream (SSE): ('tool_start' | 'tool_end', ToolEventView)
+        po kolei, na końcu ('final', TurnView).
+
+        Odpowiedź spoza 2xx przed strumieniem → ApiCallError z ApiError; zdarzenie error →
+        ApiCallError(200, error, detail); koniec strumienia bez final →
+        ApiCallError(0, 'stream_interrupted'). Limit czasu odczytu (ui_api_timeout_s) liczy się
+        między zdarzeniami.
+        """
+        path = f"/threads/{thread_id}/messages/stream"
+        try:
+            async with (
+                self._client() as client,
+                aconnect_sse(client, "POST", path, json={"text": text}) as source,
+            ):
+                response = source.response
+                if not response.is_success:
+                    await response.aread()
+                    try:
+                        data: Any = response.json()
+                    except ValueError:
+                        data = None
+                    raise self._error_from(response, data)
+                async for sse in source.aiter_sse():
+                    try:
+                        payload = json.loads(sse.data) if sse.data else {}
+                    except ValueError as exc:
+                        raise ApiCallError(
+                            200, "bad_response", f"Niepoprawne zdarzenie SSE: {exc}"
+                        ) from exc
+                    if sse.event in ("tool_start", "tool_end"):
+                        try:
+                            event = ToolEventView.model_validate(payload)
+                        except ValidationError as exc:
+                            raise ApiCallError(
+                                200, "bad_response", f"Nieoczekiwane zdarzenie api: {exc}"
+                            ) from exc
+                        yield (sse.event, event)  # type: ignore[misc]
+                    elif sse.event == "final":
+                        yield ("final", self._view(payload))
+                        return
+                    elif sse.event == "error":
+                        raise ApiCallError(
+                            200,
+                            str(payload.get("error") or "stream_error"),
+                            str(payload.get("detail") or ""),
+                        )
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            raise ApiCallError(
+                0, "api_unreachable", f"{type(exc).__name__}: {exc}".rstrip(": ")
+            ) from exc
+        except SSEError as exc:
+            raise ApiCallError(0, "stream_interrupted", f"Niepoprawny strumień api: {exc}") from exc
+        raise ApiCallError(
+            0, "stream_interrupted", "Strumień api skończył się bez wyniku tury. Spróbuj ponownie."
+        )

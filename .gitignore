@@ -12,7 +12,12 @@ reports/**
 !reports/*/*-e[0-9].md
 !reports/*/review.yaml
 .DS_Store
-.chainlit/
+# Chainlit: śledzimy tylko konfigurację i polskie tłumaczenie (reszta generuje się sama)
+.chainlit/*
+!.chainlit/config.toml
+!.chainlit/translations/
+.chainlit/translations/*
+!.chainlit/translations/pl-PL.json
 .files/
 .claude/settings.local.json
 .vscode/
