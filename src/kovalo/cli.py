@@ -1,4 +1,4 @@
-"""Polecenie `kovalo`: first-call (kontrakt F0, 7), ingest i eval e1 (F1, 7), eval e2 (F2, 8.7)."""
+"""Polecenie `kovalo`: first-call (F0, 7), ingest, eval e1 (F1, 7), e2 (F2, 8.7), e3 (F3, 10.6)."""
 
 from __future__ import annotations
 
@@ -215,11 +215,14 @@ def _e1_specs(
 def eval_command(
     settings: Settings, *, stage: str, args: argparse.Namespace, out: TextIO, err: TextIO
 ) -> int:
-    """`kovalo eval <stage>`: E1 (reports/mp1) i E2 (reports/mp2)."""
+    """`kovalo eval <stage>`: E1 (reports/mp1), E2 (reports/mp2), E3 (reports/mp3)."""
     if stage == "e2":
         return eval_e2(settings, args=args, out=out, err=err)
+    if stage == "e3":
+        return eval_e3(settings, args=args, out=out, err=err)
     if stage != "e1":
-        print(f"Etap {stage} jeszcze nie istnieje (F3).", file=err)
+        phase = f"F{stage[1:]}" if stage[:1] == "e" and stage[1:].isdigit() else "?"
+        print(f"Etap {stage} jeszcze nie istnieje ({phase}).", file=err)
         return EXIT_CONFIG
 
     from kovalo.eval.retrieval.e1 import E1LlmCallError, run_e1
@@ -340,16 +343,21 @@ def eval_e2(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: T
         )
 
     # Modele budujemy przed czymkolwiek innym: brak klucza → kod 2, ale raport bez LLM-a
-    # i tak powstaje (jak w E1).
+    # i tak powstaje (jak w E1). --cache-only: offline, bez klucza (N3, kontrakt F3 7.2).
     llm_error: ConfigError | None = None
     answer_model = judge_model = None
     if with_llm:
         from kovalo.llm import get_structured_model
 
+        offline = bool(args.cache_only)
         try:
-            answer_model = get_structured_model(Answer, "answer", settings=settings, cache=cache)
+            answer_model = get_structured_model(
+                Answer, "answer", settings=settings, cache=cache, offline=offline
+            )
             if judge:
-                judge_model = get_structured_model(Verdict, "judge", settings=settings, cache=cache)
+                judge_model = get_structured_model(
+                    Verdict, "judge", settings=settings, cache=cache, offline=offline
+                )
         except ConfigError as exc:
             llm_error = exc
 
@@ -411,6 +419,154 @@ def eval_e2(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: T
     return EXIT_OK
 
 
+_E3_STAGE_WORDS = (
+    ("route", "kierowanie"),
+    ("fields", "pola"),
+    ("request", "wniosek"),
+    ("approvers", "zatwierdzający"),
+    ("pauses", "pauzy"),
+    ("status", "status"),
+)
+
+
+def _e3_line(name: str, score: dict[str, object]) -> str:
+    stages = ", ".join(
+        f"{word} {score[key][0]}/{score[key][1]}"  # type: ignore[index]
+        for key, word in _E3_STAGE_WORDS
+    )
+    return f"{name}: {stages}, błędy {score['errors']}"
+
+
+def eval_e3(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    """`kovalo eval e3`: odtworzenie (zawsze, 0 wywołań) i przebieg na żywo (--live)
+    (kontrakt F3, 10.6). --cache-only: offline, bez klucza i bez sieci."""
+    from kovalo.eval.datasets import load_dialogues
+    from kovalo.eval.llm_cache import JsonFileLlmCache
+    from kovalo.eval.review import REVIEW_FILE, check_review_keys, load_review
+    from kovalo.eval.workflow.e3 import (
+        E3AllErrorsError,
+        E3Report,
+        plan_llm_calls,
+        replay_perfect,
+        run_e3,
+        select_dialogues,
+    )
+    from kovalo.eval.workflow.report import REVIEW_LABELS, turn_ids, write_reports
+    from kovalo.knowledge.corpus import CorpusError
+    from kovalo.knowledge.pgvector import IndexUnavailableError
+
+    if args.no_cache and args.cache_only:
+        print("--no-cache i --cache-only wykluczają się.", file=err)
+        return EXIT_CONFIG
+    live = bool(args.live)
+    try:
+        ids = _split(args.ids) or None
+        dialogues = select_dialogues(load_dialogues(settings.paths.mini_project_3_dialogues), ids)
+    except (ConfigError, FileNotFoundError, ValueError) as exc:
+        print(str(exc), file=err)
+        return EXIT_CONFIG
+
+    # Komentarze przeglądu ręcznego przed planem, cache i modelami: błąd → kod 2, zero wywołań.
+    out_dir = Path(args.out) if args.out else settings.paths.mini_project_3_output_dir
+    review_path = out_dir / REVIEW_FILE
+    try:
+        review = load_review(review_path)
+        if review is not None:
+            all_ids = turn_ids(
+                [
+                    {"dialogue": d.id}
+                    for d in load_dialogues(settings.paths.mini_project_3_dialogues)
+                    for _ in d.turns
+                ]
+            )
+            check_review_keys(review, variants=REVIEW_LABELS, ids=all_ids)
+    except ConfigError as exc:
+        message = str(exc)
+        print(message if str(review_path) in message else f"{review_path}: {message}", file=err)
+        return EXIT_CONFIG
+
+    plan = plan_llm_calls(dialogues)
+    if live:
+        print(
+            f"Plan: understand {plan['understand']}, odpowiedzi {plan['answer']}, razem "
+            f"{plan['total']} (górna granica bez fallbacku; bez cache: "
+            f"{'tak' if args.no_cache else 'nie'}; tylko cache: "
+            f"{'tak' if args.cache_only else 'nie'})",
+            file=out,
+        )
+    else:
+        print("Plan: 0 wywołań LLM-a (odtworzenie; przebieg na żywo: --live)", file=out)
+    if args.plan:
+        return EXIT_OK
+
+    cache = None
+    if live and not args.no_cache:
+        cache = JsonFileLlmCache(
+            settings.paths.llm_cache_dir, mode="strict" if args.cache_only else "read_write"
+        )
+
+    config_error: ConfigError | None = None
+    all_errors: E3AllErrorsError | None = None
+    report: E3Report
+    try:
+        try:
+            report = run_e3(
+                settings, live=live, ids=ids, cache=cache, offline=bool(args.cache_only),
+                backend=args.backend,
+            )  # fmt: skip
+        except E3AllErrorsError as exc:
+            all_errors, report = exc, exc.report
+        except ConfigError as exc:
+            if not live:
+                raise
+            # Brak klucza (albo inny błąd konfiguracji na żywo): odtworzenie i tak zapisujemy.
+            config_error = exc
+            report = run_e3(settings, ids=ids)
+    except ConfigError as exc:
+        print(str(exc), file=err)
+        return EXIT_CONFIG
+    except CorpusError as exc:
+        print(str(exc), file=err)
+        return EXIT_CORPUS
+    except IndexUnavailableError as exc:
+        return _db_unavailable(settings, exc, err)
+
+    paths = write_reports(report, out_dir, review=review)
+    print(_e3_line("odtworzenie", report.replay.score), file=out)
+    if report.live is not None:
+        c = report.live.calls
+        models = ", ".join(f"{m}: {n}" for m, n in report.live.answered_by.items()) or "brak"
+        print(
+            f"{_e3_line('na żywo', report.live.score)}; wywołania {c.understand + c.answer}, "
+            f"z cache {c.from_cache}, błędy wywołań {c.errors}, modele: {models}",
+            file=out,
+        )
+    print("Raporty:", file=out)
+    for path in paths:
+        print(f"  {path}", file=out)
+
+    if config_error is not None:
+        print(f"{config_error}\nZapisano tylko odtworzenie (bez przebiegu na żywo).", file=err)
+        return EXIT_CONFIG
+    if not replay_perfect(report.replay):
+        wrong = [d for d in report.replay.details if d["wrong"]]
+        print(
+            "Odtworzenie z idealnym understand nie daje 100%: błąd workflow, nie modelu "
+            f"(np. {wrong[0] if wrong else 'błędy tur'}). Sprawdź raport.",
+            file=err,
+        )
+        return EXIT_EMPTY
+    if all_errors is not None:
+        print(
+            f"Żadna tura na żywo się nie udała (przebieg {all_errors.run_id} zapisano jako "
+            f"nieudany), np.: {all_errors.first_error}\nSprawdź klucz i model "
+            "poleceniem: kovalo first-call albo uzupełnij cache (bez --cache-only).",
+            file=err,
+        )
+        return EXIT_PROVIDER
+    return EXIT_OK
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kovalo", description="Kovalo Decision Copilot.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -427,23 +583,37 @@ def _parser() -> argparse.ArgumentParser:
         help="wariant chunków (domyślnie oba: mp1, potem ctx)",
     )
     ing.add_argument("--table", default=None, help="tabela indeksu (tylko z --chunks mp1 albo ctx)")
-    ev = sub.add_parser("eval", help="ewaluacja etapu (e1, e2), raporty w reports/")
-    ev.add_argument("stage", help="etap ewaluacji: e1 albo e2")
+    ev = sub.add_parser("eval", help="ewaluacja etapu (e1, e2, e3), raporty w reports/")
+    ev.add_argument("stage", help="etap ewaluacji: e1, e2 albo e3")
     ev.add_argument("--candidates", action="store_true", help="e1: także embeddings.candidates")
     ev.add_argument("--model", action="append", help="e1: tylko wskazany model (można powtórzyć)")
-    ev.add_argument("--backend", choices=["memory", "pgvector"], default="memory")
+    ev.add_argument(
+        "--backend",
+        choices=["memory", "pgvector"],
+        default="memory",
+        help="wyszukiwanie w pamięci albo w Postgresie (e3: pytania o dokumenty na żywo)",
+    )
     ev.add_argument(
         "--with-llm",
         action="store_true",
         help="e1: jedno wywołanie z promptem Q01; e2: poziomy 3–4 (odpowiedzi i sędzia)",  # noqa: RUF001
     )
+    ev.add_argument(
+        "--live", action="store_true", help="e3: także przebieg z modelem z configu (≤ 14 wywołań)"
+    )
     ev.add_argument("--variants", default=None, help="e2: warianty z LLM-em (domyślnie ctx,hybrid)")
     ev.add_argument("--llm-side", choices=["ours", "reference"], default="ours", help="e2")
-    ev.add_argument("--ids", default=None, help="e2: tylko te pytania, np. M03,M10")
+    ev.add_argument(
+        "--ids", default=None, help="e2: tylko te pytania, np. M03,M10; e3: dialogi, np. D2,D7"
+    )
     ev.add_argument("--no-judge", action="store_true", help="e2: bez sędziego")
-    ev.add_argument("--no-cache", action="store_true", help="e2: bez cache LLM-a")
-    ev.add_argument("--cache-only", action="store_true", help="e2: tylko cache LLM-a, bez sieci")
-    ev.add_argument("--plan", action="store_true", help="e2: wypisz plan wywołań i zakończ")
+    ev.add_argument("--no-cache", action="store_true", help="e2, e3: bez cache LLM-a")
+    ev.add_argument(
+        "--cache-only",
+        action="store_true",
+        help="e2, e3: tylko cache LLM-a, bez sieci i bez klucza",
+    )
+    ev.add_argument("--plan", action="store_true", help="e2, e3: wypisz plan wywołań i zakończ")
     ev.add_argument("--out", default=None, help="katalog raportów")
     return parser
 

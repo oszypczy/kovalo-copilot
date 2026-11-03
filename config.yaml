@@ -238,3 +238,8 @@ services:
   api_url: http://localhost:8080          # w compose: KOVALO_SERVICES__API_URL=http://api:8080
   mcp_url: http://localhost:8765/mcp      # w compose: KOVALO_SERVICES__MCP_URL=http://mcp-server:8765/mcp
   health_timeout_s: 2
+  ui_api_timeout_s: 180             # NASZE (ADR-0010): limit jednego żądania ui → api (tura z fallbackiem i limiterem)
+
+workflow:                           # NASZE (ADR-0009)
+  checkpointer: postgres            # postgres | memory (memory: lokalnie bez Postgresa; pauzy znikają po restarcie)
+  max_message_chars: 4000           # dłuższa wiadomość → 422 w API, ValueError w serwisie

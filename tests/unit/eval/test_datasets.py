@@ -46,3 +46,44 @@ def test_load_gold(settings, tmp_path):
     empty.write_text("inne: 1\n", encoding="utf-8")
     with pytest.raises(ValueError, match=r"puste\.yaml"):
         load_gold(empty)
+
+
+def test_load_dialogues(settings, tmp_path):
+    import pytest
+
+    from kovalo.eval.datasets import Dialogue, DialogueTurn, load_dialogues
+    from kovalo.workflow.schemas import Turn
+
+    dialogues = load_dialogues(settings.paths.mini_project_3_dialogues)
+    assert [d.id for d in dialogues] == [f"D{i}" for i in range(1, 9)]
+    assert all(isinstance(d, Dialogue) and d.title for d in dialogues)
+    assert sum(len(d.turns) for d in dialogues) == 13
+    assert [len(d.turns) for d in dialogues] == [3, 2, 1, 2, 1, 1, 2, 1]
+    assert all(isinstance(t, DialogueTurn) for d in dialogues for t in d.turns)
+    for dialogue in dialogues:
+        for t in dialogue.turns:
+            Turn.model_validate(t.understand)  # idealny Turn waliduje się
+    d2 = {d.id: d for d in dialogues}["D2"]
+    assert d2.turns[1].resume == ["approved", "rejected"]
+    assert d2.turns[0].expect["status"] == "approved"
+    assert d2.turns[1].expect["pauses"] == [["approval", "CEO"], ["approval", "CFO"]]
+
+    with pytest.raises(FileNotFoundError):
+        load_dialogues(tmp_path / "brak.yaml")
+
+
+def test_load_dialogues_rejects_invalid_understand(tmp_path):
+    import pytest
+
+    from kovalo.eval.datasets import load_dialogues
+
+    bad = tmp_path / "zle.yaml"
+    bad.write_text(
+        "dialogues:\n"
+        "  - id: D1\n    title: x\n    turns:\n"
+        "      - user: Cześć\n        understand: {kind: nieznany}\n"
+        "        resume: []\n        expect: {}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(Exception, match=r"kind|zle\.yaml"):
+        load_dialogues(bad)

@@ -377,3 +377,68 @@ def test_llm_string_stable_and_secret_free(tmp_config: Path):
     b = get_chat_model(settings=load_settings(tmp_config, google_api_key=secret))
     assert a._get_llm_string() == b._get_llm_string()
     assert secret not in a._get_llm_string()
+
+
+# ---------------------------------------------------------------------------
+# F3: tryb offline (kontrakt F3, 7.2, N3)
+# ---------------------------------------------------------------------------
+
+
+def test_offline_without_key(llm_cache):
+    from kovalo.config import load_settings
+    from kovalo.llm import get_chat_model, get_fallback_models, get_structured_model
+    from kovalo.rag.records import Answer
+
+    settings = load_settings()  # bez GOOGLE_API_KEY
+    assert get_chat_model("answer", settings=settings, cache=llm_cache, offline=True) is not None
+    fallbacks = get_fallback_models("answer", settings=settings, cache=llm_cache, offline=True)
+    assert fallbacks, "fallbacki z configu także bez klucza"
+    structured = get_structured_model(
+        Answer, "answer", settings=settings, cache=llm_cache, offline=True
+    )
+    assert structured is not None
+
+    with pytest.raises(ValueError):
+        get_chat_model("answer", settings=settings, cache=None, offline=True)
+    with pytest.raises(ValueError):
+        get_fallback_models("answer", settings=settings, cache=None, offline=True)
+    with pytest.raises(ValueError):
+        get_structured_model(Answer, "answer", settings=settings, offline=True)
+
+
+def test_offline_false_still_requires_key():
+    from kovalo.config import MissingConfigError, load_settings
+    from kovalo.llm import get_chat_model
+
+    with pytest.raises(MissingConfigError):
+        get_chat_model(settings=load_settings(), offline=False)
+
+
+def test_offline_llm_string_matches_online(tmp_config: Path, llm_cache):
+    from kovalo.config import load_settings
+    from kovalo.llm import get_chat_model
+
+    online = get_chat_model(
+        "answer",
+        settings=load_settings(tmp_config, google_api_key="AIza-prawdziwy-klucz-123"),
+        cache=llm_cache,
+    )
+    offline = get_chat_model(
+        "answer", settings=load_settings(tmp_config), cache=llm_cache, offline=True
+    )
+    assert online._get_llm_string() == offline._get_llm_string(), "trafienia w cache te same"
+    assert "offline-cache-only" not in offline._get_llm_string()
+
+
+def test_offline_model_makes_no_request(tmp_path: Path):
+    """Strict cache bez wpisu: LlmCacheMiss zamiast żądania sieciowego (bez klucza)."""
+    from langchain_core.messages import HumanMessage
+
+    from kovalo.config import load_settings
+    from kovalo.eval.llm_cache import JsonFileLlmCache, LlmCacheMiss
+    from kovalo.llm import get_chat_model
+
+    strict = JsonFileLlmCache(tmp_path / "llm", mode="strict")
+    model = get_chat_model(settings=load_settings(), cache=strict, offline=True)
+    with pytest.raises(LlmCacheMiss):
+        model.invoke([HumanMessage("Cześć")])

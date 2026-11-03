@@ -19,12 +19,13 @@ from kovalo.config import HybridConfig, RetrievalMode, Settings
 from kovalo.knowledge.chunking import ChunkVariant, build_chunks
 from kovalo.knowledge.corpus import load_corpus
 from kovalo.knowledge.lexical import BM25Index
-from kovalo.knowledge.retrieval import ScoredChunk, search
+from kovalo.knowledge.retrieval import ScoredChunk, build_vector_store, search
 
 __all__ = [
     "HybridRetriever",
     "Retriever",
     "VectorRetriever",
+    "build_memory_retriever",
     "build_retriever",
     "open_retriever",
     "rrf_fuse",
@@ -114,6 +115,28 @@ def build_retriever(
     raise ValueError(f"Nieznany tryb wyszukiwania: {mode!r} (dozwolone: vector, hybrid)")
 
 
+def build_memory_retriever(
+    settings: Settings,
+    embeddings: Embeddings,
+    *,
+    variant: ChunkVariant = "ctx",
+    mode: RetrievalMode | None = None,
+    documents: Sequence[Document] | None = None,
+) -> Retriever:
+    """Korpus (albo documents) → build_chunks(variant) → InMemoryVectorStore → build_retriever.
+
+    Wyszukiwanie w pamięci, wspólne dla E2 i E3 (kontrakt F3, 7.1); mode None → retrieval.mode.
+    """
+    docs = list(documents) if documents is not None else load_corpus(settings)
+    chunks = build_chunks(docs, settings.chunking, variant)
+    return build_retriever(
+        chunks,
+        build_vector_store(chunks, embeddings),
+        mode=mode or settings.retrieval.mode,
+        hybrid=settings.retrieval.hybrid,
+    )
+
+
 def open_retriever(
     settings: Settings,
     embeddings: Embeddings,
@@ -125,8 +148,14 @@ def open_retriever(
 
     Niezgodny model/wymiar albo liczba chunków korpusu ≠ meta.n_chunks → IndexMismatchError.
     """
-    from kovalo.knowledge.ingest import configured_embedding_model, index_table
-    from kovalo.knowledge.pgvector import IndexMismatchError, check_index, open_store, pg_engine
+    from kovalo.knowledge.pgvector import (
+        IndexMismatchError,
+        check_index,
+        configured_embedding_model,
+        index_table,
+        open_store,
+        pg_engine,
+    )
 
     table = index_table(settings, variant)
     model, dimensions = configured_embedding_model(settings)

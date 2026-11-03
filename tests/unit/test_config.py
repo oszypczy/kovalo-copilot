@@ -438,3 +438,100 @@ def test_default_purposes_have_no_params():
 
     s = load_settings()
     assert all(not override.params for override in s.llm.purposes.values())
+
+
+# ---------------------------------------------------------------------------
+# F3 (kontrakt: docs/contracts/f3.md, sekcja 4)
+# ---------------------------------------------------------------------------
+
+
+def test_f3_config_keys_load():
+    from kovalo.config import load_settings
+
+    s = load_settings(google_api_key="test-key")
+    assert s.workflow.checkpointer == "postgres"
+    assert s.workflow.max_message_chars == 4000
+    assert s.services.ui_api_timeout_s == 180
+
+
+def test_policy_decimal_and_ranks():
+    from decimal import Decimal
+
+    from kovalo.config import load_settings
+
+    policy = load_settings(google_api_key="test-key").policy
+    assert policy.bands[0].up_to == Decimal(5)
+    assert [b.up_to for b in policy.bands] == [Decimal(5), Decimal(12), Decimal(20), Decimal(100)]
+    assert all(isinstance(b.up_to, Decimal) for b in policy.bands)
+    assert policy.margin_floor == Decimal(9) and isinstance(policy.margin_floor, Decimal)
+    assert policy.exceptions["clearance"].cap == Decimal(35)
+    assert policy.band_rank(["Dyrektor handlowy"]) == 2
+    assert policy.band_rank(["CEO", "CFO"]) == 3
+    with pytest.raises(ValueError):
+        policy.band_rank(["Nieznana rola"])
+    with pytest.raises(ValueError):
+        policy.band_rank(["CFO", "CEO"])  # kolejność ma znaczenie
+
+
+def test_policy_matches_course_numerically():
+    from kovalo.config import load_settings
+
+    policy = load_settings(google_api_key="test-key").policy
+    course = _load(COURSE_CONFIG)["policy"]
+    assert [float(b.up_to) for b in policy.bands] == [b["up_to"] for b in course["bands"]]
+    assert float(policy.margin_floor) == course["margin_floor"]
+    assert {k: float(v.cap) for k, v in policy.exceptions.items()} == {
+        k: v["cap"] for k, v in course["exceptions"].items()
+    }
+
+
+def _policy_with(tmp_config: Path, patch_config, mutate):
+    from kovalo.config import load_settings
+
+    data = _load(tmp_config)["policy"]
+    mutate(data)
+    patch_config(tmp_config, "policy", data)
+    return load_settings(tmp_config, google_api_key="test-key")
+
+
+_POLICY_BREAKS = {
+    "decreasing_up_to": (
+        lambda p: p["bands"].__setitem__(
+            1, {"up_to": 4, "roles": ["Regionalny kierownik sprzedaży"]}
+        ),
+        "up_to",
+    ),
+    "last_band_not_100": (lambda p: p["bands"][-1].__setitem__("up_to", 90), "up_to"),
+    "exception_roles_outside_bands": (
+        lambda p: p["exceptions"]["clearance"].__setitem__("roles", ["Prezes"]),
+        "clearance",
+    ),
+    "unknown_exception_name": (
+        lambda p: p["exceptions"].__setitem__("vip", {"cap": 10, "roles": ["CEO", "CFO"]}),
+        "vip",
+    ),
+    "cap_zero": (lambda p: p["exceptions"]["clearance"].__setitem__("cap", 0), "cap"),
+    "cap_over_100": (lambda p: p["exceptions"]["clearance"].__setitem__("cap", 101), "cap"),
+}
+
+
+@pytest.mark.parametrize("name", list(_POLICY_BREAKS))
+def test_policy_validation(tmp_config: Path, patch_config, name):
+    from kovalo.config import ConfigError
+
+    mutate, key = _POLICY_BREAKS[name]
+    with pytest.raises(ConfigError, match=key):
+        _policy_with(tmp_config, patch_config, mutate)
+
+
+@pytest.mark.parametrize(
+    "workflow",
+    [{"checkpointer": "sqlite"}, {"max_message_chars": 0}, {"max_message_chars": -5}],
+    ids=["unknown_checkpointer", "zero_chars", "negative_chars"],
+)
+def test_workflow_config_rejected(tmp_config: Path, patch_config, workflow):
+    from kovalo.config import ConfigError, load_settings
+
+    patch_config(tmp_config, "workflow", workflow)
+    with pytest.raises(ConfigError):
+        load_settings(tmp_config, google_api_key="test-key")

@@ -416,3 +416,16 @@ def llm_cache(tmp_path: Path):  # type: ignore[no-untyped-def]
     from kovalo.eval.llm_cache import JsonFileLlmCache
 
     return JsonFileLlmCache(tmp_path / "llm")
+
+
+# ---------------------------------------------------------------------------
+# F3 (kontrakt: docs/contracts/f3.md, sekcja 14.1). Importy kodu produkcyjnego wewnątrz fixture'ów.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def gold_dialogues(session_settings):  # type: ignore[no-untyped-def]
+    """8 dialogów MP3 (13 tur) z `data/eval/mini_project_3_dialogues.yaml`."""
+    from kovalo.eval.datasets import load_dialogues
+
+    return load_dialogues(session_settings.paths.mini_project_3_dialogues)

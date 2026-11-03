@@ -38,7 +38,7 @@ T ?= tests/live
 test-live:
 	uv run --env-file .env pytest -m live $(T)
 
-# usuwa wolumeny: pgvector (dane i checkpointy) oraz cache embeddingów (przeliczenie 47 chunków to sekundy)
+# usuwa wolumeny: pgvector (dane, tabele checkpointów LangGraph F3 i pauzy zatwierdzeń: ten sam pgdata) oraz cache embeddingów (przeliczenie 47 chunków to sekundy)
 db-reset:
 	docker compose down -v
 	docker compose up -d postgres
@@ -49,11 +49,13 @@ ingest:
 ingest-local:
 	uv run --env-file .env kovalo ingest
 
-# STAGE=e1|e2|...; ARGS przekazuje opcje, np. make eval STAGE=e1 ARGS="--backend pgvector"
+# STAGE=e1|e2|e3...; ARGS przekazuje opcje, np. make eval STAGE=e1 ARGS="--backend pgvector"
+# F3: make eval STAGE=e3 (odtworzenie D1-D8, zero wywołań LLM-a)
 eval:
 	docker compose run --rm api kovalo eval $(STAGE) $(ARGS)
 
-# Lokalnie (bez Dockera), np. make eval-local STAGE=e2 ARGS="--with-llm" (wymaga GOOGLE_API_KEY w .env)
+# Lokalnie (bez Dockera), np. make eval-local STAGE=e2 ARGS="--with-llm" albo
+# make eval-local STAGE=e3 ARGS="--live" (wymaga GOOGLE_API_KEY w .env)
 eval-local:
 	uv run --env-file .env kovalo eval $(STAGE) $(ARGS)
 

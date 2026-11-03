@@ -159,8 +159,8 @@ def test_eval_unknown_stage_or_model_exit_2(capsys, fake_embeddings, tmp_path):
     from kovalo.cli import main
     from kovalo.llm import override_embeddings
 
-    assert main(["eval", "e3"]) == 2
-    assert "Etap e3 jeszcze nie istnieje (F3)." in capsys.readouterr().err
+    assert main(["eval", "e4"]) == 2
+    assert "Etap e4 jeszcze nie istnieje (F4)." in capsys.readouterr().err
     with override_embeddings(fake_embeddings):
         assert main(["eval", "e1", "--model", "nieznany", "--out", str(tmp_path)]) == 2
     assert "nieznany" in capsys.readouterr().err
@@ -341,9 +341,9 @@ def test_eval_e2_errors_exit_codes(capsys, tmp_path, fake_embeddings):
         assert main([*base, "--variants", "nieznany"]) == 2
         assert main([*base, "--with-llm", "--ids", "X99"]) == 2
         assert main([*base, "--no-cache", "--cache-only"]) == 2
-        assert main(["eval", "e3"]) == 2
+        assert main(["eval", "e4"]) == 2
         err = capsys.readouterr().err
-        assert "nieznany" in err and "X99" in err and "Etap e3 jeszcze nie istnieje (F3)." in err
+        assert "nieznany" in err and "X99" in err and "Etap e4 jeszcze nie istnieje (F4)." in err
 
         failing = FakeStructuredChatModel(error=ValueError("sztuczny błąd"))
         with override_chat_model(failing):
@@ -440,3 +440,116 @@ def test_eval_e2_bad_review_exit_2(capsys, tmp_path, fake_embeddings):
         assert not list(out_dir.glob("answers.*")), name
     assert not any(p.name.endswith("-e2.md") for p in out_dir.iterdir())  # nic nie zapisano
     assert fake_embeddings.calls == []  # także modele embeddingów nie zbudowane
+
+
+# ---------------------------------------------------------------------------
+# F3: `kovalo eval e3` i N3 (kontrakt F3, 10.6 i 14.2)
+# ---------------------------------------------------------------------------
+
+REPLAY_LINE = (
+    "odtworzenie: kierowanie 13/13, pola 11/11, wniosek 8/8, zatwierdzający 11/11, "
+    "pauzy 13/13, status 13/13, błędy 0"
+)
+
+
+def _e3_names(out_dir) -> set[str]:
+    return {p.name for p in out_dir.iterdir()}
+
+
+def test_eval_e3_replay_ok(capsys, tmp_path):
+    from kovalo.cli import main
+
+    out_dir = tmp_path / "mp3"
+    assert main(["eval", "e3", "--out", str(out_dir)]) == 0
+    names = _e3_names(out_dir)
+    assert any(n.endswith("-e3.md") for n in names) and any(n.endswith("-e3.json") for n in names)
+    assert "dialogues.replay.json" in names and "dialogues.live.json" not in names
+    out = capsys.readouterr().out
+    assert REPLAY_LINE in out
+    assert str(out_dir) in out  # ścieżki raportów
+
+
+def test_eval_e3_live_fake(capsys, tmp_path, settings, gold_dialogues, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+    from tests.workflow_fakes import ideal_chat_model
+
+    out_dir = tmp_path / "mp3"
+    model = ideal_chat_model(gold_dialogues, settings)
+    with override_chat_model(model), override_embeddings(fake_embeddings):
+        assert main(["eval", "e3", "--live", "--no-cache", "--out", str(out_dir)]) == 0
+    assert "dialogues.live.json" in _e3_names(out_dir)
+    out = capsys.readouterr().out
+    assert REPLAY_LINE in out
+    assert "wywołania 14, z cache 0" in out
+    assert len(model.sent) == 14
+
+
+def test_eval_e3_exit_codes(capsys, tmp_path, monkeypatch, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    monkeypatch.setenv("KOVALO_PATHS__LLM_CACHE_DIR", str(tmp_path / "llm-cache"))
+    out_dir = tmp_path / "mp3"
+    base = ["eval", "e3", "--out", str(out_dir)]
+    with override_embeddings(fake_embeddings):
+        assert main([*base, "--ids", "D9"]) == 2
+        assert "D9" in capsys.readouterr().err
+        assert main([*base, "--no-cache", "--cache-only"]) == 2
+        capsys.readouterr()
+        assert not out_dir.exists() or not list(out_dir.iterdir()), "błąd argumentów przed zapisem"
+
+        # brak klucza przy --live (bez --cache-only): kod 2, odtworzenie zapisane
+        assert main([*base, "--live", "--no-cache", "--ids", "D2"]) == 2
+        assert "GOOGLE_API_KEY" in capsys.readouterr().err
+        names = _e3_names(out_dir)
+        assert "dialogues.replay.json" in names and "dialogues.live.json" not in names
+
+        # --live --cache-only bez klucza i z pustym cache: wszystkie tury na żywo to błędy -> 3
+        assert main([*base, "--live", "--cache-only", "--ids", "D1"]) == 3
+        err = capsys.readouterr().err
+        assert "GOOGLE_API_KEY" not in err, "--cache-only nie wymaga klucza"
+        assert "dialogues.live.json" in _e3_names(out_dir), "raporty zapisane mimo błędów"
+
+        assert main(["eval", "e4"]) == 2
+        assert "Etap e4 jeszcze nie istnieje (F4)." in capsys.readouterr().err
+
+
+def test_eval_e3_plan(capsys, tmp_path):
+    from kovalo.cli import main
+
+    out_dir = tmp_path / "mp3"
+    assert main(["eval", "e3", "--live", "--plan", "--out", str(out_dir)]) == 0
+    out = capsys.readouterr().out
+    assert "understand 13, odpowiedzi 1, razem 14" in out
+    assert not out_dir.exists() or not list(out_dir.iterdir())
+
+
+def test_eval_e3_reads_review(capsys, tmp_path):
+    from kovalo.cli import main
+
+    out_dir = tmp_path / "mp3"
+    out_dir.mkdir()
+    (out_dir / "review.yaml").write_text(
+        "version: 1\nreviewed_on: 2026-11-03\nintro: Wstęp przeglądu E3 z CLI.\nitems: []\n",
+        encoding="utf-8",
+    )
+    assert main(["eval", "e3", "--out", str(out_dir)]) == 0
+    md = next(p for p in out_dir.iterdir() if p.name.endswith("-e3.md")).read_text(encoding="utf-8")
+    assert "Wstęp przeglądu E3 z CLI." in md
+    assert (out_dir / "review.yaml").is_file()
+
+
+def test_eval_e2_cache_only_without_key(capsys, tmp_path, monkeypatch, fake_embeddings):
+    """N3: `eval e2 --with-llm --cache-only` nie sprawdza klucza (pusty cache: kod 3, nie 2)."""
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    monkeypatch.setenv("KOVALO_PATHS__LLM_CACHE_DIR", str(tmp_path / "llm-cache"))
+    out_dir = tmp_path / "raporty"
+    argv = ["eval", "e2", "--with-llm", "--cache-only", "--variants", "ctx", "--out", str(out_dir)]
+    with override_embeddings(fake_embeddings):
+        code = main(argv)
+    err = capsys.readouterr().err
+    assert code != 2 and "GOOGLE_API_KEY" not in err
+    assert code == 3, err

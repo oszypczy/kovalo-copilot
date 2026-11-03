@@ -34,13 +34,17 @@ chunki z kontekstem (nagłówki → rozmiar), odpowiedź w schemacie z cytowania
 
 **Kontrakt i zadania:** [contracts/f2.md](contracts/f2.md); decyzje: [ADR-0008](adr/0008-rag-hybrid-e2.md) (przyjęty), zmiana modelu głównego na `gemini-3.5-flash-lite` w [ADR-0006](adr/0006-config-and-llm-factory.md). Budżet: `kovalo eval e2` bez LLM-a, `--with-llm` do 48 wywołań przy domyślnych wariantach, powtórka z cache 0.
 
-**Status (2026-11-02):** kod, testy jednostkowe i architektury, `-m model`, `-m integration` (compose) i `-m live` zielone; E2 zrobione ([raport](../reports/mp2/2026-11-02-e2.md)): poziomy 1–2 referencji odtwarzają `check.py` kursu co do znaku, poziomy 3–4 spełniają cel „≥ referencja − 1” dla `ctx` i `hybrid`, przeliczenie z cache daje 0 wywołań. `retrieval.mode: vector` (ADR-0008). Otwarte przed merge: komentarze z przeglądu ręcznego w `reports/mp2/review.yaml` i raport przeliczony z cache (zadanie P1 w [contracts/f2.md §14.3](contracts/f2.md)). Znane ograniczenia (pytania PL do dokumentów EN, samoocena sędziego) są w ADR-0008 jako kandydaci na F3–F6.
+**Status (2026-11-02):** kod, testy jednostkowe i architektury, `-m model`, `-m integration` (compose) i `-m live` zielone; E2 zrobione ([raport](../reports/mp2/2026-11-02-e2.md)): poziomy 1–2 referencji odtwarzają `check.py` kursu co do znaku, poziomy 3–4 spełniają cel „≥ referencja − 1” dla `ctx` i `hybrid`, przeliczenie z cache daje 0 wywołań. `retrieval.mode: vector` (ADR-0008). Komentarze z przeglądu ręcznego w `reports/mp2/review.yaml`, raport przeliczony z cache (zadanie P1 w [contracts/f2.md §14.3](contracts/f2.md)); F2 zmergowane. Znane ograniczenia (pytania PL do dokumentów EN, samoocena sędziego) są w ADR-0008 jako kandydaci na F3–F6.
 
 ## F3: workflow decyzyjny (MP3)
 
 silnik polityki `course-v1` (TDD z tabelą przypadków), parser polskich odpowiedzi człowieka, `understand` (structured output), graf z `interrupt()` i wersjonowaniem wniosku, `PostgresSaver`, API `/messages` + `/resume`, **pierwsza wersja UI Chainlit** (czat + przyciski akceptacji), ewaluacja E3 (odtworzenie + na żywo).
 
 **Gotowe, gdy:** dialogi D1–D8 przechodzą w odtworzeniu 100%; scenariusz D2 da się przeklikać w UI.
+
+**Kontrakt i zadania:** [contracts/f3.md](contracts/f3.md) (zadania D1, T1, A0–A9, T2, D2, R1; w tym uwagi N1–N3 z F2); decyzje: [ADR-0009](adr/0009-workflow-f3.md) (workflow, `PostgresSaver`, `CopilotService`, E3, tryb offline modeli) i [ADR-0010](adr/0010-api-ui-f3.md) (API JSON, przyciski Chainlit), oba przyjęte. Budżet: odtworzenie E3 i testy bez LLM-a; `eval e3 --live` ≤ 14 wywołań, powtórka z cache 0, test na żywo 1, przeklikanie D2 w UI 2 na przejście (zamknięcie F3 ≈ 19).
+
+**Status (2026-11-03):** kod, testy jednostkowe i architektury (641), `-m integration` (17/17, compose) i `-m live` (1 wywołanie) zielone; przegląd R1 bez problemów blokujących ([contracts/f3.md §18](contracts/f3.md)). E3 ([raport](../reports/mp3/2026-11-03-e3.md)): odtworzenie 100% na każdym etapie bez LLM-a; na żywo (`gemini-3.5-flash-lite`, 14 wywołań) kierowanie 13/13, pola 10/11, wniosek 8/8, zatwierdzający 11/11, pauzy 13/13, status 13/13, 0 błędów; przeliczenie z cache bez klucza: 0 wywołań. Pauza przetrwała `docker compose restart api`. Otwarte przed merge: ręczne przeklikanie D2 w UI (do potwierdzenia przez użytkownika, 2 wywołania). Znane ograniczenie: przy „marża bez zmian” Flash-Lite nie przenosi marży do pola `Turn` (D2-t2, bez skutku dla wniosku; zmiana promptu PINNED wymaga ADR-u). Zużycie Gemini w F3: 16 wywołań (+2 na przeklikanie D2).
 
 ## F4: agent z narzędziami (MP4)
 
