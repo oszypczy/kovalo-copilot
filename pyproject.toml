@@ -27,6 +27,9 @@ dependencies = [
     "numpy>=2,<3",
     # F2 (RAG)
     "rank-bm25>=0.2.2,<0.3",
+    # F3 (workflow, checkpointy w Postgresie)
+    "langgraph-checkpoint-postgres>=3.2,<4",
+    "psycopg-pool>=3.2,<4",
 ]
 
 [project.optional-dependencies]

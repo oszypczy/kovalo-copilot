@@ -10,10 +10,14 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 __all__ = [
+    "Dialogue",
+    "DialogueTurn",
     "EvalQuery",
     "GoldQuestion",
+    "load_dialogues",
     "load_eval_queries",
     "load_gold",
     "load_mp2_retrieval_queries",
@@ -85,3 +89,37 @@ def load_gold(path: Path) -> list[GoldQuestion]:
         return [GoldQuestion(**q) for q in items]
     except (KeyError, TypeError) as exc:
         raise ValueError(f"{path}: każde pytanie musi mieć pola GoldQuestion ({exc})") from exc
+
+
+class DialogueTurn(BaseModel):
+    """Tura dialogu MP3: wiadomość, idealny Turn, odpowiedzi na pauzy, wzorzec (F3, 10.1)."""
+
+    user: str
+    understand: dict[str, Any]  # idealny Turn (walidowany przy wczytaniu)
+    resume: list[float | int | str] = Field(default_factory=list)
+    expect: dict[str, Any]  # kind, fields, request, approvers, pauses, status (podzbiór)
+
+    @field_validator("understand")
+    @classmethod
+    def _valid_turn(cls, value: dict[str, Any]) -> dict[str, Any]:
+        from kovalo.workflow.schemas import Turn
+
+        Turn.model_validate(value)
+        return value
+
+
+class Dialogue(BaseModel):
+    id: str
+    title: str
+    turns: list[DialogueTurn] = Field(min_length=1)
+
+
+def load_dialogues(path: Path) -> list[Dialogue]:
+    """Dialogi MP3 (klucz "dialogues"). Brak pliku → FileNotFoundError; zły kształt albo
+    `understand`, który nie jest poprawnym Turn → ValueError z nazwą pliku."""
+    path = Path(path)
+    items = _read_list(path, "dialogues")
+    try:
+        return [Dialogue.model_validate(d) for d in items]
+    except ValidationError as exc:
+        raise ValueError(f"{path}: niepoprawny dialog ({exc})") from exc

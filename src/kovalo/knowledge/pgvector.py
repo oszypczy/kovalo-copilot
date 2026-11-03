@@ -23,6 +23,8 @@ from kovalo.config import ConfigError, Settings
 if TYPE_CHECKING:
     from langchain_postgres import PGEngine, PGVectorStore
 
+    from kovalo.knowledge.chunking import ChunkVariant
+
 __all__ = [
     "ID_COLUMN",
     "METADATA_COLUMNS",
@@ -30,6 +32,8 @@ __all__ = [
     "IndexMismatchError",
     "IndexUnavailableError",
     "check_index",
+    "configured_embedding_model",
+    "index_table",
     "is_cosine_distance",
     "is_pg_store",
     "open_store",
@@ -62,6 +66,19 @@ class IndexMismatchError(ConfigError):
 
 class IndexUnavailableError(RuntimeError):
     """Postgres niedostępny (połączenie, timeout). Komunikat bez hasła i bez pełnego DSN."""
+
+
+def index_table(settings: Settings, variant: ChunkVariant) -> str:
+    """Tabela wariantu: db.vector_collection_mp1 ('mp1') albo db.vector_collection ('ctx')."""
+    return settings.db.vector_collection_mp1 if variant == "mp1" else settings.db.vector_collection
+
+
+def configured_embedding_model(settings: Settings) -> tuple[str, int]:
+    """(model, wymiar) indeksu według embeddings.provider."""
+    emb = settings.embeddings
+    if emb.provider == "openai_cache":
+        return emb.model, emb.dimensions
+    return emb.local.model, emb.local.dimensions
 
 
 def _unavailable(exc: BaseException) -> IndexUnavailableError:

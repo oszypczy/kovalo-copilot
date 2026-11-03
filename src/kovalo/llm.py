@@ -91,6 +91,10 @@ StructuredResult = dict[str, Any]
 StructuredModel = Runnable[LanguageModelInput, StructuredResult]
 
 ModelOverride = BaseChatModel | Callable[[ModelPurpose], BaseChatModel]
+
+# Klucz zastępczy trybu offline (N3, ADR-0009 pkt 10). Sekrety są w llm_string zamaskowane,
+# więc klucz cache jest identyczny jak przy prawdziwym kluczu.
+OFFLINE_API_KEY = "offline-cache-only"
 _override: ModelOverride | None = None
 
 
@@ -123,6 +127,13 @@ def _overridden(purpose: ModelPurpose) -> BaseChatModel | None:
     return override(purpose)
 
 
+def _check_offline(offline: bool, cache: BaseCache | None) -> None:
+    if offline and cache is None:
+        raise ValueError(
+            "Tryb offline (tylko cache) wymaga cache LLM-a (np. JsonFileLlmCache(mode='strict'))."
+        )
+
+
 def _require_api_key(settings: Settings, provider: ModelProvider) -> str:
     key = settings.api_key_for(provider)
     if key is None or not key.get_secret_value():
@@ -140,11 +151,12 @@ def _build_model(
     temperature: float | None,
     params: dict[str, Any],
     cache: BaseCache | None = None,
+    offline: bool = False,
 ) -> BaseChatModel:
     llm = settings.llm
     if spec.provider == "openai" and importlib.util.find_spec("langchain_openai") is None:
         raise ConfigError("Dostawca openai wymaga: uv sync --extra openai")
-    api_key = _require_api_key(settings, spec.provider)
+    api_key = OFFLINE_API_KEY if offline else _require_api_key(settings, spec.provider)
     rate_limit = spec.rate_limit or llm.rate_limit
     kwargs: dict[str, Any] = {
         "model_provider": spec.provider,
@@ -181,11 +193,15 @@ def get_chat_model(
     *,
     settings: Settings | None = None,
     cache: BaseCache | None = None,
+    offline: bool = False,
 ) -> BaseChatModel:
     """Model główny z configu (bez fallbacku), z rate limiterem i opcjonalnym cache.
 
-    Dla create_agent (F4: fallback przez ModelFallbackMiddleware).
+    Dla create_agent (F4: fallback przez ModelFallbackMiddleware). offline=True: tylko z cache
+    (None → ValueError), klucz zastępczy zamiast klucza z env, więc brak GOOGLE_API_KEY nie
+    zgłasza MissingConfigError. Przeznaczony do JsonFileLlmCache(mode='strict').
     """
+    _check_offline(offline, cache)
     overridden = _overridden(purpose)
     if overridden is not None:
         return overridden
@@ -193,7 +209,9 @@ def get_chat_model(
     llm = settings.llm
     model, temperature, params = _purpose_settings(settings, purpose)
     spec = ModelSpec(provider=llm.provider, model=model, rate_limit=llm.rate_limit)
-    return _build_model(settings, spec, temperature=temperature, params=params, cache=cache)
+    return _build_model(
+        settings, spec, temperature=temperature, params=params, cache=cache, offline=offline
+    )
 
 
 def get_fallback_models(
@@ -201,14 +219,19 @@ def get_fallback_models(
     *,
     settings: Settings | None = None,
     cache: BaseCache | None = None,
+    offline: bool = False,
 ) -> list[BaseChatModel]:
-    """Modele z llm.fallbacks w kolejności z configu, każdy z własnym limiterem."""
+    """Modele z llm.fallbacks w kolejności z configu, każdy z własnym limiterem (offline jak
+    w get_chat_model)."""
+    _check_offline(offline, cache)
     if _override is not None:
         return []
     settings = settings or get_settings()
     _, temperature, params = _purpose_settings(settings, purpose)
     return [
-        _build_model(settings, spec, temperature=temperature, params=params, cache=cache)
+        _build_model(
+            settings, spec, temperature=temperature, params=params, cache=cache, offline=offline
+        )
         for spec in settings.llm.fallbacks
     ]
 
@@ -238,18 +261,21 @@ def get_structured_model(
     *,
     settings: Settings | None = None,
     cache: BaseCache | None = None,
+    offline: bool = False,
 ) -> Runnable[LanguageModelInput, StructuredResult]:
     """Structured output (include_raw=True) związany z modelem głównym i każdym fallbackiem.
 
     Fallback tylko dla FALLBACK_EXCEPTIONS (dostępność modelu); błąd parsowania wraca
     w 'parsing_error' i nie przełącza modelu (ADR-0006 pkt 4, ADR-0008 pkt 5).
-    Brak klucza → MissingConfigError przy budowie, przed jakimkolwiek wywołaniem.
+    Brak klucza → MissingConfigError przy budowie, przed jakimkolwiek wywołaniem
+    (offline=True: tylko cache, bez klucza; jak w get_chat_model).
     """
+    _check_offline(offline, cache)
     overridden = _overridden(purpose)
     if overridden is not None:
         return cast(StructuredModel, overridden.with_structured_output(schema, include_raw=True))
-    primary = get_chat_model(purpose, settings=settings, cache=cache)
-    fallbacks = get_fallback_models(purpose, settings=settings, cache=cache)
+    primary = get_chat_model(purpose, settings=settings, cache=cache, offline=offline)
+    fallbacks = get_fallback_models(purpose, settings=settings, cache=cache, offline=offline)
     structured = cast(StructuredModel, primary.with_structured_output(schema, include_raw=True))
     if not fallbacks:
         return structured

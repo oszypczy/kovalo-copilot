@@ -18,7 +18,7 @@ from kovalo.config import Settings
 from kovalo.knowledge.chunking import ChunkStats, ChunkVariant, build_chunks, chunk_stats
 from kovalo.knowledge.corpus import CorpusStats, corpus_stats, load_corpus
 from kovalo.knowledge.embeddings import CountingEmbeddings
-from kovalo.knowledge.pgvector import IndexMeta
+from kovalo.knowledge.pgvector import IndexMeta, configured_embedding_model, index_table
 
 __all__ = [
     "IndexWriter",
@@ -47,14 +47,6 @@ class IngestStats(BaseModel):
     seconds: float
 
 
-def configured_embedding_model(settings: Settings) -> tuple[str, int]:
-    """(model, wymiar) indeksu według embeddings.provider."""
-    emb = settings.embeddings
-    if emb.provider == "openai_cache":
-        return emb.model, emb.dimensions
-    return emb.local.model, emb.local.dimensions
-
-
 def _counter(embeddings: Embeddings) -> CountingEmbeddings | None:
     if isinstance(embeddings, CountingEmbeddings):
         return embeddings
@@ -63,11 +55,6 @@ def _counter(embeddings: Embeddings) -> CountingEmbeddings | None:
     ):
         return embeddings.underlying_embeddings
     return None
-
-
-def index_table(settings: Settings, variant: ChunkVariant) -> str:
-    """Tabela wariantu: db.vector_collection_mp1 ('mp1') albo db.vector_collection ('ctx')."""
-    return settings.db.vector_collection_mp1 if variant == "mp1" else settings.db.vector_collection
 
 
 def ingest_mp1(settings: Settings, *, embeddings: Embeddings, writer: IndexWriter) -> IngestStats:

@@ -32,7 +32,7 @@
 | FR-3.1 | Silnik polityki rabatowej `course-v1` jako czysty kod (przedziały, wyjątki z limitem, najniższy uprawniony poziom, minimalna marża 9% → CFO, wyprzedaż końcówek zwolniona) | tabela przypadków z [05-domain.md](05-domain.md) przechodzi w 100% |
 | FR-3.2 | Węzeł `understand`: LLM klasyfikuje wiadomość (`document_question / policy_question / approval_request / other`), `request_action` (`new / update / none`), `standalone`, pola rabatu i flagi (`null`, gdy niewspomniane) | na dialogach kursu: kierowanie 13/13, pola 11/11 (cel) |
 | FR-3.3 | Graf LangGraph: `understand → route → answer_documents / answer_policy / reply_other / update_request → clarify ⟲ → decide → approve ⟲` | odtworzenie dialogów z idealnym `understand` (bez LLM-a) przechodzi 100% |
-| FR-3.4 | Pauzy przez `interrupt()` i wznowienie `Command(resume=…)`: pytanie o marżę (liczba albo `cancel`) i akceptacja każdej roli po kolei (`approved / rejected / cancel`) | nieprawidłowa odpowiedź → ta sama rola pytana ponownie |
+| FR-3.4 | Pauzy przez `interrupt()` i wznowienie `Command(resume=…)`: pytanie o marżę (liczba albo `cancel`) i akceptacja każdej roli po kolei (`approved / rejected / cancel`); ładunki pauz 1:1 z kursu (`type`: `clarification` / `approval`) | nieprawidłowa odpowiedź → ta sama rola pytana ponownie; pauza przetrwa restart `api` (`PostgresSaver`, [ADR-0009](adr/0009-workflow-f3.md)) |
 | FR-3.5 | Wersjonowanie wniosku: zmiana warunków → nowa wersja, wcześniejsze akceptacje przestają się liczyć; te same warunki po pełnej akceptacji → „Już zatwierdzone” | testy stanu wniosku |
 | FR-3.6 | Strażnik: w trakcie pauzy przyjmujemy tylko odpowiedź na bieżące pytanie | nowa wiadomość w pauzie → odrzucona z komunikatem |
 | FR-3.7 | Polskie odpowiedzi człowieka: „zatwierdź / odrzuć / anuluj”, liczby „7,5” i „7.5” | testy parsera |
@@ -64,8 +64,8 @@
 
 | ID | Wymaganie | Kryterium akceptacji |
 |---|---|---|
-| FR-6.1 | API (FastAPI): `POST /threads`, `POST /threads/{id}/messages`, `POST /threads/{id}/resume`, `GET /threads/{id}` (stan, pauza), `GET /threads/{id}/trace`, `GET /health` | kontrakt OpenAPI, testy API |
-| FR-6.2 | UI (Chainlit): czat, strumieniowanie odpowiedzi, kroki agenta (tool calls) jako rozwijane `Step`, pauzy jako przyciski akceptacji (`AskActionMessage`) i pole marży, źródła jako elementy z treścią chunku | ręczny scenariusz C1–C5 z MP5 przechodzi w UI |
+| FR-6.1 | API (FastAPI): `POST /threads`, `POST /threads/{id}/messages`, `POST /threads/{id}/resume`, `GET /threads/{id}` (stan, pauza), `GET /threads/{id}/trace`, `GET /health` | kontrakt OpenAPI, testy API. F3: JSON (`TurnResult`) bez `/trace`; SSE i `/trace` w F4 ([ADR-0010](adr/0010-api-ui-f3.md)) |
+| FR-6.2 | UI (Chainlit): czat, strumieniowanie odpowiedzi, kroki agenta (tool calls) jako rozwijane `Step`, pauzy jako przyciski akceptacji (`cl.Action` z `action_callback`, [ADR-0010](adr/0010-api-ui-f3.md)) i wpis marży w polu czatu, źródła jako elementy z treścią chunku | F3: scenariusz D2 z MP3 da się przeklikać; F5: ręczny scenariusz C1–C5 z MP5 przechodzi w UI |
 | FR-6.3 | Indeksowanie jako polecenie `kovalo ingest` (`make ingest`), idempotentne | ponowne uruchomienie nie duplikuje chunków |
 | FR-6.4 | Ewaluacja jako zadanie (`eval`) z raportem Markdown/JSON w `reports/` | raport porównuje wynik z referencyjnym |
 | FR-6.5 | Licznik kosztów i tokenów per tura i per przebieg | widoczny w UI i raporcie ewaluacji |

@@ -22,3 +22,8 @@ architect (kontrakty, ADR, diagramy, review architektury) → test-engineer (tes
 - API LangChain/LangGraph sprawdzaj w MCP `langchain-docs`, inne biblioteki w `context7`.
 - Dokumentacja i UI po polsku; identyfikatory, klucze, statusy po angielsku.
 - `data/` i `reference/` są tylko do odczytu.
+
+<!-- claude-reflect: learned rules (saved from the band; edit freely) -->
+## Learned rules
+- Treat the approval flow as simulated: Approve/Reject/Cancel buttons stand in for approvers, and nothing is sent to the CRM.
+<!-- end claude-reflect -->

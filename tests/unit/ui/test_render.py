@@ -1,0 +1,147 @@
+"""render_turn i render_error: czyste funkcje widoku (kontrakt F3, 9.2)."""
+
+from __future__ import annotations
+
+import httpx
+import pytest
+
+
+def view(**fields):
+    from kovalo.ui.client import PendingView, SourceView, TurnView
+
+    base = {"thread_id": "T1", "status": "answered", "replies": []}
+    base.update(fields)
+    if isinstance(base.get("pending"), dict):
+        base["pending"] = PendingView(**base["pending"])
+    base["sources"] = [
+        SourceView(**s) if isinstance(s, dict) else s for s in base.get("sources", [])
+    ]
+    return TurnView(**base)
+
+
+APPROVAL = {
+    "type": "approval",
+    "role": "CFO",
+    "revision": 2,
+    "approvers": ["CEO", "CFO"],
+    "summary": "klient: Carrefour Express, rabat: 22%, wersja wniosku: 2",
+    "options": ["approved", "rejected", "cancel"],
+}
+
+
+def test_render_approval_pause():
+    from kovalo.ui.render import render_turn
+
+    messages = render_turn(
+        view(status="pending_approval", replies=["Opis wniosku."], pending=APPROVAL)
+    )
+    assert messages[0].content == "Opis wniosku." and not messages[0].actions
+    pause = messages[-1]
+    assert "**Akceptacja (symulacja): CFO**" in pause.content
+    assert "CEO" in pause.content, "wymagani zatwierdzający"
+    assert "klient: Carrefour Express, rabat: 22%, wersja wniosku: 2" in pause.content
+    assert [(a.value, a.label) for a in pause.actions] == [
+        ("approved", "Zatwierdź"),
+        ("rejected", "Odrzuć"),
+        ("cancel", "Anuluj"),
+    ]
+    for action in pause.actions:
+        assert action.pause_ref == {"type": "approval", "key": "CFO", "revision": 2}
+    assert "Status:" not in pause.content, "status końcowy tylko bez pauzy"
+
+
+def test_render_resume_rejected_comes_before_the_pause():
+    from kovalo.ui.render import render_turn
+
+    messages = render_turn(view(status="pending_approval", resume_rejected=True, pending=APPROVAL))
+    texts = [m.content for m in messages]
+    rejected = next(i for i, t in enumerate(texts) if t.startswith("Nie rozpoznałem odpowiedzi."))
+    pause = next(i for i, t in enumerate(texts) if "Akceptacja (symulacja)" in t)
+    assert rejected < pause
+
+
+def test_render_clarification_and_status():
+    from kovalo.ui.render import render_turn
+
+    pending = {
+        "type": "clarification",
+        "field": "margin_after_pct",
+        "question": "Jaka będzie marża brutto po rabacie (w procentach)?",
+        "options": ["cancel"],
+    }
+    pause = render_turn(view(status="pending_clarification", replies=[], pending=pending))[-1]
+    assert "Jaka będzie marża brutto po rabacie" in pause.content
+    assert "Wpisz marżę w polu czatu (np. 7,5)." in pause.content
+    assert [(a.value, a.label) for a in pause.actions] == [("cancel", "Anuluj")]
+    assert pause.actions[0].pause_ref["type"] == "clarification"
+    assert pause.actions[0].pause_ref["key"] == "margin_after_pct"
+
+
+@pytest.mark.parametrize(
+    ("status", "label"),
+    [
+        ("answered", "odpowiedź"),
+        ("approved", "zatwierdzony (symulacja)"),
+        ("rejected", "odrzucony"),
+        ("cancelled", "anulowany"),
+        ("error", "błąd"),
+    ],
+)
+def test_final_status_is_last_line_in_polish(status, label):
+    from kovalo.ui.render import render_turn
+
+    messages = render_turn(view(status=status, replies=["Pierwsza.", "Druga."]))
+    assert len(messages) == 2
+    assert messages[-1].content.splitlines()[-1] == f"Status: {label}"
+    assert "Status:" not in messages[0].content, "status tylko w ostatniej wiadomości"
+    assert not messages[-1].actions
+
+
+def test_sources_attached_to_last_reply():
+    from kovalo.ui.render import UiSource, render_turn
+
+    sources = [
+        {"doc_id": "MTG-402", "chunk_id": "MTG-402#ctx001", "text": "Komitet utrzymał ceny."}
+    ]
+    messages = render_turn(view(replies=["Ceny bez zmian."], sources=sources))
+    assert messages[-1].sources == [
+        UiSource(name="MTG-402#ctx001", content="Komitet utrzymał ceny.")
+    ]
+    two = render_turn(view(replies=["A", "B"], sources=sources))
+    assert not two[0].sources and len(two[-1].sources) == 1
+
+
+def test_label_tables():
+    from kovalo.ui.render import ACTION_LABELS, STATUS_LABELS
+
+    assert ACTION_LABELS == {"approved": "Zatwierdź", "rejected": "Odrzuć", "cancel": "Anuluj"}
+    assert STATUS_LABELS["pending_approval"] == "czeka na akceptację"
+    assert STATUS_LABELS["pending_clarification"] == "czeka na doprecyzowanie"
+
+
+async def _api_error(status: int, error: str, detail: str):
+    from kovalo.ui.client import ApiCallError, CopilotApiClient
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if status == 0:
+            raise httpx.ConnectError("odmowa")
+        return httpx.Response(status, json={"error": error, "detail": detail, "pending": None})
+
+    client = CopilotApiClient(
+        "http://api.test", timeout_s=1, transport=httpx.MockTransport(handler)
+    )
+    with pytest.raises(ApiCallError) as info:
+        await client.send_message("T1", "x")
+    return info.value
+
+
+@pytest.mark.anyio
+async def test_render_error_messages():
+    from kovalo.ui.render import render_error
+
+    unavailable = render_error(await _api_error(503, "copilot_unavailable", "Brak klucza LLM-a."))
+    text = unavailable.content
+    assert any(word in text for word in ("GOOGLE_API_KEY", "klucz", "Postgres")), text
+    unreachable = render_error(await _api_error(0, "api_unreachable", "timeout"))
+    assert "api nie odpowiada" in unreachable.content.lower()
+    assert not unavailable.actions and not unreachable.actions

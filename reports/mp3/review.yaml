@@ -1,0 +1,30 @@
+# Komentarze z przeglądu ręcznego raportu E3 (kontrakt F3, 10.5 i F2 14.3).
+# Generator (`kovalo eval e3`) wstawia je do sekcji „Rozbieżności przejrzane ręcznie”.
+# Wygenerowanego Markdownu nie edytujemy; komentarze zmieniamy tutaj.
+# Klucz wpisu: etykieta `ours-replay` / `ours-live` + id tury `<D>-t<n>`.
+version: 1
+reviewed_on: 2026-11-03
+intro: |
+  Przegląd T2 (2026-11-03) na podstawie dialogues.live.json i dialogues.replay.json.
+  Przebieg na żywo: gemini-3.5-flash-lite, 14 wywołań (13 understand + 1 odpowiedź RAG), 0 z cache,
+  0 błędów. Odtworzenie 100% na każdym etapie. Jedyna rozbieżność na żywo: D2-t2 (etap „pola”).
+items:
+  - variants: [ours-live]
+    id: D2-t2
+    comment: |
+      realne, ale łagodne odstępstwo modelu; ocena zgodna z kursem, nie jest nadmiernie surowa.
+      Wzorzec wymaga w `fields` tylko discount_pct=22 i margin_after_pct=10. Model zwrócił
+      discount_pct=22, ale margin_after_pct=null (do „marża bez zmian” nie przejął 10 z rozmowy;
+      opis pola Turn i prompt understand_system każą wypełniać pola także tym, „co jasno wynika
+      z wcześniejszej rozmowy”). Pola customer=„Biedronka Express” i product=„woda” NIE są przyczyną:
+      ocena sprawdza tylko pola wymienione we wzorcu, nadmiarowe są tolerowane, tak samo jak
+      w kursie (`score_transcript`, krok 5 MP3: „każde wymienione pole jest równe”).
+      Skutki: żadne. `update_request` zostawia margin_after_pct=10 z rewizji 1 (None = bez zmiany),
+      więc wniosek rev. 2 (22%, marża 10%), zatwierdzający (CEO, CFO), pauzy i status rejected
+      są poprawne. Odpowiedź „Wniosek odrzucony (wersja 2) przez: CFO.” zgodna ze stanem.
+      Kurs (gpt-5.4-mini) przeniósł marżę 10, stąd 11/11. Poprawka kodu niepotrzebna; ewentualnie
+      doprecyzować prompt (poza zakresem: prompt PINNED, zmiana wymaga ADR-u).
+notes:
+  - "Odpowiedzi tekstowe (reply) przejrzane ręcznie: wszystkie po polsku, zgodne ze stanem i z wzorcem; liczby po polsku, role w mianowniku („CEO i CFO”), stopka „To tylko informacja” (pytania o politykę) i „To symulacja: nic nie trafia do CRM-u” (wnioski)."
+  - "D7-t1 (cytowanie): odpowiedź zgodna z MTG-402 (podwyżka cen wody o 4% od 1 września 2026 r., 1% po stronie Kovalo, termin płatności 45 dni), odwołanie MTG-402 wskazuje dokument z dowodem (MTG-402#ctx001, top-1), linia „Źródła: MTG-402”, answerable=true. Różnica wobec kursu: brak, odpowiedź parafrazuje decyzję komitetu."
+  - "D7-t2 („Dzięki!”): rodzaj other, odpowiedź informacyjna o możliwościach copilota, bez wywołania odpowiedzi RAG."

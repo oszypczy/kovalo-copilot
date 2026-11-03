@@ -19,6 +19,7 @@ __all__ = [
     "monthly_cost_tokens",
     "our_price",
     "reference_price",
+    "tokens_cost",
 ]
 
 _PER_MILLION = 1_000_000
@@ -52,6 +53,18 @@ def monthly_cost_tokens(
         )
     per_question = (input_tokens * price.input + output_tokens * price.output) / _PER_MILLION
     return scenario.questions_per_day * scenario.working_days_per_month * per_question
+
+
+def tokens_cost(input_tokens: float, output_tokens: float, *, price: TokenPrice) -> float:
+    """Koszt (USD) podanej liczby tokenów wejścia i wyjścia po cenniku (E3, FR-6.5).
+
+    Bez zaokrąglania; ujemne → ValueError.
+    """
+    if input_tokens < 0 or output_tokens < 0:
+        raise ValueError(
+            f"Liczba tokenów nie może być ujemna: wejście {input_tokens}, wyjście {output_tokens}"
+        )
+    return (input_tokens * price.input + output_tokens * price.output) / _PER_MILLION
 
 
 def reference_price(cost: CostConfig) -> TokenPrice:

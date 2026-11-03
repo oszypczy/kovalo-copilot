@@ -11,7 +11,9 @@ from __future__ import annotations
 import datetime
 import functools
 import os
+from collections.abc import Sequence
 from contextvars import ContextVar
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote
@@ -252,21 +254,64 @@ class CostConfig(_Section):
 
 
 class PolicyBand(_Section):
-    up_to: int
-    roles: list[str]
+    up_to: Decimal
+    roles: list[str] = Field(min_length=1)
 
 
 class PolicyException(_Section):
-    cap: int
-    roles: list[str]
+    cap: Decimal = Field(gt=0, le=100)
+    roles: list[str] = Field(min_length=1)
+
+
+# Nazwy wyjątków = flagi DiscountRequest (kontrakt F3, 4.2).
+POLICY_EXCEPTION_FLAGS = ("clearance", "strategic_account", "competitor_offer")
 
 
 class PolicyConfig(_Section):
+    """Polityka rabatowa (PINNED, course-v1). Progi jako Decimal, wartości z YAML bez zmian."""
+
     version: str
-    bands: list[PolicyBand]
+    bands: list[PolicyBand] = Field(min_length=1)
     exceptions: dict[str, PolicyException]
-    margin_floor: int
-    floor_role: str
+    margin_floor: Decimal
+    floor_role: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _check(self) -> PolicyConfig:
+        """Progi ściśle rosnące, ostatni = 100; role wyjątku = role dokładnie jednego przedziału;
+        nazwy wyjątków tylko z POLICY_EXCEPTION_FLAGS (ranga uprawnień musi być jednoznaczna)."""
+        for i in range(1, len(self.bands)):
+            if self.bands[i].up_to <= self.bands[i - 1].up_to:
+                raise ValueError(
+                    f"policy.bands[{i}].up_to ({self.bands[i].up_to}) musi być większe niż "
+                    f"policy.bands[{i - 1}].up_to ({self.bands[i - 1].up_to})"
+                )
+        if self.bands[-1].up_to != 100:
+            raise ValueError(
+                f"policy.bands[-1].up_to musi wynosić 100 (jest {self.bands[-1].up_to}): "
+                "każdy rabat 0–100 potrzebuje przedziału"  # noqa: RUF001
+            )
+        for name, exc in self.exceptions.items():
+            if name not in POLICY_EXCEPTION_FLAGS:
+                raise ValueError(
+                    f"policy.exceptions.{name}: nieznany wyjątek (dozwolone: "
+                    f"{', '.join(POLICY_EXCEPTION_FLAGS)})"
+                )
+            matching = [b for b in self.bands if b.roles == exc.roles]
+            if len(matching) != 1:
+                raise ValueError(
+                    f"policy.exceptions.{name}.roles {exc.roles} muszą być równe rolom "
+                    "dokładnie jednego przedziału policy.bands"
+                )
+        return self
+
+    def band_rank(self, roles: Sequence[str]) -> int:
+        """Indeks przedziału o dokładnie tych rolach (kolejność ma znaczenie); brak → ValueError."""
+        wanted = list(roles)
+        for index, band in enumerate(self.bands):
+            if band.roles == wanted:
+                return index
+        raise ValueError(f"Żaden przedział policy.bands nie ma ról {wanted}")
 
 
 class AgentConfig(_Section):
@@ -312,6 +357,14 @@ class ServicesConfig(_Section):
     api_url: str = "http://localhost:8080"
     mcp_url: str = "http://localhost:8765/mcp"
     health_timeout_s: float = 2
+    ui_api_timeout_s: float = Field(default=180, gt=0)  # NASZE (ADR-0010): jedno żądanie ui → api
+
+
+class WorkflowConfig(_Section):
+    """NASZE (ADR-0009): checkpointer grafu copilota i limit długości wiadomości."""
+
+    checkpointer: Literal["postgres", "memory"] = "postgres"
+    max_message_chars: int = Field(default=4000, ge=1)
 
 
 _API_KEY_ENV: dict[str, str] = {"google_genai": "GOOGLE_API_KEY", "openai": "OPENAI_API_KEY"}
@@ -361,6 +414,7 @@ class Settings(BaseSettings):
     prompts: PromptsConfig
     db: DbConfig = DbConfig()
     services: ServicesConfig = ServicesConfig()
+    workflow: WorkflowConfig = WorkflowConfig()
     root: Path
 
     # sekrety i zmienne z env / .env (nazwy bez prefiksu, jak w .env.example)

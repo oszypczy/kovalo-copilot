@@ -148,3 +148,24 @@ def test_reference_hybrid_finds_sup_114(reference_hybrid):
     assert ids(top) == ["CON-101#ctx002", "CON-101#ctx003", "CON-101#ctx000"]
     vector_only = reference_hybrid["vector"].retrieve("Co SUP-114 mówi o karach?", 3)
     assert ids(vector_only) == ["CON-102#ctx004", "CON-102#ctx002", "CON-102#ctx001"]
+
+
+# ---------------------------------------------------------------------------
+# F3 (kontrakt F3, 7.1): build_memory_retriever, wspólne dla E2 i E3
+# ---------------------------------------------------------------------------
+
+
+def test_build_memory_retriever_variants(settings, fake_embeddings):
+    from kovalo.knowledge.retrievers import HybridRetriever, VectorRetriever, build_memory_retriever
+
+    ctx = build_memory_retriever(settings, fake_embeddings, variant="ctx")
+    assert isinstance(ctx, VectorRetriever)  # retrieval.mode: vector
+    assert len(ctx.store.store) == 87, "wariant ctx: 87 chunków w magazynie"
+
+    mp1 = build_memory_retriever(settings, fake_embeddings, variant="mp1")
+    assert len(mp1.store.store) == 47
+
+    hybrid = build_memory_retriever(settings, fake_embeddings, variant="ctx", mode="hybrid")
+    assert isinstance(hybrid, HybridRetriever)
+    hits = hybrid.retrieve("Kto zatwierdza rabat powyżej 20%?", 3)
+    assert len(hits) == 3
