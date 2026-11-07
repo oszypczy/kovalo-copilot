@@ -150,8 +150,11 @@ class EmptyRetriever:
 # --- serwer ----------------------------------------------------------------------------------
 
 
-def server_deps(settings: Any, *, retriever: Any = None, variant: str = "course") -> Any:
-    """ServerDeps na prawdziwych danych firmy i korpusie, z podanym retrieverem (§7.1)."""
+def server_deps(
+    settings: Any, *, retriever: Any = None, variant: str = "course", search: str | None = None
+) -> Any:
+    """ServerDeps na prawdziwych danych firmy i korpusie, z podanym retrieverem (§7.1).
+    `search` None → mcp_server.search z ustawień (jak w build_server)."""
     from kovalo.mcp_server.server import ServerDeps
 
     ctx = tool_context(settings, load_company_data(settings.paths.company_data_dir), retriever)
@@ -164,18 +167,26 @@ def server_deps(settings: Any, *, retriever: Any = None, variant: str = "course"
         catalog=catalog,
         policy_yaml=yaml.safe_dump(raw["policy"], allow_unicode=True),
         variant=variant,  # type: ignore[arg-type]
+        search=search,  # type: ignore[arg-type]
     )
 
 
 def mcp_server(
-    settings: Any, variant: str = "course", *, retriever: Any = "fake", **kwargs: Any
+    settings: Any,
+    variant: str = "course",
+    *,
+    retriever: Any = "fake",
+    search: str | None = None,
+    **kwargs: Any,
 ) -> Any:
     """`build_server(server_deps(...), settings=settings)`; retriever "fake" = FakeRetriever."""
     from kovalo.mcp_server.server import build_server
 
     chosen = FakeRetriever() if retriever == "fake" else retriever
     return build_server(
-        server_deps(settings, retriever=chosen, variant=variant), settings=settings, **kwargs
+        server_deps(settings, retriever=chosen, variant=variant, search=search),
+        settings=settings,
+        **kwargs,
     )
 
 

@@ -361,7 +361,8 @@ def _health(server):
 
 
 def test_health_reports_index_memory(settings):
-    response = _health(mcp_server(settings, "ours"))
+    """Indeks w pamięci: bez Postgresa (w CI go nie ma), więc `ok` niezależnie od compose."""
+    response = _health(mcp_server(settings, "ours", search="memory"))
     assert response.status_code == 200
     body = response.json()
     assert body["service"] == "mcp-server" and body["status"] == "ok"
@@ -493,3 +494,30 @@ def test_parallel_calls_from_threads_share_one_connection(connection):
     for t in threads:
         t.join(20)
     assert errors == [] and len(connection.captures) == 4
+
+
+def test_dns_rebinding_protection_on_for_any_bind_host(settings):
+    """Także przy --host 0.0.0.0 (kontener): obcy nagłówek Host → 421, obcy Origin → 403;
+    loopback i host z services.mcp_url przechodzą."""
+    from starlette.testclient import TestClient
+
+    configured = settings.model_copy(
+        update={
+            "services": settings.services.model_copy(
+                update={"mcp_url": "http://mcp-server:8765/mcp"}
+            )
+        }
+    )
+    body = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+    headers = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
+
+    def post(host: str, **extra: str) -> int:
+        # menedżer sesji SDK startuje raz na instancję: nowy serwer na każde żądanie
+        server = mcp_server(configured, "ours", search="memory", host="0.0.0.0")
+        with TestClient(server.streamable_http_app(), base_url=f"http://{host}") as client:
+            return client.post("/mcp", json=body, headers={**headers, **extra}).status_code
+
+    assert post("evil.example:8765") == 421
+    assert post("localhost:8765", origin="http://evil.example") == 403
+    for allowed in ("localhost:8765", "127.0.0.1:8765", "mcp-server:8765"):
+        assert post(allowed) == 200, allowed

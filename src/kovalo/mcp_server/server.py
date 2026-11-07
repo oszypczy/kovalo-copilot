@@ -17,10 +17,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 import anyio.to_thread
 import yaml
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -136,6 +138,21 @@ def _check_pgvector_index(settings: Settings) -> CheckResult:
     return CheckResult(status="ok", detail=f"{table}: {meta.n_chunks} chunków")
 
 
+def transport_security(settings: Settings) -> TransportSecuritySettings:
+    """Ochrona przed DNS rebinding zawsze włączona, także przy --host 0.0.0.0 w kontenerze
+    (SDK włącza ją sam tylko dla hosta loopback). Dozwolone: loopback i host z
+    `services.mcp_url` (w compose `mcp-server`), dowolny port."""
+    hosts = ["127.0.0.1", "localhost", "[::1]"]
+    own = urlsplit(settings.services.mcp_url).hostname
+    if own and own not in hosts and f"[{own}]" not in hosts:
+        hosts.append(own)
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=[f"{h}:*" for h in hosts],
+        allowed_origins=[f"http://{h}:*" for h in hosts],
+    )
+
+
 def build_server(
     deps: ServerDeps | Settings,
     *,
@@ -144,7 +161,7 @@ def build_server(
     port: int | None = None,
 ) -> FastMCP:
     """FastMCP(SERVER_NAME, stateless HTTP) z narzędziami wariantu, zasobami, promptem i /health.
-    Przy host 0.0.0.0 SDK nie włącza ochrony DNS rebinding (kontener; port na hoście: 127.0.0.1).
+    Ochrona przed DNS rebinding zawsze włączona (`transport_security`), także przy 0.0.0.0.
 
     Zgodność z F0: `build_server(settings)` (bez `deps`) = `build_server(open_server_deps(
     settings), settings=settings)`."""
@@ -159,6 +176,7 @@ def build_server(
         port=port if port is not None else settings.services.mcp_port,
         stateless_http=True,
         log_level="WARNING",
+        transport_security=transport_security(settings),
     )
     register_tools(server, deps.ctx, deps.variant)
     register_resources(

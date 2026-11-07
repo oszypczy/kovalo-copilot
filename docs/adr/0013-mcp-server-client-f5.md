@@ -44,3 +44,7 @@ Stan bibliotek (2026-11-04, `uv.lock`, `.venv`, MCP `langchain-docs`, `context7`
 - Synchroniczne funkcje zarejestrowane wprost w FastMCP: działa w stdio, ale blokuje pętlę serwera HTTP przy wyszukiwaniu (embedding zapytania + pgvector).
 - Serwer w pamięci procesu `api` zamiast kontenera: brak prawdziwego transportu i niezgodność z ADR-0005.
 - Aktualizacja LangGraph dla R1-2: brak nowszej wersji niż 1.2.19.
+
+## Utwardzenie po przeglądzie bezpieczeństwa (2026-11-07)
+
+Serwer HTTP zawsze włącza ochronę przed DNS rebinding (`TransportSecuritySettings`), także przy `--host 0.0.0.0` w kontenerze. SDK robi to samo tylko dla hosta loopback, więc w compose ochrona była wyłączona. Dozwolone nagłówki Host to loopback i host z `services.mcp_url` (w compose `mcp-server`, dlatego usługa `mcp-server` dostaje `KOVALO_SERVICES__MCP_URL`), z dowolnym portem; obcy Host → 421, obcy Origin → 403. Bez zmian w kontrakcie narzędzi i bez uwierzytelniania: serwer jest tylko do odczytu, a port na hoście jest związany z 127.0.0.1.
