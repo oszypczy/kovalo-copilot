@@ -222,8 +222,12 @@ def agent_runner(
     extra_middleware: Sequence[Any] = (),
     model: BaseChatModel | None = None,
     fallbacks: Sequence[BaseChatModel] = (),
+    fallback_exceptions: tuple[type[BaseException], ...] | None = None,
 ) -> tuple[Any, ScriptedModel]:
-    """(AgentRunner z atrapą modelu, atrapa) - `agent_for(script, variant)` z kontraktu."""
+    """(AgentRunner z atrapą modelu, atrapa) - `agent_for(script, variant)` z kontraktu.
+
+    `fallback_exceptions` None → llm.FALLBACK_EXCEPTIONS (na żywo);
+    offline: llm.fallback_exceptions(True)."""
     from kovalo.agents.agent import AgentRunner, build_agent
     from kovalo.llm import FALLBACK_EXCEPTIONS
     from kovalo.tools.langchain import langchain_tools
@@ -235,7 +239,9 @@ def agent_runner(
         langchain_tools(ctx, variant),  # type: ignore[arg-type]
         system_prompt=settings.prompts.agent_system,
         fallbacks=fallbacks,
-        fallback_exceptions=FALLBACK_EXCEPTIONS,
+        fallback_exceptions=FALLBACK_EXCEPTIONS
+        if fallback_exceptions is None
+        else fallback_exceptions,
         extra_middleware=extra_middleware,
     )
     return AgentRunner(agent, settings.agent), scripted  # type: ignore[return-value]

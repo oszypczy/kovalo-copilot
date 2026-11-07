@@ -228,7 +228,7 @@ def test_explicit_understand_prompt_wins(settings):
     assert "PROMPT-TESTOWY-XYZ" in fake.prompts[0]
 
 
-def test_lazy_agent_errors_are_traces(settings, monkeypatch, tmp_path):
+def test_lazy_agent_errors_are_traces(settings, monkeypatch, tmp_path, direct_tools):
     """Uszkodzone dane firmy → Trace(status='error'), drugie pytanie próbuje ponownie."""
     import shutil
 
@@ -255,7 +255,7 @@ def test_lazy_agent_errors_are_traces(settings, monkeypatch, tmp_path):
     assert second.status == "answered" and second.answer == "Teraz działa."
 
 
-def test_lazy_agent_without_key_is_an_error_trace(settings):
+def test_lazy_agent_without_key_is_an_error_trace(settings, direct_tools):
     from kovalo.config import load_settings
     from kovalo.workflow.factory import LazyAgentRunner
 
@@ -267,8 +267,9 @@ def test_lazy_retriever_error_is_tool_error(settings, monkeypatch, fake_embeddin
     """open_retriever zgłasza IndexUnavailableError → zdarzenie search_documents z status 'error';
     kolejne retrieve() próbuje ponownie; agent odpowiada dalej."""
     from kovalo.knowledge.pgvector import IndexUnavailableError
-    from kovalo.llm import override_chat_model, override_embeddings
-    from kovalo.workflow.factory import LazyRetriever, build_agent_runner
+    from kovalo.knowledge.retrievers import LazyRetriever  # F5: przeniesiony z workflow/factory.py
+    from kovalo.llm import get_embeddings, override_chat_model, override_embeddings
+    from kovalo.workflow.factory import build_agent_runner
     from tests.agent_fakes import ScriptedModel, answer, call
 
     attempts: list[int] = []
@@ -294,7 +295,10 @@ def test_lazy_retriever_error_is_tool_error(settings, monkeypatch, fake_embeddin
         ]
     )
     with override_chat_model(model), override_embeddings(fake_embeddings):
-        runner = build_agent_runner(settings, retriever=LazyRetriever(settings))
+        lazy = LazyRetriever(
+            lambda: fake_open_retriever(settings, get_embeddings(settings=settings))
+        )
+        runner = build_agent_runner(settings, retriever=lazy)
         first = runner("Kto zatwierdza wyjazdy?")
         second = runner("Kto zatwierdza wyjazdy?")
     assert first.status == "answered"
@@ -348,3 +352,245 @@ def test_open_copilot_service_uses_config_answerer(monkeypatch):
         result = service.send_message("t", "Ile wynosi kara?")
     assert result.trace is not None and result.replies == ["Odpowiedź agenta."]
     assert _StubAnswerer.built == ["_StubAnswerer"]
+
+
+# ---------------------------------------------------------------------------
+# F5: źródło narzędzi agenta (kontrakt F5, 9.1 i 13.2)
+# ---------------------------------------------------------------------------
+
+
+class FakeSource:
+    """Atrapa `McpToolSource`: narzędzia bezpośrednie pod interfejsem źródła; liczy zamknięcia."""
+
+    def __init__(self, tools, *, fail_first=False):
+        self._tools = tools
+        self.fail_first = fail_first
+        self.tools_calls = 0
+        self.closed = 0
+
+    def tools(self):
+        from kovalo.mcp_client.connection import McpStartupError
+
+        self.tools_calls += 1
+        if self.fail_first:
+            raise McpStartupError("serwer MCP się nie uruchomił (atrapa)")
+        return self._tools
+
+    def close(self):
+        self.closed += 1
+
+
+def direct_tool_list(settings, small_data, retriever):
+    from kovalo.tools.langchain import langchain_tools
+    from tests.agent_fakes import tool_context
+
+    return langchain_tools(tool_context(settings, small_data, retriever), "ours")
+
+
+def configured(monkeypatch, **env):
+    from kovalo.config import load_settings
+
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    return load_settings(google_api_key="test-key")
+
+
+def test_mcp_source_from_config(settings, monkeypatch, small_data, retriever):
+    """`tools.source: mcp` → LazyAgentRunner woła `open_tool_source` z nazwami wariantu i buduje
+    agenta na `source.tools()`; źródło otwarte raz; `direct` → F4 (bez MCP)."""
+    from kovalo.llm import override_chat_model
+    from kovalo.tools.specs import OUR_TOOLS
+    from kovalo.workflow.factory import LazyAgentRunner
+    from tests.agent_fakes import ScriptedModel, answer, call
+
+    opened: list[dict] = []
+    sources: list[FakeSource] = []
+
+    def fake_open(settings_arg, *, names, **kwargs):
+        opened.append({"names": set(names), **kwargs})
+        sources.append(FakeSource(direct_tool_list(settings, small_data, retriever)))
+        return sources[-1]
+
+    monkeypatch.setattr("kovalo.workflow.factory.open_tool_source", fake_open)
+    mcp_settings = configured(monkeypatch, KOVALO_TOOLS__SOURCE="mcp")
+    assert (mcp_settings.tools.source, mcp_settings.tools.variant) == ("mcp", "ours")
+    runner = LazyAgentRunner(mcp_settings)
+    model = ScriptedModel(
+        script=[
+            call("get_contract_terms", supplier="SUP-114"),
+            answer("Cel OTIF 97%."),
+            answer("Druga odpowiedź."),
+        ]
+    )
+    with override_chat_model(model):
+        first = runner("Warunki?")
+        second = runner("Jeszcze raz?")
+    assert first.status == "answered" and [e.tool for e in first.events] == ["get_contract_terms"]
+    assert second.status == "answered"
+    assert len(opened) == 1 and opened[0]["names"] == set(OUR_TOOLS)
+    assert sources[0].tools_calls == 1, "źródło budowane raz, kolejne pytania je współdzielą"
+    runner.close()
+    runner.close()
+    assert sources[0].closed >= 1
+
+
+def test_direct_source_does_not_touch_mcp(settings, monkeypatch):
+    from kovalo.llm import override_chat_model
+    from kovalo.workflow.factory import LazyAgentRunner
+    from tests.agent_fakes import ScriptedModel, answer, call
+
+    def boom(*args, **kwargs):
+        raise AssertionError("tools.source: direct nie używa MCP")
+
+    monkeypatch.setattr("kovalo.workflow.factory.open_tool_source", boom)
+    direct_settings = configured(monkeypatch, KOVALO_TOOLS__SOURCE="direct")
+    assert direct_settings.tools.source == "direct"
+    runner = LazyAgentRunner(direct_settings)
+    model = ScriptedModel(
+        script=[
+            call("get_invoice_value", supplier="SUP-114", month="2026-07"),
+            answer("182 400 PLN"),
+        ]
+    )
+    with override_chat_model(model):
+        trace = runner("Faktura?")
+    assert trace.status == "answered" and trace.events[0].result["invoiced_grosze"] == 18240000
+    assert trace.events[0].transport is None
+
+
+def test_mcp_startup_error_is_a_trace(settings, monkeypatch, small_data, retriever):
+    """McpStartupError przy budowie → Trace(status='error'), stare źródło zamknięte; następne
+    pytanie próbuje ponownie i działa (bez restartu procesu)."""
+    from kovalo.llm import override_chat_model
+    from kovalo.workflow.factory import LazyAgentRunner
+    from tests.agent_fakes import ScriptedModel, answer
+
+    sources: list[FakeSource] = []
+
+    def fake_open(settings_arg, *, names, **kwargs):
+        broken = not sources
+        sources.append(
+            FakeSource(direct_tool_list(settings, small_data, retriever), fail_first=broken)
+        )
+        return sources[-1]
+
+    monkeypatch.setattr("kovalo.workflow.factory.open_tool_source", fake_open)
+    runner = LazyAgentRunner(configured(monkeypatch, KOVALO_TOOLS__SOURCE="mcp"))
+    with override_chat_model(ScriptedModel(script=[answer("Teraz działa.")])):
+        first = runner("Warunki?")
+        assert first.status == "error" and "McpStartupError" in first.error
+        assert first.answer is None and first.question == "Warunki?"
+        assert sources[0].closed >= 1, "stare źródło zamknięte"
+        second = runner("Warunki?")
+    assert second.status == "answered" and second.answer == "Teraz działa."
+    assert len(sources) == 2
+
+
+def test_service_close_closes_source(settings, monkeypatch, small_data, retriever):
+    """`open_copilot_service` na wyjściu zamyka serwis, potem źródło narzędzi agenta."""
+    from langchain_core.messages import AIMessage
+
+    from kovalo.llm import override_chat_model
+    from kovalo.workflow.factory import open_copilot_service
+    from kovalo.workflow.schemas import Turn
+    from tests.agent_fakes import ScriptedModel, answer, call
+
+    sources: list[FakeSource] = []
+
+    def fake_open(settings_arg, *, names, **kwargs):
+        sources.append(FakeSource(direct_tool_list(settings, small_data, retriever)))
+        return sources[-1]
+
+    monkeypatch.setattr("kovalo.workflow.factory.open_tool_source", fake_open)
+    mcp_settings = configured(
+        monkeypatch, KOVALO_TOOLS__SOURCE="mcp", KOVALO_WORKFLOW__CHECKPOINTER="memory"
+    )
+    understand = turn(kind="document_question", standalone="Jakie są warunki?")
+    model = ScriptedModel(
+        script=[
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {"name": "Turn", "args": understand.model_dump(mode="json"), "id": "u1"}
+                ],
+            ),
+            call("get_contract_terms", supplier="SUP-114"),
+            answer("Cel OTIF 97%."),
+        ]
+    )
+    with override_chat_model(model), open_copilot_service(mcp_settings) as service:
+        result = service.send_message("t", "Jakie są warunki?")
+        assert result.status == "answered" and Turn is not None
+        assert len(sources) == 1 and sources[0].closed == 0
+    assert sources[0].closed >= 1
+
+
+def test_build_agent_runner_with_given_tools_needs_no_company_data(settings, monkeypatch):
+    """`tools=` podane → używa ich i nie wczytuje danych firmy (dane ma serwer MCP)."""
+    from langchain_core.tools import tool
+
+    from kovalo.llm import override_chat_model
+    from kovalo.workflow.factory import build_agent_runner
+    from tests.agent_fakes import ScriptedModel, answer, call
+
+    @tool
+    def get_contract_terms(supplier: str) -> dict:
+        """Warunki (dubler)."""
+        return {"status": "ok", "supplier_id": "SUP-114"}
+
+    monkeypatch.setenv("KOVALO_PATHS__COMPANY_DATA_DIR", "/nie/ma/takiego/katalogu")
+    from kovalo.config import load_settings
+
+    no_data = load_settings(google_api_key="test-key")
+    model = ScriptedModel(script=[call("get_contract_terms", supplier="x"), answer("ok")])
+    with override_chat_model(model):
+        runner = build_agent_runner(no_data, tools=[get_contract_terms])
+        trace = runner("Warunki?")
+    assert model.bound == ["get_contract_terms"] and trace.status == "answered"
+
+
+def test_agent_replays_a_fallback_answer_from_strict_cache(monkeypatch, tmp_path):
+    """F5 (po A7): agent na żywo odpowiedział fallbackiem (model główny 429), więc w cache jest
+    tylko wpis fallbacku. `--cache-only` (offline, strict): AvailabilityFallbackMiddleware
+    przechodzi na fallback po braku trafienia u modelu głównego; bez wpisu → błąd LlmCacheMiss."""
+    from langchain_core.tools import tool
+
+    from kovalo.config import load_settings
+    from kovalo.eval.llm_cache import JsonFileLlmCache
+    from kovalo.workflow.factory import build_agent_runner
+    from tests.unit.test_llm import cache_fakes
+
+    @tool
+    def get_contract_terms(supplier: str) -> dict:
+        """Warunki (dubler)."""
+        return {"status": "ok"}
+
+    settings = load_settings(google_api_key="k")
+    primary, fallback = settings.llm.model, settings.llm.fallbacks[0].model
+    agent_model = settings.llm.purposes["agent"].model if "agent" in settings.llm.purposes else None
+    primary = agent_model or primary
+
+    calls = cache_fakes(monkeypatch, failing=primary)
+    live = build_agent_runner(
+        settings, tools=[get_contract_terms], cache=JsonFileLlmCache(tmp_path / "llm")
+    )
+    trace = live("Warunki?")
+    assert trace.status == "answered" and trace.answer == f"od {fallback}"
+    assert calls == {primary: 1, fallback: 1}
+
+    calls = cache_fakes(monkeypatch, failing=None)
+    strict = JsonFileLlmCache(tmp_path / "llm", mode="strict")
+    replay = build_agent_runner(
+        load_settings(), tools=[get_contract_terms], cache=strict, offline=True
+    )
+    again = replay("Warunki?")
+    assert again.status == "answered" and again.answer == f"od {fallback}"
+    assert calls == {} and strict.hits == 1
+
+    empty = JsonFileLlmCache(tmp_path / "pusty", mode="strict")
+    missing = build_agent_runner(
+        load_settings(), tools=[get_contract_terms], cache=empty, offline=True
+    )
+    failed = missing("Warunki?")
+    assert failed.status == "error" and "LlmCacheMiss" in failed.error
+    assert calls == {}

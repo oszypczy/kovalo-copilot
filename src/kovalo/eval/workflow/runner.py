@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.language_models import LanguageModelInput
 from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
@@ -15,6 +15,9 @@ from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
 from kovalo.rag.records import Answer
 from kovalo.workflow.schemas import Turn
 from kovalo.workflow.service import CopilotService, ThreadPausedError, TurnResult
+
+if TYPE_CHECKING:
+    from kovalo.mcp_client import McpConnection
 
 __all__ = ["ScriptedAnswerModel", "ScriptedUnderstanding", "run_turn"]
 
@@ -26,6 +29,8 @@ def run_turn(
     answer_pause: Callable[[dict[str, Any]], Any],
     *,
     max_pauses: int = 10,
+    connection: McpConnection | None = None,
+    turn: int | None = None,
 ) -> dict[str, Any]:
     """Wysyła jedną wiadomość, odpowiada na każdą pauzę i zwraca wpis transkryptu (JSON).
 
@@ -33,7 +38,33 @@ def run_turn(
     error, reply; NASZE: calls, seconds. Wątek w pauzie → RuntimeError z „pauza” (jak kurs).
     Wyjątek w answer_pause albo więcej niż max_pauses pauz → pauza ANULOWANA (wątek nie wisi),
     status 'error', powód w 'error' („… przy pauzie <typ> <rola|pole>: …”).
+
+    F5 (`assistant_turn` kursu, P5): `connection` podane → jedna tura naraz na połączeniu MCP
+    (`turn_lock`, inaczej RuntimeError „jedna tura naraz”), a na czas tury
+    `connection.context = {"thread_id", "turn"}` (zapisy wywołań znają swoją turę).
     """
+    if connection is None:
+        return _run_turn(service, thread_id, text, answer_pause, max_pauses=max_pauses)
+    if not connection.turn_lock.acquire(blocking=False):
+        raise RuntimeError(
+            "na tym połączeniu MCP trwa już inna tura: jedna tura naraz na połączenie"
+        )
+    try:
+        connection.context.update(thread_id=thread_id, turn=turn)
+        return _run_turn(service, thread_id, text, answer_pause, max_pauses=max_pauses)
+    finally:
+        connection.context.update(thread_id=None, turn=None)
+        connection.turn_lock.release()
+
+
+def _run_turn(
+    service: CopilotService,
+    thread_id: str,
+    text: str,
+    answer_pause: Callable[[dict[str, Any]], Any],
+    *,
+    max_pauses: int,
+) -> dict[str, Any]:
     start = time.perf_counter()
     try:
         result: TurnResult = service.send_message(thread_id, text)

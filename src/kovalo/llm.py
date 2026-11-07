@@ -51,6 +51,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "FALLBACK_EXCEPTIONS",
+    "CacheMissError",
+    "fallback_exceptions",
     "get_chat_model",
     "get_embeddings",
     "get_fallback_models",
@@ -75,6 +77,22 @@ FALLBACK_EXCEPTIONS: tuple[type[BaseException], ...] = (
     httpx.TimeoutException,
     httpx.TransportError,
 )
+
+
+class CacheMissError(RuntimeError):
+    """Brak odpowiedzi w cache LLM-a w trybie tylko z cache (bazowa klasa `eval.LlmCacheMiss`).
+
+    Nie jest błędem dostępności, więc nie należy do FALLBACK_EXCEPTIONS: na żywo nie przełącza
+    modelu. Tylko w trybie offline (`--cache-only`) przełącza na następny model, żeby ten
+    sprawdził SWÓJ wpis: tura odebrana na żywo przez fallback ma w cache tylko wpis fallbacku.
+    """
+
+
+def fallback_exceptions(offline: bool) -> tuple[type[BaseException], ...]:
+    """Wyjątki, przy których łańcuch modeli przechodzi do następnego: FALLBACK_EXCEPTIONS,
+    a w trybie offline także CacheMissError (żaden model nie trafi → wyjątek idzie wyżej)."""
+    return (*FALLBACK_EXCEPTIONS, CacheMissError) if offline else FALLBACK_EXCEPTIONS
+
 
 _API_KEY_HELP: dict[str, str] = {
     "google_genai": "darmowy: https://aistudio.google.com/apikey",
@@ -268,7 +286,8 @@ def get_structured_model(
     Fallback tylko dla FALLBACK_EXCEPTIONS (dostępność modelu); błąd parsowania wraca
     w 'parsing_error' i nie przełącza modelu (ADR-0006 pkt 4, ADR-0008 pkt 5).
     Brak klucza → MissingConfigError przy budowie, przed jakimkolwiek wywołaniem
-    (offline=True: tylko cache, bez klucza; jak w get_chat_model).
+    (offline=True: tylko cache, bez klucza; jak w get_chat_model). offline=True: brak trafienia
+    u modelu głównego przechodzi do fallbacku (fallback_exceptions), który sprawdza swój wpis.
     """
     _check_offline(offline, cache)
     overridden = _overridden(purpose)
@@ -284,7 +303,7 @@ def get_structured_model(
             cast(StructuredModel, fb.with_structured_output(schema, include_raw=True))
             for fb in fallbacks
         ],
-        exceptions_to_handle=FALLBACK_EXCEPTIONS,
+        exceptions_to_handle=fallback_exceptions(offline),
     )
 
 

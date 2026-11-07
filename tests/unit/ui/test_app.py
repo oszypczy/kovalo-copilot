@@ -277,3 +277,48 @@ async def test_chat_start_sends_no_welcome(fake_cl, monkeypatch):
     await app.on_chat_start()
     assert fake_cl.sent("message.send") == []
     assert fake_cl.session["thread_id"] == "T-new"
+
+
+async def test_mcp_step_is_labelled_after_the_call(fake_cl, mock_stream):
+    """F5: krok dostaje „(przez MCP)” po tool_end (transport znany dopiero po wywołaniu), a w wyniku
+    jest identyfikator wywołania; krok bez transportu zostaje bez zmian."""
+    from kovalo.ui import app
+
+    final = turn_result(
+        replies=["Kara wynosi 7296,00 PLN."], trace={"status": "answered", "events": []}
+    )
+    body = sse_body(
+        ("tool_start", tool_start("c1", "get_contract_terms")),
+        ("tool_end", tool_end("c1", "get_contract_terms", transport="mcp", invocation_id="inv-77")),
+        ("tool_start", tool_start("c2", "get_invoice_value")),
+        ("tool_end", tool_end("c2", "get_invoice_value")),
+        ("final", final),
+    )
+    _start(fake_cl, mock_stream(("sse", body)))
+    await app.on_message(_UserMessage("Ile wynosi kara?"))
+
+    sent = fake_cl.sent("step.send")
+    by_key = {s.id: s for s in sent}
+    names = sorted(s.name for s in by_key.values())
+    assert names == ["get_contract_terms (przez MCP)", "get_invoice_value"]
+    mcp_step = next(s for s in sent if s.name.startswith("get_contract_terms"))
+    assert "Wywołanie MCP: inv-77" in mcp_step.output
+    plain = next(s for s in sent if s.name == "get_invoice_value")
+    assert "MCP" not in plain.output
+
+
+async def test_each_evidence_path_in_chat_has_its_own_name(fake_cl, mock_stream):
+    """Chainlit łączy link „Szczegóły: …” z elementem po nazwie: druga ścieżka dowodowa
+    w tej samej rozmowie dostaje numer, żeby link nie otwierał ścieżki z wcześniejszej tury."""
+    from kovalo.ui import app
+
+    _start(fake_cl, mock_stream(("sse", _agent_turn()), ("sse", _agent_turn())))
+    fake_cl.session["evidence_count"] = 0
+    await app.on_message(_UserMessage("Pierwsze pytanie"))
+    await app.on_message(_UserMessage("Drugie pytanie"))
+
+    first, second = fake_cl.sent("message.send")
+    names = [[e.name for e in m.elements if e.name.startswith("Ścieżka")] for m in (first, second)]
+    assert names == [["Ścieżka dowodowa"], ["Ścieżka dowodowa 2"]]
+    assert first.content.endswith("Szczegóły: Ścieżka dowodowa")
+    assert second.content.endswith("Szczegóły: Ścieżka dowodowa 2")

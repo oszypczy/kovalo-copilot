@@ -78,7 +78,10 @@ async def _show(view: TurnView) -> None:
     """Renderuje turę i zapamiętuje bieżącą pauzę (albo jej brak) w sesji."""
     await _clear_pause_actions()
     messages = render_turn(view)
-    evidence = render_evidence(view)
+    shown = cl.user_session.get("evidence_count", 0)
+    evidence = render_evidence(view, number=shown + 1)
+    if evidence is not None:
+        cl.user_session.set("evidence_count", shown + 1)
     if evidence is not None and not messages:
         messages = [UiMessage(content="")]
     last: cl.Message | None = None
@@ -121,6 +124,7 @@ class _ToolSteps:
         if step is None:  # tool_end bez tool_start (nie powinno się zdarzyć)
             await self.start(ui)
             step = self.steps[ui.key]
+        step.name = ui.name  # F5: „(przez MCP)” znane dopiero w tool_end (P8)
         step.output = ui.output
         step.is_error = ui.is_error
         await step.update()
@@ -182,6 +186,7 @@ async def on_chat_start() -> None:
     cl.user_session.set("client", client)
     cl.user_session.set("pending", None)
     cl.user_session.set("pause_message", None)
+    cl.user_session.set("evidence_count", 0)
     cl.user_session.set("thread_id", None)
     # bez powitania: domyślny pusty ekran Chainlita; możliwości opisuje OTHER_REPLY
     try:

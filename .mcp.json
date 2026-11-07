@@ -8,6 +8,10 @@
       "type": "http",
       "url": "https://docs.langchain.com/mcp"
     },
+    "kovalo": {
+      "command": "uv",
+      "args": ["run", "--quiet", "kovalo-mcp", "--transport", "stdio", "--search", "memory"]
+    },
     "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"]

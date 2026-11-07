@@ -359,12 +359,27 @@ class CompanyConfig(_Section):
 
 
 ToolsVariant = Literal["course", "ours"]
+ToolSource = Literal["direct", "mcp"]
+McpTransport = Literal["http", "stdio"]
+SearchBackend = Literal["pgvector", "memory"]
 
 
 class ToolsConfig(_Section):
-    """NASZE (ADR-0011): course = 6 narzędzi kursu; ours = + check_termination_condition."""
+    """NASZE (ADR-0011, ADR-0013): course = 6 narzędzi kursu; ours = + check_termination_condition.
+
+    source: skąd agent w aplikacji bierze narzędzia (direct | mcp); mcp_transport: http
+    (services.mcp_url) | stdio (podproces kovalo-mcp), tylko przy source: mcp.
+    """
 
     variant: ToolsVariant = "ours"
+    source: ToolSource = "mcp"
+    mcp_transport: McpTransport = "http"
+
+
+class McpServerConfig(_Section):
+    """NASZE (ADR-0013): wyszukiwanie w narzędziu search_documents serwera MCP."""
+
+    search: SearchBackend = "pgvector"
 
 
 # Maks. 53 znaki: replace_table dokleja "__new" i "__new_pkey", a Postgres obcina nazwy do 63.
@@ -459,6 +474,7 @@ class Settings(BaseSettings):
     workflow: WorkflowConfig = WorkflowConfig()
     company: CompanyConfig = CompanyConfig()
     tools: ToolsConfig = ToolsConfig()
+    mcp_server: McpServerConfig = McpServerConfig()
     root: Path
 
     # sekrety i zmienne z env / .env (nazwy bez prefiksu, jak w .env.example)

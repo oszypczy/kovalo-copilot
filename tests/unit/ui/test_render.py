@@ -258,3 +258,66 @@ def test_message_text_links_side_elements():
     assert message_text(sourced, evidence).endswith("\n\nSzczegóły: Ścieżka dowodowa")
     assert EVIDENCE_LINK == "Szczegóły: Ścieżka dowodowa"
     assert message_text(UiMessage(content=""), evidence) == EVIDENCE_LINK
+
+
+# ---------------------------------------------------------------------------
+# F5: krok „przez MCP” (kontrakt F5, 9.2 i 13.2)
+# ---------------------------------------------------------------------------
+
+
+def test_mcp_step_label():
+    """`transport == "mcp"` → nazwa kroku z dopiskiem „(przez MCP)”, a w wyniku
+    „Wywołanie MCP: <invocation_id>”; bez transportu jak F4; zdarzenie składowe dziedziczy
+    dopisek rodzica; `tool_start` bez zmian."""
+    from kovalo.ui.render import render_tool_end, render_tool_start
+
+    plain = render_tool_end(tool_view(status="ok", brief="ok: x"))
+    assert plain.name == "get_contract_terms" and "MCP" not in plain.output
+
+    via = render_tool_end(
+        tool_view(status="ok", brief="ok: x", transport="mcp", invocation_id="abc123def456")
+    )
+    assert via.name == "get_contract_terms (przez MCP)"
+    assert "ok: x" in via.output and "Wywołanie MCP: abc123def456" in via.output
+    assert via.key == "c1" and via.is_error is False
+
+    start = render_tool_start(tool_view(transport="mcp", invocation_id="abc123def456"))
+    assert start.name == "get_contract_terms", "tool_start: transport jeszcze nieznany"
+
+    derived = render_tool_end(
+        tool_view(
+            call_id="c2#get_supplier_otif",
+            parent_call_id="c2",
+            tool="get_supplier_otif",
+            brief="ok: x",
+            transport="mcp",
+            invocation_id="abc123def456",
+        )
+    )
+    assert derived.name == "↳ get_supplier_otif (odczyt narzędzia) (przez MCP)"
+    assert derived.parent_key == "c2"
+
+
+def test_mcp_step_without_invocation_id_has_no_empty_line():
+    from kovalo.ui.render import render_tool_end
+
+    step = render_tool_end(tool_view(status="ok", brief="ok: x", transport="mcp"))
+    assert step.name.endswith("(przez MCP)") and "Wywołanie MCP: None" not in step.output
+
+
+def test_mcp_error_step_keeps_the_label_and_the_error_text():
+    """Nieudane wywołanie przez MCP (np. `[błąd transportu]`): krok oznaczony błędem, z dopiskiem
+    „(przez MCP)”, komunikatem i identyfikatorem wywołania, bez podwójnego „Błąd: ”."""
+    from kovalo.ui.render import render_tool_end
+
+    step = render_tool_end(
+        tool_view(
+            status="error",
+            error="[błąd transportu] serwer MCP niedostępny: x (wywołanie f00d)",
+            transport="mcp",
+            invocation_id="f00d",
+        )
+    )
+    assert step.is_error is True and step.name == "get_contract_terms (przez MCP)"
+    assert step.output.startswith("Błąd: [błąd transportu]")
+    assert step.output.count("Błąd: ") == 1 and step.output.endswith("Wywołanie MCP: f00d")

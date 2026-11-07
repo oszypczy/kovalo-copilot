@@ -1,6 +1,6 @@
 # 03. Architektura
 
-Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-architecture.drawio). Plik ma sześć stron: kontenery, graf copilota, indeksowanie i wyszukiwanie, odpowiedź ze źródłami i ewaluacja E2, workflow F3 (API, UI, checkpointy, E3), agent F4 (narzędzia, trace, SSE, E4). Eksporty PNG leżą obok pliku.
+Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-architecture.drawio). Plik ma siedem stron: kontenery, graf copilota, indeksowanie i wyszukiwanie, odpowiedź ze źródłami i ewaluacja E2, workflow F3 (API, UI, checkpointy, E3), agent F4 (narzędzia, trace, SSE, E4), MCP i końcowy asystent F5 (serwer, klient, E5). Eksporty PNG leżą obok pliku.
 
 ![Kontenery](architecture/kovalo-architecture-1-containers.png)
 
@@ -10,7 +10,7 @@ Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-archit
 |---|---|---|---|
 | `ui` | Chainlit | 8000 | czat, kroki agenta, przyciski akceptacji, źródła; rozmawia tylko z `api` |
 | `api` | FastAPI + LangGraph | 8080 (na hoście `API_PORT`) | graf copilota (`understand`, routing, workflow akceptacji, agent), checkpointy, koszty, trace |
-| `mcp-server` | FastMCP (`mcp` SDK), streamable HTTP (`/mcp`) | 8765 | 6 narzędzi tylko do odczytu, zasoby (dokumenty), prompt; dostęp do indeksu i danych firmy |
+| `mcp-server` | FastMCP (`mcp` SDK 1.30), streamable HTTP (`/mcp`) | 8765 | 7 narzędzi tylko do odczytu (6 kursu + `check_termination_condition`), szablon zasobu `kovalo://documents/{doc_id}`, zasób `kovalo://policy/course-v1`, prompt `supplier_review`; `pgvector` (`kovalo_ctx`) i `./data` tylko do odczytu; bez klucza LLM-a ([ADR-0013](adr/0013-mcp-server-client-f5.md)) |
 | `postgres` | `pgvector/pgvector:pg16` | 5432 | indeks wektorowy (`langchain-postgres`, `PGVectorStore`: tabela na kolekcję), checkpointy LangGraph (`langgraph-checkpoint-postgres`), w nich trace agenta (koperta `agent_trace` w stanie wątku, [ADR-0011](adr/0011-agent-tools-f4.md)) |
 
 Indeksowanie i ewaluacja to **nie osobne usługi**, tylko polecenia CLI (`kovalo ingest`, `kovalo eval`) uruchamiane jednorazowo w obrazie `api`: `make ingest` = `docker compose run --rm api kovalo ingest` (korpus → chunki MP1 i chunki z kontekstem → embeddingi → podmiana tabel `kovalo_mp1` i `kovalo_ctx`), `make eval STAGE=e2` = `docker compose run --rm api kovalo eval e2` (raport w `reports/`, montowanym jako wolumen).
@@ -21,7 +21,8 @@ Embeddingi liczymy **lokalnie** (fastembed, model ONNX wbudowany w obraz), więc
 
 ```
 Chainlit (ui) ──HTTP (JSON; SSE: …/stream)──> FastAPI (api) ──LangGraph──> Gemini API
-                                 │   └──MCP streamable HTTP──> mcp-server ──> pgvector + data/company
+                                 │   └──MCP streamable HTTP──> mcp-server ──> pgvector + data/company + data/corpus
+Claude Code / Inspector / Claude Desktop ──stdio (własny proces kovalo-mcp --search memory)
                                  └──checkpointy / trace──> postgres
 make ingest ──> data/corpus ──> chunki ──> fastembed ──> pgvector
 ```
@@ -44,14 +45,14 @@ src/kovalo/
   tools/             MP4: wyszukiwanie fragmentów, specyfikacje 7 narzędzi (wspólne dla LangChaina i FastMCP), adapter StructuredTool
   agents/            MP4: trace, budżet i run_question (port kursu), create_agent z fallbackiem i licznikiem wywołań, ścieżka dowodowa
   workflow/          MP3/MP5: Turn, understand_turn, update_request, stan, węzły, graf, checkpointer, CopilotService, fabryka
-  mcp_server/        MP5: FastMCP, transport stdio + streamable-http
-  mcp_client/        MP5: połączenie, limity czasu, klasy błędów, walidacja structuredContent
-  eval/              MP1–MP5: retrieval (E1), rag (E2: 4 poziomy + sędzia), cache LLM-a na dysku, workflow (E3: odtworzenie + na żywo), trace (E4: przeliczenie kursu, odtworzenie, na żywo; 5 testów), assistant
+  mcp_server/        MP5: FastMCP „kovalo” z TOOL_SPECS (nakładki async w wątku), zasoby, prompt, /health; stdio + streamable-http
+  mcp_client/        MP5: kontrakt rekordów (check_record), McpConnection (stdio / HTTP / w pamięci, limity, 4 warstwy błędów), McpToolSource (jedno połączenie, ponowne łączenie)
+  eval/              MP1–MP5: retrieval (E1), rag (E2: 4 poziomy + sędzia), cache LLM-a na dysku, workflow (E3: odtworzenie + na żywo), trace (E4: przeliczenie kursu, odtworzenie, na żywo; 5 testów; agent przez MCP z `--transport`), assistant (E5: zgodność MCP, odtworzenie 25 tur przez MCP, na żywo)
   api/               FastAPI: router /threads nad CopilotService, schematy wejścia i błędów, dostawca serwisu (lifespan)
   ui/                Chainlit (app.py) zamontowany w FastAPI (server.py, /health); klient HTTP do api, renderowanie odpowiedzi, pauz i źródeł
 ```
 
-Punkty wejścia: `kovalo` (CLI), `kovalo-api`, `kovalo-ui`, `kovalo-mcp`. Kontrakty modułów fundamentu (`config`, `llm`, `health`, `cli`) opisuje [contracts/f0.md](contracts/f0.md), modułów wiedzy i kosztów (`knowledge`, `cost`, `eval` E1) [contracts/f1.md](contracts/f1.md), odpowiedzi ze źródłami i E2 (`rag`, `knowledge` z hybrydą, `eval/rag`) [contracts/f2.md](contracts/f2.md), workflow, API, UI i E3 (`policy`, `workflow`, `api`, `ui`, `eval/workflow`) [contracts/f3.md](contracts/f3.md), a agent, narzędzia, SSE i E4 (`quantities`, `company`, `tools`, `agents`, `eval/trace`) [contracts/f4.md](contracts/f4.md).
+Punkty wejścia: `kovalo` (CLI), `kovalo-api`, `kovalo-ui`, `kovalo-mcp`. Kontrakty modułów fundamentu (`config`, `llm`, `health`, `cli`) opisuje [contracts/f0.md](contracts/f0.md), modułów wiedzy i kosztów (`knowledge`, `cost`, `eval` E1) [contracts/f1.md](contracts/f1.md), odpowiedzi ze źródłami i E2 (`rag`, `knowledge` z hybrydą, `eval/rag`) [contracts/f2.md](contracts/f2.md), workflow, API, UI i E3 (`policy`, `workflow`, `api`, `ui`, `eval/workflow`) [contracts/f3.md](contracts/f3.md), agent, narzędzia, SSE i E4 (`quantities`, `company`, `tools`, `agents`, `eval/trace`) [contracts/f4.md](contracts/f4.md), a MCP i E5 (`mcp_server`, `mcp_client`, `eval/assistant`) [contracts/f5.md](contracts/f5.md).
 
 Zasady zależności (sprawdzane w review):
 - `policy/`, `company/`, `cost/` nie importują LangChaina ani niczego z LLM-em: to deterministyczny rdzeń.
@@ -64,6 +65,7 @@ Zasady zależności (sprawdzane w review):
 - Generacja RAG żyje w `rag/`: `answer_question` dostaje `Retriever` i model przez parametr, a `kovalo.llm` importuje tylko `rag/factory.py`. `knowledge/` nie importuje `rag/`; `rag/` nie importuje `eval/`, `workflow/`, `api/`, `ui/`. `llm.py` dostaje cache LLM-a parametrem i nie importuje `eval/` ([contracts/f2.md §2.3](contracts/f2.md)).
 - `policy/` importuje tylko bibliotekę standardową, `pydantic`, `kovalo.config`, `kovalo.text_pl`. `workflow/` dostaje model `understand` i `DocumentAnswerer` przez `CopilotDeps`; `kovalo.llm`, `kovalo.rag.factory` i `kovalo.knowledge` importuje tylko `workflow/factory.py`, a `langgraph.checkpoint.postgres` i `psycopg_pool` tylko `workflow/checkpoint.py`. `interrupt()` wywołują tylko węzły w `workflow/graph.py` ([contracts/f3.md §2.3](contracts/f3.md)).
 - `company/` i `quantities.py` bez LangChaina; `tools/specs.py` i `tools/search.py` też (F5 rejestruje te funkcje w FastMCP), `langchain_core` tylko w `tools/langchain.py`. `langchain.agents` (`create_agent`, middleware) importuje tylko `agents/`; `agents/` dostaje model, narzędzia i wyjątki fallbacku przez parametr (bez `kovalo.llm`, `kovalo.tools`). `workflow/` importuje `kovalo.agents`, a `kovalo.tools` i `kovalo.company` tylko w `workflow/factory.py`; `get_stream_writer` tylko w `workflow/graph.py` ([contracts/f4.md §2.3](contracts/f4.md)).
+- Pakiet `mcp` importują tylko `mcp_server/` i `mcp_client/`; `langchain_mcp_adapters` i `langchain.mcp` nigdzie. `mcp_server/` to cienkie nakładki na `tools/` (z `kovalo.llm` tylko `get_embeddings`, bez modelu czatu), `mcp_client/` zna z naszych modułów tylko `config` i `tools.specs` (klasy rekordów). `kovalo.mcp_client` importuje w `workflow/` tylko `factory.py`; graf, węzły i serwis nie znają transportu narzędzi. `LazyRetriever` żyje w `knowledge/retrievers.py` i dostaje funkcję otwierającą ([contracts/f5.md §2.3](contracts/f5.md)).
 - `api/` woła wyłącznie `workflow.CopilotService` (bez `langgraph`, `kovalo.llm`, `kovalo.policy`); `ui/` ma własne modele widoku i nie importuje `kovalo.api` ([ADR-0010](adr/0010-api-ui-f3.md)).
 - Nazwy modeli (czatu i embeddingów) są tylko w `config.yaml` (model embeddingów także w `ARG` Dockerfile, pilnowanym testem). Część zasad sprawdza test `tests/architecture/test_dependencies.py`.
 
@@ -72,7 +74,7 @@ Zasady zależności (sprawdzane w review):
 ![Graf copilota](architecture/kovalo-architecture-2-graph.png)
 
 ```
-START → understand ─┬─ document_question ─> answer_documents   (E3: RAG z F2; aplikacja od F4: agent z 7 narzędziami; F5: te same narzędzia przez MCP)
+START → understand ─┬─ document_question ─> answer_documents   (E3: RAG z F2; aplikacja: agent z 7 narzędziami, od F5 przez MCP)
                     ├─ policy_question   ─> answer_policy      (silnik polityki, tylko informacja, bez pauzy)
                     ├─ other / error     ─> reply_other
                     └─ approval_request  ─> update_request ─┬─(ValueError: niejasne new|update, brak rabatu)─> END (error)
@@ -94,11 +96,15 @@ START → understand ─┬─ document_question ─> answer_documents   (E3: RA
 
 ![Agent F4](architecture/kovalo-architecture-6-agent.png)
 
+**Agent przez MCP i końcowy asystent (F5).** Z `tools.source: mcp` `LazyAgentRunner` przy pierwszym pytaniu otwiera `McpToolSource` (`tools.mcp_transport: http` → `services.mcp_url`; `stdio` → podproces `kovalo-mcp`) i buduje tego samego agenta na narzędziach z `list_tools()`. Graf, węzły, serwis i koperta trace się nie zmieniają (ADR-0011 pkt 6). Każde wywołanie przechodzi przez `check_record` (surowy `structuredContent` wobec rekordu z `TOOL_SPECS`, zanim cokolwiek uzupełni wartości domyślne); błąd ma warstwę `tool / protocol / transport / validation`, a połączenie po błędzie transportu nie jest używane ponownie (następne wywołanie otwiera nowe). Model widzi przez MCP dokładnie ten sam rekord co przy narzędziu bezpośrednim; pochodzenie wywołania (`transport`, `invocation_id`) idzie w artefakcie `ToolMessage`, którego `StableUsageMiddleware` nie wysyła do modelu, więc klucze cache są te same co w F4. Agent dostaje callbacki węzła (run agenta pod turą grafu w LangSmith). Pytania o politykę i akceptacje nie używają MCP. Inni klienci (Claude Code przez `.mcp.json`, Inspector, Claude Desktop) uruchamiają własny proces `kovalo-mcp --search memory` przez stdio i widzą tylko narzędzia, zasoby i prompt, nie workflow akceptacji (FR-5.5). E5: [contracts/f5.md §10](contracts/f5.md), [ADR-0014](adr/0014-assistant-eval-e5.md).
+
+![MCP i asystent F5](architecture/kovalo-architecture-7-mcp.png)
+
 ## 4. Kontrakty
 
 ### Wynik narzędzia (MP4/MP5)
 
-Każde narzędzie zwraca słownik z polem `status` (`ok / no_data / unknown_supplier / not_applicable / out_of_scope / invalid_request`) i polami zależnymi od narzędzia. Przez MCP wynik idzie jako `structuredContent` (ten sam słownik) + tekst. Klient waliduje go modelem Pydantic, zanim użyje wartości domyślnych.
+Każde narzędzie zwraca słownik z polem `status` (`ok / no_data / unknown_supplier / not_applicable / out_of_scope / invalid_request`) i polami zależnymi od narzędzia. Przez MCP wynik idzie jako `structuredContent` (ten sam słownik) + kopia JSON w tekście. Klient sprawdza surowy wynik z rekordem (`mcp_client.check_record`: komplet pól bez nadmiarowych, także w rekordach zagnieżdżonych, ścisłe typy, reguły statusów, waluta PLN), zanim użyje wartości domyślnych; zgodność z wywołaniem bezpośrednim mierzy E5 (`compare_call`, 20 wywołań).
 
 ### API
 
@@ -132,4 +138,5 @@ Wyszukiwanie (`knowledge.Retriever`): tryb `retrieval.mode` = `vector` (cosine, 
 
 - Licznik tokenów i kosztów per tura z `usage_metadata` (przeliczany po cenach referencyjnych z configu i po faktycznych cenach dostawcy; free tier = 0 USD).
 - Trace agenta w checkpointach Postgresa (kanał `record`, koperta `agent_trace` v1 z MP5; bez osobnej tabeli `agent_traces`, ADR-0011 pkt 7), widoczny w UI (kroki `cl.Step` na żywo, „Ścieżka dowodowa”) i przez `GET /threads/{id}/trace`.
-- Opcjonalnie LangSmith (`LANGSMITH_TRACING=true`).
+- Opcjonalnie LangSmith (`LANGSMITH_TRACING=true`); od F5 run agenta jest zagnieżdżony pod turą grafu (callbacki węzła, R1-2 z F4).
+- Wywołania MCP: `invocation_id` w trace (koperta w checkpoincie) i w logu `mcp-server` (stderr, z czasem i statusem rekordu).

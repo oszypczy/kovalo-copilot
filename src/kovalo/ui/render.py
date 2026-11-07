@@ -17,6 +17,7 @@ __all__ = [
     "EVIDENCE_LINK",
     "EVIDENCE_STEP",
     "INTERRUPTED",
+    "MCP_SUFFIX",
     "RESUME_REJECTED",
     "STATUS_LABELS",
     "TRACE_STATUS_LABELS",
@@ -52,6 +53,7 @@ EVIDENCE_STEP = "Ścieżka dowodowa"
 # linia w treści odpowiedzi: Chainlit linkuje nazwę elementu bocznego (cl.Text display="side")
 EVIDENCE_LINK = f"Szczegóły: {EVIDENCE_STEP}"
 INTERRUPTED = "(przerwane)"
+MCP_SUFFIX = " (przez MCP)"  # F5: krok narzędzia wywołanego przez serwer MCP
 CLARIFY_HINT = "Wpisz marżę w polu czatu (np. 7,5)."
 RESUME_REJECTED = (
     "Nie rozpoznałem odpowiedzi. Kliknij przycisk albo napisz „zatwierdź”, „odrzuć” lub "
@@ -113,32 +115,41 @@ def render_tool_start(event: ToolEventView) -> UiStep:
 
 
 def render_tool_end(event: ToolEventView) -> UiStep:
-    """Koniec wywołania: brief z api albo komunikat błędu („Błąd: …”)."""
+    """Koniec wywołania: brief z api albo komunikat błędu („Błąd: …”). F5: przy
+    transport == "mcp" nazwa z dopiskiem „ (przez MCP)” i w wyniku linia
+    „Wywołanie MCP: <invocation_id>” (zdarzenie składowe dziedziczy transport rodzica)."""
     is_error = event.status not in (None, "ok")
     if is_error:
         error = event.error or event.status or "nieznany błąd"
         output = error if error.startswith("Błąd: ") else f"Błąd: {error}"
     else:
         output = event.brief or ""
+    name = _step_name(event)
+    if event.transport == "mcp":
+        name = f"{name}{MCP_SUFFIX}"
+        if event.invocation_id:
+            line = f"Wywołanie MCP: {event.invocation_id}"
+            output = f"{output}\n{line}" if output else line
     return UiStep(
         key=event.call_id,
         parent_key=event.parent_call_id,
-        name=_step_name(event),
+        name=name,
         input=_arguments(event),
         output=output,
         is_error=is_error,
     )
 
 
-def render_evidence(view: TurnView) -> UiStep | None:
+def render_evidence(view: TurnView, number: int = 1) -> UiStep | None:
     """„Ścieżka dowodowa” z evidence_path (w UI: panel boczny podlinkowany w odpowiedzi);
-    None, gdy w turze nie było agenta."""
+    None, gdy w turze nie było agenta. `number` > 1 dopisuje numer: Chainlit łączy link
+    z elementem po nazwie, więc kolejne ścieżki w rozmowie muszą mieć różne nazwy."""
     if not view.evidence_path:
         return None
     return UiStep(
         key="evidence",
         parent_key=None,
-        name=EVIDENCE_STEP,
+        name=EVIDENCE_STEP if number == 1 else f"{EVIDENCE_STEP} {number}",
         input="",
         output=view.evidence_path,
     )
@@ -151,7 +162,7 @@ def message_text(message: UiMessage, evidence: UiStep | None = None) -> str:
     if message.sources:
         parts.append("Fragmenty: " + ", ".join(s.name for s in message.sources))
     if evidence is not None:
-        parts.append(EVIDENCE_LINK)
+        parts.append(f"Szczegóły: {evidence.name}")
     return "\n\n".join(parts)
 
 

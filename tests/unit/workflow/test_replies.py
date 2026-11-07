@@ -78,7 +78,10 @@ def test_decision_and_approval_replies(settings):
     decision = _decision(settings, request)
     assert "Wymagana akceptacja" in decision_reply(request, decision)
     assert "(symulacja)" in decision_reply(request, decision)
-    assert "Już zatwierdzone" in already_approved_reply(request, decision)
+    already = already_approved_reply(request, decision)
+    assert already.startswith("Już zatwierdzone (wersja 2), akceptacja: ")
+    assert "zatwierdzili" not in already, "bez czasownika w liczbie mnogiej przy jednej roli"
+    assert "nie trzeba go akceptować ponownie" in already
     approved = approved_reply(request, decision)
     assert "Wniosek zatwierdzony (wersja 2)" in approved and "nic nie trafia do CRM-u" in approved
     assert "CFO" in rejected_reply(request, "CFO")

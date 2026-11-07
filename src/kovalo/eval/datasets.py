@@ -5,6 +5,7 @@ Kontrakty: F1 sekcja 7.3, F2 sekcja 8.1.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ __all__ = [
     "GoldQuestion",
     "Need",
     "load_agent_gold",
+    "load_conversations",
     "load_dialogues",
     "load_eval_queries",
     "load_gold",
@@ -176,3 +178,36 @@ def load_agent_gold(path: Path) -> list[AgentGold]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     phrases = raw["approval_claim_phrases"]
     return [AgentGold(**q, approval_claim_phrases=phrases) for q in raw["questions"]]
+
+
+# --- rozmowy E5 (kontrakt F5, 10.1; port helpers.assistant_eval.load_conversations) -------------
+
+
+def load_conversations(mp5_path: Path, mp3_path: Path) -> list[Dialogue]:
+    """Rozmowy MP5 (C1-C5), potem dialogi MP3 (D1-D8) z nałożonym `mp3_overlays` (głęboka
+    kopia; plik MP3 nietknięty). Wynik: 13 Dialogue, 25 tur. `expect.agent` (needs,
+    calculations, key_facts) walidowany przy wczytaniu jako AgentGold bez id. Brak pliku →
+    FileNotFoundError; zły kształt → ValueError z nazwą pliku."""
+    path = Path(mp5_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Nie znaleziono pliku z rozmowami: {path}")
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or not raw.get("conversations"):
+        raise ValueError(f"{path}: oczekiwano niepustej listy 'conversations'")
+    dialogues = copy.deepcopy(_read_list(Path(mp3_path), "dialogues"))
+    overlays = raw.get("mp3_overlays") or {}
+    try:
+        for dialogue in dialogues:
+            for number, extra in (overlays.get(dialogue["id"]) or {}).items():
+                dialogue["turns"][int(number) - 1]["expect"].update(copy.deepcopy(extra))
+        result = [
+            Dialogue.model_validate(d) for d in [*copy.deepcopy(raw["conversations"]), *dialogues]
+        ]
+        for loaded in result:
+            for turn in loaded.turns:
+                agent = turn.expect.get("agent")
+                if agent is not None:
+                    AgentGold(id=loaded.id, question=turn.user, kind="mp5", **agent)
+    except (ValidationError, KeyError, IndexError, TypeError) as exc:
+        raise ValueError(f"{path}: niepoprawna rozmowa ({exc})") from exc
+    return result

@@ -91,7 +91,7 @@ def test_reply_texts():
 def test_agent_exception_becomes_error_trace(settings):
     """Wyjątek agenta (nie powinien wystąpić) → Trace(status='error'), nie awaria tury."""
 
-    def exploding(question, *, on_event=None):
+    def exploding(question, *, on_event=None, callbacks=None):
         raise RuntimeError("agent padł")
 
     service = service_with(settings, [DOC], agent=exploding)
@@ -227,3 +227,93 @@ def test_real_agent_inside_graph(settings, agent_for, company_data):
     assert state["record"]["kind"] == "agent_trace"
     assert model.calls == 5 and len(trace["model_calls"]) == 5
     assert result.evidence_path and "calculate_otif_penalty" in result.evidence_path
+
+
+# ---------------------------------------------------------------------------
+# F5: R1-2, callbacki grafu w agencie (kontrakt F5, 6.1 i 13.2)
+# ---------------------------------------------------------------------------
+
+
+def test_agent_runs_nest_under_the_graph_run(settings, agent_for, company_data):
+    """Handler z konfiguracji `graph.stream` widzi start modelu agenta, a łańcuch `parent_run_id`
+    prowadzi od niego do runu grafu. Agent nadal biegnie w pustym kontekście (bez przecieku
+    konfiguracji grafu); do agenta trafiają tylko callbacki konfiguracji węzła."""
+    from langchain_core.callbacks import BaseCallbackHandler
+    from langchain_core.messages import HumanMessage
+
+    from kovalo.workflow.checkpoint import memory_checkpointer
+    from kovalo.workflow.graph import CopilotDeps, build_copilot_graph
+    from kovalo.workflow.schemas import Turn
+    from tests.agent_fakes import p1_script
+
+    class Recording(BaseCallbackHandler):
+        def __init__(self):
+            self.parents: dict = {}
+            self.model_starts: list = []
+
+        def on_chain_start(self, serialized, inputs, *, run_id, parent_run_id=None, **kwargs):
+            self.parents[run_id] = parent_run_id
+
+        def on_chat_model_start(
+            self, serialized, messages, *, run_id, parent_run_id=None, **kwargs
+        ):
+            self.parents[run_id] = parent_run_id
+            self.model_starts.append(run_id)
+
+        def on_tool_start(self, serialized, input_str, *, run_id, parent_run_id=None, **kwargs):
+            self.parents[run_id] = parent_run_id
+
+    runner, model = agent_for(p1_script(), data=company_data)
+    llm = ReplayLLM([DOC])
+    deps = CopilotDeps(
+        understand_model=llm.with_structured_output(Turn),
+        policy=settings.policy,
+        understand_prompt=settings.prompts.understand_system,
+        agent=runner,
+    )
+    graph = build_copilot_graph(deps, checkpointer=memory_checkpointer())
+    handler = Recording()
+    list(
+        graph.stream(
+            {"messages": [HumanMessage("Ile wynosi kara za lipiec?")]},
+            {"configurable": {"thread_id": "t"}, "callbacks": [handler]},
+            stream_mode="updates",
+        )
+    )
+    assert model.calls == 5
+    assert len(handler.model_starts) == 5, "handler widzi każdą turę modelu agenta"
+    roots = [rid for rid, parent in handler.parents.items() if parent is None]
+    assert len(roots) == 1, "jeden run grafu"
+    for start in handler.model_starts:
+        chain, current = [], start
+        while current is not None:
+            chain.append(current)
+            current = handler.parents.get(current)
+        assert chain[-1] == roots[0], "łańcuch parent_run_id kończy się w runie grafu"
+        assert len(chain) >= 3, "model agenta jest zagnieżdżony pod węzłem grafu"
+
+
+def test_agent_answerer_receives_node_callbacks(settings):
+    """Węzeł `answer_documents` woła agenta z `callbacks=` (konfiguracja węzła); atrapa przyjmuje
+    argument nazwany."""
+    from langchain_core.callbacks import BaseCallbackHandler
+    from langchain_core.messages import HumanMessage
+
+    seen: dict = {}
+
+    def answerer(question, *, on_event=None, callbacks=None):
+        seen["callbacks"] = callbacks
+        return doc_trace()
+
+    graph, _ = graph_with(settings, [DOC], agent=answerer)
+    handler = BaseCallbackHandler()
+    list(
+        graph.stream(
+            {"messages": [HumanMessage("Ile wynosi kara?")]},
+            {"configurable": {"thread_id": "t"}, "callbacks": [handler]},
+            stream_mode="updates",
+        )
+    )
+    assert seen["callbacks"] is not None
+    flat = list(getattr(seen["callbacks"], "handlers", seen["callbacks"]))
+    assert handler in flat

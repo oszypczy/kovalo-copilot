@@ -912,6 +912,7 @@ name = "kovalo-copilot"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "chainlit" },
     { name = "fastapi" },
     { name = "fastembed" },
@@ -954,6 +955,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4,<5" },
     { name = "chainlit", specifier = ">=2,<3" },
     { name = "fastapi" },
     { name = "fastembed", specifier = ">=0.9,<0.10" },

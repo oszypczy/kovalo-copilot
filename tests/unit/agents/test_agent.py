@@ -356,3 +356,280 @@ def test_cache_key_is_stable_across_runs(agent_for, tmp_path):
     strict = JsonFileLlmCache(tmp_path / "llm", mode="strict")
     third, m3, _ = run(strict)
     assert third.status == "answered" and m3.calls == 0 and strict.misses == 0
+
+
+# ---------------------------------------------------------------------------
+# F5: A0 (kontrakt F5, 6.1-6.2 i 13.2): callbacki (R1-2), count_errors i wspólny licznik (R1-6)
+# ---------------------------------------------------------------------------
+
+
+def recording_handler():
+    from langchain_core.callbacks import BaseCallbackHandler
+
+    class Recording(BaseCallbackHandler):
+        def __init__(self):
+            self.model_starts = []
+            self.chain_starts = []
+
+        def on_chat_model_start(
+            self, serialized, messages, *, run_id, parent_run_id=None, **kwargs
+        ):
+            self.model_starts.append((run_id, parent_run_id))
+
+        def on_chain_start(self, serialized, inputs, *, run_id, parent_run_id=None, **kwargs):
+            self.chain_starts.append((run_id, parent_run_id))
+
+    return Recording()
+
+
+def test_callbacks_reach_the_agent_model(agent_for):
+    handler = recording_handler()
+    runner, _ = agent_for([call("get_contract_terms", supplier="SUP-114"), answer("ok")])
+    trace = runner("Warunki?", callbacks=[handler])
+    assert trace.status == "answered"
+    assert len(handler.model_starts) == 2, "handler widzi start każdej tury modelu agenta"
+
+
+def test_no_callbacks_is_the_f4_behaviour(agent_for):
+    runner, _ = agent_for([answer("ok"), answer("ok")])
+    assert runner("Cześć").status == "answered"
+    assert runner("Cześć", callbacks=None).status == "answered"
+
+
+def test_call_meter_counts_errors_when_asked(agent_for):
+    from kovalo.agents.middleware import CallMeter
+
+    meter = CallMeter(max_calls=2, count_errors=True)
+    runner, model = agent_for(
+        [RuntimeError("provider down"), RuntimeError("provider down"), answer("trzecia próba")],
+        extra_middleware=[meter],
+    )
+    first = runner("Dzień dobry")
+    second = runner("Dzień dobry")
+    assert first.status == second.status == "error"
+    assert meter.errors == 2 and meter.network == 0
+    third = runner("Dzień dobry")
+    assert third.status == "error" and "CallBudgetExhausted" in third.error
+    assert model.calls == 2, "trzecia próba nie doszła do modelu: błędy liczą się do limitu"
+
+
+def test_call_meter_default_does_not_count_errors(agent_for):
+    """count_errors=False (domyślnie, E4): jak F4, nieudane próby nie zjadają limitu."""
+    from kovalo.agents.middleware import CallMeter
+
+    meter = CallMeter(max_calls=2)
+    runner, model = agent_for(
+        [RuntimeError("x"), RuntimeError("x"), RuntimeError("x"), answer("ok")],
+        extra_middleware=[meter],
+    )
+    for _ in range(3):
+        assert runner("Dzień dobry").status == "error"
+    assert runner("Dzień dobry").status == "answered"
+    assert model.calls == 4 and meter.errors == 3 and meter.network == 1
+
+
+def test_shared_counter(agent_for):
+    """Dwa CallMeter ze wspólnym CallCounter wyczerpują wspólny limit (E5: understand + agent)."""
+    from kovalo.agents.middleware import CallBudgetExhausted, CallCounter, CallMeter
+
+    counter = CallCounter(max_calls=3)
+    one = CallMeter(counter=counter, count_errors=True)
+    two = CallMeter(counter=counter, count_errors=True)
+    runner_a, model_a = agent_for([answer("a"), answer("b")], extra_middleware=[one])
+    runner_b, model_b = agent_for([answer("c"), answer("d")], extra_middleware=[two])
+    assert runner_a("q").status == "answered" and runner_b("q").status == "answered"
+    assert runner_a("q").status == "answered"  # trzecia próba w sumie
+    exhausted = runner_b("q")
+    assert exhausted.status == "error" and "CallBudgetExhausted" in exhausted.error
+    assert model_b.calls == 1 and model_a.calls == 2
+    with pytest.raises(CallBudgetExhausted):
+        counter.admit()
+
+
+def test_call_counter_records_outcomes():
+    """`admit()` przed próbą (wyczerpany → CallBudgetExhausted); sieć zjada limit, trafienie
+    w cache nie. (Liczenie `error` zależy od `count_errors`: tylko przez CallMeter, zob. wyżej.)"""
+    from kovalo.agents.middleware import CallBudgetExhausted, CallCounter
+
+    counter = CallCounter(max_calls=2)
+    counter.admit()
+    counter.record("network")
+    counter.admit()
+    counter.record("cache")  # trafienie w cache nie zjada limitu
+    counter.admit()
+    counter.record("network")
+    with pytest.raises(CallBudgetExhausted):
+        counter.admit()
+
+
+def test_cache_key_does_not_depend_on_the_tool_artifact(agent_for, small_data, tmp_path):
+    """ADR-0013 pkt 4 / U2: pochodzenie wywołania MCP (losowy `invocation_id`) idzie do artefaktu
+    ToolMessage, więc NIE może zmieniać klucza cache. Sprawdzamy to bezpośrednio: powtórka tego
+    samego pytania z NOWYM losowym artefaktem to same trafienia, także z tym samym cache co
+    przebieg na narzędziach bezpośrednich (artefakt None), czyli warunek U9 (E4 przez MCP
+    `--cache-only` odtwarza wynik F4 bez wywołań). `dumps(messages)` serializuje `artifact`, więc
+    potrzebna jest normalizacja (jak `total_cost` w StableUsageMiddleware)."""
+    import uuid
+
+    from langchain_core.tools import StructuredTool
+
+    from kovalo.agents.agent import AgentRunner, build_agent
+    from kovalo.agents.middleware import CallMeter
+    from kovalo.eval.llm_cache import JsonFileLlmCache
+
+    def terms(supplier: str):
+        return {"status": "ok", "supplier_id": "SUP-114", "supplier": "Mleczna Dolina"}
+
+    def mcp_tool():
+        return StructuredTool.from_function(
+            func=lambda supplier: (
+                terms(supplier),
+                {"transport": "mcp", "invocation_id": uuid.uuid4().hex[:12]},
+            ),
+            name="get_contract_terms",
+            description="dubler narzędzia MCP",
+            args_schema={"type": "object", "properties": {"supplier": {"type": "string"}}},
+            response_format="content_and_artifact",
+        )
+
+    def direct_tool():
+        return StructuredTool.from_function(
+            func=terms,
+            name="get_contract_terms",
+            description="dubler narzędzia MCP",
+            args_schema={"type": "object", "properties": {"supplier": {"type": "string"}}},
+        )
+
+    messages = [
+        call("get_contract_terms", supplier="SUP-114"),
+        answer("Gotowe.", model="scripted-model", usage=(120, 15)),
+    ]
+
+    def run(tool, cache):
+        model = ScriptedModel(script=list(messages), cache=cache)
+        meter = CallMeter(cache=cache)
+        agent = build_agent(model, [tool], system_prompt="prompt", extra_middleware=[meter])
+        from kovalo.config import load_settings
+
+        return AgentRunner(agent, load_settings(google_api_key="k").agent)("Warunki?"), model, meter
+
+    cache = JsonFileLlmCache(tmp_path / "llm")
+    first, m1, _ = run(direct_tool(), cache)
+    assert first.status == "answered" and m1.calls == 2
+    second, m2, meter2 = run(mcp_tool(), JsonFileLlmCache(tmp_path / "llm"))
+    assert second.status == "answered" and second.events[0].tool == "get_contract_terms"
+    assert m2.calls == 0 and (meter2.network, meter2.from_cache) == (0, 2), (
+        "artefakt MCP nie zmienia klucza: przebieg z MCP trafia w cache przebiegu bezpośredniego"
+    )
+    _, m3, meter3 = run(mcp_tool(), JsonFileLlmCache(tmp_path / "llm"))
+    assert m3.calls == 0 and meter3.from_cache == 2, "nowy losowy invocation_id: nadal trafienia"
+
+
+# --- F5 (po A7): fallback offline, liczenie błędów każdej próby, budżet nie jest błędem ---------
+
+
+def _offline():
+    from kovalo.llm import fallback_exceptions
+
+    return fallback_exceptions(offline=True)
+
+
+def test_offline_cache_miss_falls_back_but_only_to_a_model_that_hits(agent_for):
+    """`--cache-only`: brak wpisu u modelu głównego przechodzi do fallbacku (tura odebrana na żywo
+    przez fallback ma w cache tylko jego wpis). Na żywo (domyślne wyjątki) to nie zachodzi."""
+    from kovalo.eval.llm_cache import LlmCacheMiss
+
+    primary = ScriptedModel(script=[LlmCacheMiss("brak wpisu głównego")], label="primary")
+    backup = ScriptedModel(script=[answer("z wpisu fallbacku", model="backup")], label="backup")
+    runner, _ = agent_for([], model=primary, fallbacks=[backup], fallback_exceptions=_offline())
+    trace = runner("Dzień dobry")
+    assert trace.status == "answered" and trace.answer == "z wpisu fallbacku"
+    assert (primary.calls, backup.calls) == (1, 1)
+
+    live_primary = ScriptedModel(script=[LlmCacheMiss("brak")], label="primary")
+    live_backup = ScriptedModel(script=[answer("nie powinien")], label="backup")
+    runner, _ = agent_for([], model=live_primary, fallbacks=[live_backup])
+    assert runner("Dzień dobry").status == "error" and live_backup.calls == 0
+
+
+def test_offline_miss_in_every_model_is_an_error_trace_not_a_loop(agent_for):
+    from kovalo.eval.llm_cache import LlmCacheMiss
+
+    primary = ScriptedModel(script=[LlmCacheMiss("brak 1")], label="primary")
+    backup = ScriptedModel(script=[LlmCacheMiss("brak 2")], label="backup")
+    runner, _ = agent_for([], model=primary, fallbacks=[backup], fallback_exceptions=_offline())
+    trace = runner("Dzień dobry")
+    assert trace.status == "error" and "LlmCacheMiss" in trace.error
+    assert (primary.calls, backup.calls) == (1, 1), "po jednej próbie na model"
+
+
+def test_offline_exhausted_budget_still_does_not_fall_back(agent_for):
+    """Tryb offline poszerza fallback tylko o CacheMissError; CallBudgetExhausted i błędy 400
+    nadal idą wyżej bez próby zapasowego modelu."""
+    from kovalo.agents.middleware import CallBudgetExhausted
+
+    for exc in (CallBudgetExhausted("limit"), ValueError("400 bad request")):
+        primary = ScriptedModel(script=[exc], label="primary")
+        backup = ScriptedModel(script=[answer("zapasowy")], label="backup")
+        runner, _ = agent_for([], model=primary, fallbacks=[backup], fallback_exceptions=_offline())
+        trace = runner("Dzień dobry")
+        assert trace.status == "error" and type(exc).__name__ in trace.error
+        assert backup.calls == 0, type(exc).__name__
+
+
+def test_offline_miss_then_fallback_counts_the_miss_as_an_error(agent_for, llm_cache):
+    """Licznik przy powtórce offline: chybienie modelu głównego to `error` i zjada limit przy
+    count_errors (tu atrapa fallbacku nie czyta cache, więc jego próba to `network`)."""
+    from kovalo.agents.middleware import CallCounter, CallMeter
+    from kovalo.eval.llm_cache import LlmCacheMiss
+
+    counter = CallCounter(max_calls=5)
+    meter = CallMeter(cache=llm_cache, count_errors=True, counter=counter)
+    primary = ScriptedModel(script=[LlmCacheMiss("brak")], label="primary")
+    backup = ScriptedModel(script=[answer("ok", model="backup")], label="backup")
+    runner, _ = agent_for(
+        [],
+        model=primary,
+        fallbacks=[backup],
+        fallback_exceptions=_offline(),
+        extra_middleware=[meter],
+    )
+    assert runner("Dzień dobry").status == "answered"
+    assert (counter.errors, meter.errors) == (1, 1)
+    assert counter.network == 1 and counter.used == 2
+
+
+def test_budget_exhaustion_is_not_counted_as_an_error(agent_for):
+    """Odmowa wejścia przy wyczerpanym limicie nie jest nieudaną próbą: nie powiększa `errors`
+    ani licznika (inaczej limit rósłby sam przy każdej pominiętej turze)."""
+    from kovalo.agents.middleware import CallCounter, CallMeter
+
+    counter = CallCounter(max_calls=1)
+    meter = CallMeter(counter=counter, count_errors=True)
+    runner, model = agent_for([answer("pierwsza"), answer("druga")], extra_middleware=[meter])
+    assert runner("a").status == "answered"
+    for _ in range(3):
+        trace = runner("b")
+        assert trace.status == "error" and "CallBudgetExhausted" in trace.error
+    assert (meter.errors, counter.errors, counter.network) == (0, 0, 1)
+    assert model.calls == 1
+
+
+def test_count_errors_counts_each_failed_fallback_attempt(agent_for):
+    """Obie nieudane próby (główny 429, zapasowy 429) zjadają limit, bo CallMeter jest wewnątrz
+    fallbacku i liczy każdą próbę (R1-6)."""
+    from langchain_core.exceptions import ModelRateLimitError
+
+    from kovalo.agents.middleware import CallCounter, CallMeter
+
+    counter = CallCounter(max_calls=3)
+    meter = CallMeter(counter=counter, count_errors=True)
+    primary = ScriptedModel(script=[ModelRateLimitError("429 a")] * 2, label="primary")
+    backup = ScriptedModel(script=[ModelRateLimitError("429 b")] * 2, label="backup")
+    runner, _ = agent_for([], model=primary, fallbacks=[backup], extra_middleware=[meter])
+    assert runner("Dzień dobry").status == "error"
+    assert counter.errors == 2 and counter.used == 2
+    second = runner("Dzień dobry")  # trzecia próba jeszcze wchodzi, czwarta już nie
+    assert second.status == "error"
+    assert counter.used == 3 and (primary.calls, backup.calls) == (2, 1)
+    assert "CallBudgetExhausted" in runner("Dzień dobry").error

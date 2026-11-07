@@ -324,7 +324,10 @@ def test_cache_only_without_key(tmp_path, fake_embeddings):
     assert len(live.rows) == 1
     trace = live.rows[0]["trace"]
     assert trace.status == "error" and "LlmCacheMiss" in trace.error
-    assert live.calls.network == 0 and live.calls.errors == 1
+    # F5 (ADR-0008, adaptacja): offline brak u modelu głównego przechodzi do fallbacku, który
+    # też nie trafia; CallMeter liczy każdą próbę (także fallbacku), więc 2 nieudane próby.
+    fallbacks = len(settings.llm.fallbacks)
+    assert live.calls.network == 0 and live.calls.errors == 1 + fallbacks
     assert report.replay.summary["outcomes"]["answered"] == 1, (
         "odtworzenie zapisane mimo błędów na żywo"
     )
@@ -390,3 +393,78 @@ def test_ids_filter_and_unknown(session_settings, fake_embeddings):
         assert report.llm_calls_planned == {"estimate": 6, "upper_bound": 24}
         with pytest.raises(ConfigError, match="X9"):
             run_e4(session_settings, ids=["X9"])
+
+
+# --- F5: E4 przez MCP (kontrakt F5, 10.6 i 13.2; ADR-0014) ---------------------------------------
+
+
+def _top_events(run):
+    return {
+        r["trace"].question_id: [e for e in r["trace"].events if e.parent_call_id is None]
+        for r in run.rows
+    }
+
+
+def test_e4_live_over_mcp(session_settings, ctx_chunks, e4_live_report, fake_embeddings):
+    """`run_e4(live=True, transport='memory', model=atrapa)`: zdarzenia mają `transport 'mcp'`,
+    a wyniki (narzędzie, argumenty, rekord) są te same co przy przebiegu `direct`."""
+    from kovalo.eval.trace.e4 import run_e4
+    from kovalo.llm import override_embeddings
+    from tests.agent_fakes import ideal_e4_model
+
+    model = ideal_e4_model(ctx_chunks)
+    with override_embeddings(fake_embeddings):
+        report = run_e4(
+            session_settings, live=True, transport="memory", model=model, max_calls=None
+        )
+    over_mcp, direct = _top_events(report.live), _top_events(e4_live_report.live)
+    assert list(over_mcp) == IDS
+    for qid in IDS:
+        events = over_mcp[qid]
+        assert events and all(e.transport == "mcp" and e.invocation_id for e in events), qid
+        assert [(e.tool, e.arguments, e.result) for e in events] == [
+            (e.tool, e.arguments, e.result) for e in direct[qid]
+        ], f"{qid}: te same wyniki co direct"
+        assert all(e.transport is None for e in direct[qid])
+    assert report.live.summary["outcomes"] == e4_live_report.live.summary["outcomes"]
+    for key in ("tools", "args", "facts", "uncovered", "approval"):
+        assert report.live.summary[key] == e4_live_report.live.summary[key], key
+    # 21 = liczba tur w skryptach P1…B1, tyle samo co w przebiegu bezpośrednim (test_live_fake_run)
+    assert report.live.calls.network == e4_live_report.live.calls.network == 21
+
+
+def test_e4_default_transport_is_direct(e4_live_report):
+    for events in _top_events(e4_live_report.live).values():
+        assert all(e.transport is None for e in events)
+
+
+def test_e4_transport_needs_live_and_known_value(session_settings, fake_embeddings):
+    from kovalo.config import ConfigError
+    from kovalo.eval.trace.e4 import run_e4
+    from kovalo.llm import override_embeddings
+
+    with override_embeddings(fake_embeddings), pytest.raises((ConfigError, ValueError)):
+        run_e4(session_settings, live=True, transport="smtp", ids=["P1"])
+
+
+def test_e4_count_errors_makes_failed_attempts_count(session_settings, fake_embeddings):
+    """R1-6: `count_errors=True` — nieudane próby zjadają `max_calls` (E4 domyślnie nie, liczby F4
+    zostają porównywalne)."""
+    from kovalo.eval.trace.e4 import E4AllErrorsError, run_e4
+    from kovalo.llm import override_embeddings
+
+    failing = ScriptedModel(script=[ValueError("sztuczny błąd")] * 9)
+    with override_embeddings(fake_embeddings), pytest.raises(E4AllErrorsError) as info:
+        run_e4(session_settings, live=True, model=failing, max_calls=2, count_errors=True)
+    report = info.value.report
+    assert report.stopped_by_max_calls is True and failing.calls == 2
+    statuses = [r["trace"].error for r in report.live.rows]
+    assert sum("pominięte" in (e or "") for e in statuses) == 7
+    assert report.live.calls.errors == 2 and report.live.calls.network == 0
+
+    plain = ScriptedModel(script=[ValueError("sztuczny błąd")] * 9)
+    with override_embeddings(fake_embeddings), pytest.raises(E4AllErrorsError) as info:
+        run_e4(session_settings, live=True, model=plain, max_calls=2)
+    assert info.value.report.stopped_by_max_calls is False and plain.calls == 9, (
+        "domyślnie błędy nie liczą się do limitu (jak F4)"
+    )

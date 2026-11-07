@@ -64,6 +64,10 @@ Hybryda jest gorsza w hit@1 i nie jest lepsza w żadnej mierze, więc reguła da
 12. **Rozszerzenia kontraktu przyjęte w R1** (pola i funkcje pomocnicze, bez nowych zależności): lista w [contracts/f2.md §14.2](../contracts/f2.md).
 13. **Komentarze z przeglądu ręcznego poza wygenerowanym raportem:** plik `reports/<mp>/review.yaml` (commitowany) wczytywany przez generator raportu, klucz: wariant + id pytania. Raport da się wtedy przeliczyć z cache bez utraty komentarzy. Kontrakt: [contracts/f2.md §14.3](../contracts/f2.md).
 
+## Adaptacja F5: brak w cache a fallback w trybie `--cache-only` (2026-11-04)
+
+Powtórka E5 `--live --cache-only` po przebiegu A7 dała 24/25: w turze D7-t2 `understand` na żywo odpowiedział fallback (`gemini-3.6-flash`), bo model główny zawiódł błędem dostępności, więc w cache był tylko wpis fallbacku. `LlmCacheMiss` nie należy do `FALLBACK_EXCEPTIONS`, więc łańcuch nie sprawdzał wpisu fallbacku. Zmiana: `kovalo.llm.CacheMissError` (bazowa klasa `LlmCacheMiss`; `kovalo.llm` nie importuje `kovalo.eval`) i `fallback_exceptions(offline)`. Tylko w trybie offline (`offline=True`: `get_structured_model` i `AvailabilityFallbackMiddleware` agenta z `build_agent_runner`) brak trafienia u modelu głównego przełącza na następny model; żaden nie trafi → `LlmCacheMiss` jak dotąd. Na żywo bez zmian: brak w cache nie jest błędem dostępności. Testy: `tests/unit/test_llm.py::test_strict_cache_falls_back_to_the_fallback_entry`, `tests/unit/workflow/test_factory.py::test_agent_replays_a_fallback_answer_from_strict_cache`.
+
 ## Znane ograniczenia (kandydaci na późniejsze etapy)
 
 - **Pytania po polsku do dokumentów po angielsku (M04, PL-601).** e5 trafia dokument, ale nie chunk z dowodem (`PL-601#ctx002`), a BM25 bez wspólnych tokenów podbija niezwiązany `CON-103#ctx000`. Model uczciwie odmawia (`phrases_missing`). Kandydaci: tłumaczenie albo rozszerzenie zapytania przed wyszukiwaniem (węzeł grafu w F3 albo opcja `Retriever`), dwujęzyczny nagłówek kontekstu w chunkach dokumentów EN (zmiana `build_contextual_chunks` = zmiana kroku 1 kursu, więc nowy ADR i E1/E2 przed i po). Bez strojenia na 10 pytaniach.

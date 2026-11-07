@@ -7,7 +7,8 @@ open_retriever sięga po kovalo.knowledge.pgvector leniwie.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import threading
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -23,6 +24,7 @@ from kovalo.knowledge.retrieval import ScoredChunk, build_vector_store, search
 
 __all__ = [
     "HybridRetriever",
+    "LazyRetriever",
     "Retriever",
     "VectorRetriever",
     "build_memory_retriever",
@@ -179,3 +181,27 @@ def open_retriever(
         mode=mode or settings.retrieval.mode,
         hybrid=settings.retrieval.hybrid,
     )
+
+
+class LazyRetriever:
+    """Retriever otwierany przy pierwszym retrieve() funkcją `opener` (F5: przeniesiony
+    z workflow/factory.py; opener przychodzi z zewnątrz, więc knowledge/ nie zna modeli).
+
+    Błąd otwarcia (IndexUnavailableError, IndexMismatchError, ConfigError) idzie wyżej
+    z retrieve() (narzędzie → błąd w trace albo isError w MCP); kolejne retrieve() próbuje
+    ponownie. Wątkowo bezpieczny: jedno otwarcie przy wielu wątkach.
+    """
+
+    name = "lazy"
+
+    def __init__(self, opener: Callable[[], Retriever]) -> None:
+        self._opener = opener
+        self._retriever: Retriever | None = None
+        self._lock = threading.Lock()
+
+    def retrieve(self, question: str, k: int) -> list[ScoredChunk]:
+        with self._lock:
+            if self._retriever is None:
+                self._retriever = self._opener()
+            retriever = self._retriever
+        return retriever.retrieve(question, k)

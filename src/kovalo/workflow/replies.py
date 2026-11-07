@@ -121,8 +121,9 @@ def decision_reply(request: DiscountRequest, decision: Decision) -> str:
 
 def already_approved_reply(request: DiscountRequest, decision: Decision) -> str:
     return (
-        f"Już zatwierdzone (wersja {request.revision}): "
-        f"{join_roles(decision.approvers)} zatwierdzili ten wniosek bez zmian. {_SIMULATION}"
+        f"Już zatwierdzone (wersja {request.revision}), akceptacja: "
+        f"{join_roles(decision.approvers)}. Wniosek się nie zmienił, więc nie trzeba go "
+        f"akceptować ponownie. {_SIMULATION}"
     )
 
 

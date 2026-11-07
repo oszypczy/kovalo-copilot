@@ -7,6 +7,9 @@ z modelem z configu (albo podanym, w testach), z cache LLM-a i limitem wywołań
 (`--max-calls`, CallMeter); po wyczerpaniu limitu reszta pytań jest „pominięta”.
 Wyszukiwanie: indeks w pamięci z chunków `ctx` i embeddingów z configu (llm.get_embeddings),
 budowany leniwie przy pierwszym wyszukiwaniu; `backend='pgvector'`: open_retriever.
+F5 (kontrakt F5, 10.6; ADR-0014 pkt 4-5): `transport` inny niż `direct` → agent na żywo bierze
+narzędzia przez MCP (odpowiednik `run_agent_mcp.py`; przeliczenie i odtworzenie kursu zostają
+bezpośrednie); `count_errors=True` → nieudane próby zjadają `max_calls`.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from typing import Any, Literal
 
 from langchain_core.caches import BaseCache
 from langchain_core.language_models import BaseChatModel
+from langchain_core.tools import BaseTool
 from pydantic import BaseModel, field_validator
 
 from kovalo.agents import Middleware
@@ -37,6 +41,7 @@ from kovalo.eval.trace.replay import ScriptedToolModel, script_from_trace
 from kovalo.eval.trace.scoring import score_trace
 from kovalo.knowledge.retrieval import ScoredChunk
 from kovalo.knowledge.retrievers import Retriever
+from kovalo.mcp_client import McpConnection
 from kovalo.tools.langchain import langchain_tools
 from kovalo.tools.specs import ToolContext
 
@@ -48,6 +53,7 @@ __all__ = [
     "E4Mode",
     "E4Report",
     "E4Run",
+    "E4Transport",
     "LazySearch",
     "plan_llm_calls",
     "replay_problems",
@@ -58,6 +64,8 @@ __all__ = [
 
 E4Mode = Literal["course", "course_supervisor", "replay", "live"]
 Backend = Literal["memory", "pgvector"]
+E4Transport = Literal["direct", "memory", "stdio", "http"]
+TRANSPORTS: tuple[str, ...] = ("direct", "memory", "stdio", "http")
 Variant = Literal["course", "ours"]
 
 SKIPPED_ERROR = "pominięte: wyczerpany limit --max-calls"
@@ -97,6 +105,7 @@ class E4Report(BaseModel):
     created_at: datetime
     questions: list[str]
     backend: Backend
+    transport: E4Transport = "direct"  # F5: narzędzia agenta na żywo (direct albo przez MCP)
     embedding_model: str | None
     reference: dict[str, Any]  # course_e4(...)
     course: E4Run
@@ -296,7 +305,9 @@ def _live_runner(
     variant: Variant,
     meter: CallMeter,
     model: BaseChatModel | None,
+    tools: Sequence[BaseTool] | None = None,
 ) -> AgentRunner:
+    """Agent na żywo; `tools` podane (narzędzia MCP) → zamiast bezpośrednich wariantu."""
     extra: list[Middleware] = [meter]
     if model is None:
         from kovalo.workflow.factory import build_agent_runner
@@ -304,6 +315,7 @@ def _live_runner(
         return build_agent_runner(
             settings,
             retriever=retriever,
+            tools=tools,
             cache=cache,
             offline=offline,
             variant=variant,
@@ -311,7 +323,7 @@ def _live_runner(
         )
     agent = build_agent(
         model,
-        langchain_tools(_context(settings, retriever), variant),
+        tools if tools is not None else langchain_tools(_context(settings, retriever), variant),
         system_prompt=settings.prompts.agent_system,
         extra_middleware=extra,
     )
@@ -407,6 +419,22 @@ def _embedding_model(settings: Settings) -> str:
     return emb.local.model if emb.provider == "fastembed" else emb.model
 
 
+def _live_traces(runner: AgentRunner, questions: Sequence[AgentGold]) -> tuple[list[Trace], bool]:
+    """Pytania po kolei; CallBudgetExhausted → to pytanie i następne „pominięte”."""
+    traces: list[Trace] = []
+    stopped = False
+    for gold in questions:
+        if stopped:
+            traces.append(_skipped(gold))
+            continue
+        trace = runner(gold.question, question_id=gold.id)
+        if trace.status == "error" and (trace.error or "").startswith("CallBudgetExhausted"):
+            stopped = True
+            trace = _skipped(gold)
+        traces.append(trace)
+    return traces, stopped
+
+
 def run_e4(
     settings: Settings,
     *,
@@ -418,10 +446,15 @@ def run_e4(
     backend: Backend = "memory",
     variant: Variant | None = None,
     model: BaseChatModel | None = None,
+    transport: E4Transport = "direct",
+    count_errors: bool = False,
 ) -> E4Report:
-    """Ewaluacja E4 (kontrakt F4, 11.3-11.4). Bez `live` zero wywołań LLM-a.
+    """Ewaluacja E4 (kontrakt F4, 11.3-11.4; F5, 10.6). Bez `live` zero wywołań LLM-a.
 
     Na żywo agent jest budowany przed odtworzeniem (brak klucza → ConfigError, nic nie biegnie).
+    transport != 'direct' (tylko z live; nieznany → ConfigError): narzędzia agenta przez jedno
+    połączenie MCP (memory, stdio albo http), zamykane na końcu. count_errors: nieudane próby
+    zjadają max_calls (R1-6; domyślnie nie, jak F4).
     Pytania po kolei; CallBudgetExhausted → to pytanie i następne „pominięte”,
     stopped_by_max_calls=True. ids: podzbiór (nieznane → ConfigError). Każde niepominięte
     pytanie na żywo z błędem → E4AllErrorsError(report). Przeliczenie ≠ kurs →
@@ -432,55 +465,74 @@ def run_e4(
     tools_variant: Variant = variant or settings.tools.variant
     search = LazySearch(settings, backend)
 
+    if transport not in TRANSPORTS:
+        raise ConfigError(f"Nieznany transport E4: {transport!r} ({', '.join(TRANSPORTS)})")
+    if transport != "direct" and not live:
+        raise ConfigError("--transport inny niż direct dotyczy tylko przebiegu na żywo (--live)")
+
     meter: CallMeter | None = None
     runner: AgentRunner | None = None
+    connection: McpConnection | None = None
     if live:
-        meter = CallMeter(cache=cache, max_calls=max_calls)
-        runner = _live_runner(
-            settings,
-            retriever=search,
-            cache=cache,
-            offline=offline,
-            variant=tools_variant,
-            meter=meter,
-            model=model,
-        )
+        meter = CallMeter(cache=cache, max_calls=max_calls, count_errors=count_errors)
+        tools: list[BaseTool] | None = None
+        if transport != "direct":
+            if model is None:  # brak klucza → MissingConfigError, zanim uruchomimy serwer
+                from kovalo.llm import get_chat_model
+
+                get_chat_model("agent", settings=settings, cache=cache, offline=offline)
+            from kovalo.eval.assistant.e5 import open_connection
+            from kovalo.tools.specs import tool_specs
+
+            connection = open_connection(settings, transport, backend, _context(settings, search))
+            tools = list(connection.tools([s.name for s in tool_specs(tools_variant)]))
+        try:
+            runner = _live_runner(
+                settings,
+                retriever=search,
+                cache=cache,
+                offline=offline,
+                variant=tools_variant,
+                meter=meter,
+                model=model,
+                tools=tools,
+            )
+        except BaseException:
+            if connection is not None:
+                connection.close()
+            raise
 
     now = datetime.now(UTC)
-    course = _course_run(settings, "single", "course", wanted)
-    course_supervisor = _course_run(settings, "supervisor", "course_supervisor", wanted)
-    replay = _replay(settings, questions, search, now)
+    try:
+        course = _course_run(settings, "single", "course", wanted)
+        course_supervisor = _course_run(settings, "supervisor", "course_supervisor", wanted)
+        replay = _replay(settings, questions, search, now)
 
-    live_run: E4Run | None = None
-    stopped = False
-    if live:
-        assert runner is not None and meter is not None
-        start = time.perf_counter()
-        traces: list[Trace] = []
-        for gold in questions:
-            if stopped:
-                traces.append(_skipped(gold))
-                continue
-            trace = runner(gold.question, question_id=gold.id)
-            if trace.status == "error" and (trace.error or "").startswith("CallBudgetExhausted"):
-                stopped = True
-                trace = _skipped(gold)
-            traces.append(trace)
-        scores = [score_trace(t, g) for t, g in zip(traces, questions, strict=True)]
-        info = _run_info(
-            settings,
-            datetime.now(UTC),
-            provider=settings.llm.provider,
-            model=settings.llm.model,
-            variant=tools_variant,
-        )
-        calls = E4Calls(network=meter.network, from_cache=meter.from_cache, errors=meter.errors)
-        live_run = _make_run("live", info, traces, scores, calls, time.perf_counter() - start)
+        live_run: E4Run | None = None
+        stopped = False
+        if live:
+            assert runner is not None and meter is not None
+            start = time.perf_counter()
+            traces, stopped = _live_traces(runner, questions)
+            scores = [score_trace(t, g) for t, g in zip(traces, questions, strict=True)]
+            info = _run_info(
+                settings,
+                datetime.now(UTC),
+                provider=settings.llm.provider,
+                model=settings.llm.model,
+                variant=tools_variant,
+            )
+            calls = E4Calls(network=meter.network, from_cache=meter.from_cache, errors=meter.errors)
+            live_run = _make_run("live", info, traces, scores, calls, time.perf_counter() - start)
+    finally:
+        if connection is not None:
+            connection.close()
 
     report = E4Report(
         created_at=now,
         questions=[q.id for q in questions],
         backend=backend,
+        transport=transport if live else "direct",
         embedding_model=_embedding_model(settings),
         reference=reference.course_e4(settings.reference_llm.model),
         course=course,

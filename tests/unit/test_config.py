@@ -629,3 +629,51 @@ def test_f4_env_overrides(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("KOVALO_TOOLS__VARIANT", "course")
     s = load_settings(google_api_key="test-key")
     assert (s.workflow.answerer, s.tools.variant) == ("rag", "course")
+
+
+# ---------------------------------------------------------------------------
+# F5 (kontrakt F5, 4 i 13.2)
+# ---------------------------------------------------------------------------
+
+
+def test_f5_config_keys_load():
+    from kovalo.config import load_settings
+
+    s = load_settings()
+    assert (s.tools.variant, s.tools.source, s.tools.mcp_transport) == ("ours", "mcp", "http")
+    assert s.mcp_server.search == "pgvector"
+    assert (s.mcp.startup_timeout_s, s.mcp.call_timeout_s, s.mcp.cleanup_timeout_s) == (
+        60,
+        120,
+        10,
+    ), "sekcja mcp PINNED bez zmian"
+    assert s.services.mcp_url == "http://localhost:8765/mcp"
+
+
+def test_f5_config_env_overrides_and_validation(monkeypatch: pytest.MonkeyPatch):
+    from kovalo.config import ConfigError, load_settings
+
+    monkeypatch.setenv("KOVALO_TOOLS__SOURCE", "direct")
+    monkeypatch.setenv("KOVALO_TOOLS__MCP_TRANSPORT", "stdio")
+    monkeypatch.setenv("KOVALO_MCP_SERVER__SEARCH", "memory")
+    s = load_settings()
+    assert (s.tools.source, s.tools.mcp_transport, s.mcp_server.search) == (
+        "direct",
+        "stdio",
+        "memory",
+    )
+    monkeypatch.setenv("KOVALO_TOOLS__SOURCE", "grpc")
+    with pytest.raises(ConfigError, match=r"tools\.source"):
+        load_settings()
+    monkeypatch.setenv("KOVALO_TOOLS__SOURCE", "mcp")
+    monkeypatch.setenv("KOVALO_MCP_SERVER__SEARCH", "bm25")
+    with pytest.raises(ConfigError, match=r"mcp_server\.search"):
+        load_settings()
+
+
+def test_f5_config_yaml_text():
+    """config.yaml ma nowe klucze (NASZE) z komentarzem, a sekcja `mcp` zostaje PINNED."""
+    ours = _load(REPO_CONFIG)
+    assert ours["tools"]["source"] == "mcp" and ours["tools"]["mcp_transport"] == "http"
+    assert ours["mcp_server"] == {"search": "pgvector"}
+    assert ours["mcp"] == _load(COURSE_CONFIG)["mcp"]

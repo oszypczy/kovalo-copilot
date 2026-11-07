@@ -515,3 +515,69 @@ def e4_fakes(ctx_chunks) -> Callable[..., Any]:
         return ideal_e4_model(ctx_chunks, ids, **kwargs)
 
     return ideal
+
+
+# ---------------------------------------------------------------------------
+# F5 (kontrakt: docs/contracts/f5.md, sekcja 13.1). Importy kodu produkcyjnego wewnątrz fixture'ów.
+# Atrapy: tests/mcp_fakes.py, serwery-zabawki: tests/fixtures/mcp_toy_servers/.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def conversations(session_settings):  # type: ignore[no-untyped-def]
+    """13 rozmów E5 (C1-C5 + D1-D8 z nakładkami), 25 tur (`load_conversations`)."""
+    from kovalo.eval.datasets import load_conversations
+
+    return load_conversations(
+        session_settings.paths.mini_project_5_conversations,
+        session_settings.paths.mini_project_3_dialogues,
+    )
+
+
+@pytest.fixture(scope="session")
+def claim_phrases(session_settings):  # type: ignore[no-untyped-def]
+    """Frazy „twierdzenia o akceptacji” z `mini_project_4_questions.yaml`."""
+    raw = yaml.safe_load(
+        session_settings.paths.mini_project_4_questions.read_text(encoding="utf-8")
+    )
+    return list(raw["approval_claim_phrases"])
+
+
+@pytest.fixture
+def server(settings):  # type: ignore[no-untyped-def]
+    """Serwer MCP wariantu `course` (6 narzędzi) z FakeRetriever: jak fixture kursu."""
+    from tests.mcp_fakes import mcp_server
+
+    return mcp_server(settings, "course")
+
+
+@pytest.fixture
+def connection(server):  # type: ignore[no-untyped-def]
+    """Połączenie w pamięci z serwerem `course`, zamykane po teście."""
+    from tests.mcp_fakes import connect
+
+    conn = connect(server)
+    yield conn
+    conn.close()
+
+
+@pytest.fixture
+def ours_connection(settings):  # type: ignore[no-untyped-def]
+    """Połączenie w pamięci z serwerem wariantu `ours` (7 narzędzi)."""
+    from tests.mcp_fakes import connect, mcp_server
+
+    conn = connect(mcp_server(settings, "ours"))
+    yield conn
+    conn.close()
+
+
+@pytest.fixture
+def direct_tools(monkeypatch):  # type: ignore[no-untyped-def]
+    """Testy F4 budujące prawdziwy `LazyAgentRunner` zakładają narzędzia bezpośrednie. Od F5
+    domyślne `tools.source` to `mcp` (kontrakt F5, 4.1), więc te testy ustawiają `direct`
+    (zmienną KOVALO_TOOLS__SOURCE, jak w opisie „lokalnie bez serwera MCP”). Przed A1 pola nie
+    ma w konfiguracji i zmienna byłaby odrzucona, więc ustawiamy ją tylko, gdy pole istnieje."""
+    from kovalo.config import ToolsConfig
+
+    if "source" in ToolsConfig.model_fields:
+        monkeypatch.setenv("KOVALO_TOOLS__SOURCE", "direct")

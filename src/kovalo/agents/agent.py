@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from langchain.agents import create_agent
+from langchain_core.callbacks import Callbacks
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
@@ -54,7 +55,10 @@ def build_agent(
 
 
 class AgentRunner:
-    """Jedno pytanie = nowy stan i nowy Budget.from_settings(agent_config)."""
+    """Jedno pytanie = nowy stan i nowy Budget.from_settings(agent_config).
+
+    `callbacks` (F5, R1-2): callbacki konfiguracji węzła grafu, żeby run agenta zagnieżdżał się
+    pod turą grafu (LangSmith); None → jak F4."""
 
     def __init__(self, agent: Any, agent_config: AgentConfig) -> None:
         self.agent = agent
@@ -66,6 +70,7 @@ class AgentRunner:
         *,
         question_id: str | None = None,
         on_event: EventCallback | None = None,
+        callbacks: Callbacks = None,
     ) -> Trace:
         return run_question(
             self.agent,
@@ -73,4 +78,5 @@ class AgentRunner:
             Budget.from_settings(self.agent_config),
             question_id=question_id,
             on_event=on_event,
+            callbacks=callbacks,
         )

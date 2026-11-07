@@ -25,6 +25,8 @@ from langchain_core.load import Serializable, dumps, loads
 from langchain_core.messages import AIMessage, AIMessageChunk
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, Generation
 
+from kovalo.llm import CacheMissError
+
 __all__ = ["CacheMode", "JsonFileLlmCache", "LlmCacheMiss"]
 
 CacheMode = Literal["read_write", "read_only", "strict"]
@@ -39,10 +41,14 @@ _ALLOWED: list[type[Serializable]] = [
 ]
 
 
-class LlmCacheMiss(RuntimeError):
+class LlmCacheMiss(CacheMissError):
     """Tryb strict: brak odpowiedzi w cache.
 
-    Nie jest w FALLBACK_EXCEPTIONS, więc nie przełącza modelu.
+    Nie jest w FALLBACK_EXCEPTIONS, więc na żywo nie przełącza modelu. W trybie offline
+    (`--cache-only`, `llm.fallback_exceptions(offline=True)`) przełącza na następny model,
+    który sprawdza swój wpis: tura odebrana na żywo przez fallback (model główny zawiódł
+    błędem dostępności) ma w cache tylko wpis fallbacku. Żaden model nie trafi → wyjątek
+    idzie wyżej (ADR-0008 pkt 6, adaptacja F5).
     """
 
 

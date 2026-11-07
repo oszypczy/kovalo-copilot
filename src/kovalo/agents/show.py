@@ -56,7 +56,8 @@ def brief(result: Any) -> str:
 
 
 def format_trace(trace: Trace, score: dict[str, Any] | None = None) -> str:
-    """Ścieżka dowodowa w formacie show_trace.py kursu."""
+    """Ścieżka dowodowa w formacie show_trace.py kursu; wywołania przez MCP z dopiskiem
+    „[MCP <invocation_id>]” (F5)."""
     lines = [
         f"{trace.question_id or ''}  {trace.question}",
         f"status: {trace.status}"
@@ -76,7 +77,10 @@ def format_trace(trace: Trace, score: dict[str, Any] | None = None) -> str:
             else f"{event.status.upper()}: {(event.error or '')[:160]}"
         )
         who = "" if event.agent == "agent" else f"[{event.agent}] "
-        lines.append(f"  {indent}{n:2}. {who}{event.tool}({args})  <{event.origin}>")
+        via = ""
+        if event.transport == "mcp":  # F5: wywołanie przez serwer MCP (ADR-0013 pkt 4)
+            via = f"  [MCP {event.invocation_id}]" if event.invocation_id else "  [MCP]"
+        lines.append(f"  {indent}{n:2}. {who}{event.tool}({args})  <{event.origin}>{via}")
         lines.append(f"  {indent}      -> {outcome}")
     lines.append("odpowiedź: " + (trace.answer or "(brak)"))
     if score:
