@@ -65,10 +65,10 @@
 | ID | Wymaganie | Kryterium akceptacji |
 |---|---|---|
 | FR-6.1 | API (FastAPI): `POST /threads`, `POST /threads/{id}/messages`, `POST /threads/{id}/resume`, `GET /threads/{id}` (stan, pauza), `GET /threads/{id}/trace`, `GET /health` | kontrakt OpenAPI, testy API. F3: JSON (`TurnResult`) bez `/trace`; SSE i `/trace` w F4 ([ADR-0010](adr/0010-api-ui-f3.md)) |
-| FR-6.2 | UI (Chainlit): czat, strumieniowanie odpowiedzi, kroki agenta (tool calls) jako rozwijane `Step`, pauzy jako przyciski akceptacji (`cl.Action` z `action_callback`, [ADR-0010](adr/0010-api-ui-f3.md)) i wpis marży w polu czatu, źródła jako elementy z treścią chunku | F3: scenariusz D2 z MP3 da się przeklikać; F5: ręczny scenariusz C1–C5 z MP5 przechodzi w UI, kroki agenta z dopiskiem „(przez MCP)” |
+| FR-6.2 | UI (Chainlit): czat, strumieniowanie odpowiedzi (strumień kroków agenta i wyniku tury przez SSE, bez tokenów odpowiedzi; [ADR-0012](adr/0012-sse-agent-steps-f4.md), [ADR-0015](adr/0015-polish-f6.md)), kroki agenta (tool calls) jako rozwijane `Step`, pauzy jako przyciski akceptacji (`cl.Action` z `action_callback`, [ADR-0010](adr/0010-api-ui-f3.md)) i wpis marży w polu czatu, źródła jako elementy z treścią chunku | F3: scenariusz D2 z MP3 da się przeklikać; F5: ręczny scenariusz C1–C5 z MP5 przechodzi w UI, kroki agenta z dopiskiem „(przez MCP)”; F6: tura z LLM-em kończy się linią kosztu (tokeny, koszt tury, suma rozmowy) |
 | FR-6.3 | Indeksowanie jako polecenie `kovalo ingest` (`make ingest`), idempotentne | ponowne uruchomienie nie duplikuje chunków |
-| FR-6.4 | Ewaluacja jako zadanie (`eval`) z raportem Markdown/JSON w `reports/` | raport porównuje wynik z referencyjnym |
-| FR-6.5 | Licznik kosztów i tokenów per tura i per przebieg | widoczny w UI i raporcie ewaluacji |
+| FR-6.4 | Ewaluacja jako zadanie (`eval`) z raportem Markdown/JSON w `reports/` | raport porównuje wynik z referencyjnym; F6: zbiorczy widok `reports/dashboard.md` (`kovalo eval dashboard`, `--check` w CI) |
+| FR-6.5 | Licznik kosztów i tokenów per tura i per przebieg | `TurnResult.usage.cost` (po cenach płatnego tieru Gemini i kursu) i linia kosztu w UI z sumą rozmowy; koszty przebiegów E1–E5 w raportach i w `reports/dashboard.md` ([ADR-0015](adr/0015-polish-f6.md)) |
 
 ## Wymagania niefunkcjonalne
 

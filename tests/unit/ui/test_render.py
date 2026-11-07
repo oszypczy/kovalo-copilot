@@ -321,3 +321,248 @@ def test_mcp_error_step_keeps_the_label_and_the_error_text():
     assert step.is_error is True and step.name == "get_contract_terms (przez MCP)"
     assert step.output.startswith("Błąd: [błąd transportu]")
     assert step.output.count("Błąd: ") == 1 and step.output.endswith("Wywołanie MCP: f00d")
+
+
+# ---------------------------------------------------------------------------
+# F6: linia kosztu tury i suma rozmowy (kontrakt F6, 6.4), tekst not_paused (7)
+# ---------------------------------------------------------------------------
+
+
+def usage_view(
+    *,
+    calls=5,
+    input_tokens=9120,
+    output_tokens=612,
+    models=("gemini-3.5-flash-lite",),
+    ours=0.004266,
+    reference=0.009594,
+    unpriced=(),
+    cost=True,
+):
+    from kovalo.ui.client import ModelUsageView, TurnCostView, UsageView
+
+    return UsageView(
+        calls=calls,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        reasoning_tokens=210,
+        models=list(models),
+        by_model=[
+            ModelUsageView(
+                model=m,
+                calls=max(1, calls // len(models)),
+                input_tokens=input_tokens // len(models),
+                output_tokens=output_tokens // len(models),
+            )
+            for m in models
+        ],
+        cost=(
+            TurnCostView(ours_usd=ours, reference_usd=reference, unpriced_models=list(unpriced))
+            if cost
+            else None
+        ),
+    )
+
+
+def squash(text: str) -> str:
+    """Zawinięcia linii i twarde spacje nie są częścią testowanego kontraktu."""
+    return " ".join(text.split())  # split() traktuje też twarde spacje jak białe znaki
+
+
+def total_after(*usages):
+    from kovalo.ui.render import UsageTotal, add_usage
+
+    total = UsageTotal()
+    for u in usages:
+        total = add_usage(total, u)
+    return total
+
+
+def test_render_usage_details():
+    """Przykład z kontraktu 6.4 jako lista do panelu „Koszt tury”: polskie liczby, odmiana,
+    centy z dwoma miejscami, suma rozmowy."""
+    from kovalo.ui.render import render_usage
+
+    first = usage_view(
+        ours=0.002834, reference=0.005606, calls=2, input_tokens=4000, output_tokens=300
+    )
+    this = usage_view()
+    total = total_after(first, this)
+    details = render_usage(this, total)
+    assert details == (
+        "- **Tura:** 5 wywołań (gemini-3.5-flash-lite)\n"
+        "- **Tokeny:** 9120 wejścia, 612 wyjścia\n"
+        "- **Koszt tury:** 0 USD w darmowym tierze; po cenach płatnych 0,43 centa (Gemini) / "
+        "0,96 centa (cennik kursu)\n"
+        "- **Rozmowa:** 2 tury, 0,71 / 1,52 centa"
+    )
+
+
+def test_render_cost_element_is_numbered_in_conversation():
+    from kovalo.ui.render import COST_STEP, UiMessage, message_text, render_cost
+
+    assert render_cost(None) is None, "tura bez LLM-a nie ma panelu kosztu"
+    first, second = render_cost("x"), render_cost("y", number=2)
+    assert first is not None and second is not None
+    assert (first.name, second.name) == (COST_STEP, f"{COST_STEP} 2")
+    assert message_text(UiMessage(content="Odp."), cost=first) == "Odp.\n\nSzczegóły: Koszt tury"
+
+
+@pytest.mark.parametrize(
+    ("calls", "word"),
+    [
+        (1, "1 wywołanie"),
+        (2, "2 wywołania"),
+        (4, "4 wywołania"),
+        (5, "5 wywołań"),
+        (12, "12 wywołań"),
+        (14, "14 wywołań"),
+        (22, "22 wywołania"),
+        (25, "25 wywołań"),
+    ],
+)
+def test_render_usage_call_declension(calls, word):
+    from kovalo.ui.render import render_usage
+
+    usage = usage_view(calls=calls, input_tokens=100, output_tokens=10)
+    assert word + " " in squash(render_usage(usage, total_after(usage)))
+
+
+def test_render_usage_models_listed_without_duplicates():
+    from kovalo.ui.client import ModelUsageView
+    from kovalo.ui.render import render_usage
+
+    usage = usage_view(models=("gemini-3.5-flash-lite", "gemini-3.6-flash"))
+    usage = usage.model_copy(
+        update={
+            "by_model": [
+                *usage.by_model,
+                ModelUsageView(
+                    model="gemini-3.5-flash-lite", calls=1, input_tokens=1, output_tokens=1
+                ),
+            ],
+            "models": ["bez-znaczenia"],
+        }
+    )
+    text = squash(render_usage(usage, total_after(usage)))
+    assert "(gemini-3.5-flash-lite, gemini-3.6-flash)" in text, (
+        "modele z by_model (nie z models), bez powtórzeń, przecinkami (fallback widoczny)"
+    )
+    assert "bez-znaczenia" not in text
+
+
+def test_render_usage_thousands_and_tiny_cost():
+    from kovalo.ui.render import render_usage
+
+    usage = usage_view(input_tokens=1234567, output_tokens=89, ours=1e-8, reference=2e-8)
+    text = squash(render_usage(usage, total_after(usage)))
+    assert "1 234 567 wejścia" in text and "89 wyjścia" in text
+    assert "< 0,01 centa (Gemini)" in text and "< 0,01 centa (cennik kursu)" in text
+
+
+def test_render_usage_unpriced_and_missing_cost():
+    from kovalo.ui.render import add_usage, render_usage
+
+    assert render_usage(None, total_after()) is None, "tura bez LLM-a nie ma kosztu"
+
+    unpriced = usage_view(ours=None, unpriced=("model-x",), models=("model-x",))
+    total = add_usage(total_after(usage_view()), unpriced)
+    assert total.partial is True
+    text = squash(render_usage(unpriced, total))
+    assert "brak ceny dla model-x" in text
+    assert "0,96 centa (cennik kursu)" in text, "cennik kursu zawsze znany"
+    assert "(część tur bez ceny)" in text
+
+    no_cost = usage_view(cost=False)
+    total = add_usage(total_after(), no_cost)
+    text = squash(render_usage(no_cost, total))
+    assert text.startswith("- **Tura:** 5 wywołań")
+    assert "Koszt" not in text and "centa" not in text and "USD" not in text
+
+
+def test_add_usage_accumulates():
+    from kovalo.ui.render import UsageTotal, add_usage
+
+    first = usage_view(calls=5, input_tokens=9120, output_tokens=612, ours=0.004, reference=0.01)
+    second = usage_view(calls=1, input_tokens=100, output_tokens=10, ours=0.001, reference=0.002)
+    total = add_usage(UsageTotal(), first)
+    assert (total.turns, total.calls, total.input_tokens, total.output_tokens) == (1, 5, 9120, 612)
+    assert total.ours_usd == pytest.approx(0.004) and total.reference_usd == pytest.approx(0.01)
+    assert total.partial is False
+
+    unchanged = add_usage(total, None)
+    assert unchanged == total, "tura bez usage (wznowienie pauzy) nie zmienia sumy"
+
+    total = add_usage(unchanged, second)
+    assert (total.turns, total.calls, total.input_tokens, total.output_tokens) == (2, 6, 9220, 622)
+    assert total.ours_usd == pytest.approx(0.005) and total.reference_usd == pytest.approx(0.012)
+    assert UsageTotal().turns == 0, "UsageTotal jest niezmienny (kopie)"
+
+
+def test_add_usage_marks_partial_when_a_turn_has_no_price():
+    from kovalo.ui.render import UsageTotal, add_usage
+
+    priced = usage_view(ours=0.004, reference=0.01)
+    unpriced = usage_view(ours=None, unpriced=("x",))
+    no_cost = usage_view(cost=False)
+    total = add_usage(add_usage(UsageTotal(), priced), unpriced)
+    assert total.partial and total.turns == 2
+    assert total.ours_usd == pytest.approx(0.004), "tura bez ceny nie dodaje do kwoty"
+    assert total.reference_usd == pytest.approx(0.01 + 0.009594)
+    assert add_usage(UsageTotal(), no_cost).partial is True, "cost None też oznacza brak ceny"
+
+
+def test_not_paused_text():
+    from kovalo.ui.client import ApiCallError
+    from kovalo.ui.render import render_error
+
+    message = render_error(ApiCallError(409, "not_paused", "Wątek T1 nie czeka na odpowiedź."))
+    assert message.content == "Ta decyzja jest nieaktualna: rozmowa nie czeka już na odpowiedź."
+    assert not message.actions
+    stale = render_error(ApiCallError(409, "stale_pause", "inna pauza"))
+    assert stale.content != message.content, "stale_pause ma własny tekst"
+
+
+def test_turn_view_carries_usage():
+    from kovalo.ui.client import TurnView
+
+    view = TurnView.model_validate(
+        {
+            "thread_id": "T1",
+            "status": "answered",
+            "replies": ["x"],
+            "usage": {
+                "calls": 2,
+                "input_tokens": 10,
+                "output_tokens": 3,
+                "reasoning_tokens": None,
+                "models": ["m"],
+                "by_model": [
+                    {"model": "m", "calls": 2, "input_tokens": 10, "output_tokens": 3},
+                ],
+                "cost": {
+                    "ours_usd": 0.1,
+                    "reference_usd": 0.2,
+                    "unpriced_models": [],
+                    "our_prices_checked_on": "2026-11-02",
+                },
+            },
+        }
+    )
+    assert view.usage.calls == 2 and view.usage.by_model[0].model == "m"
+    assert view.usage.cost.ours_usd == 0.1 and view.usage.cost.reference_usd == 0.2
+    assert TurnView(thread_id="T1", status=None).usage is None
+
+
+def test_tool_steps_get_icons_instead_of_empty_avatars():
+    """Chainlit rysuje szare kółko, gdy krok nie ma awatara; ikona lucide w metadata.icon."""
+    from kovalo.ui.client import ToolEventView
+    from kovalo.ui.render import DEFAULT_TOOL_ICON, render_tool_start
+
+    def icon(tool: str, origin: str | None) -> str | None:
+        return render_tool_start(ToolEventView(call_id="c", tool=tool, origin=origin)).icon
+
+    assert icon("search_documents", "data") == "file-search"
+    assert icon("get_supplier_otif", "data") == "database"
+    assert icon("calculate_otif_penalty", "calculation") == "calculator"
+    assert icon("cos_nowego", None) == DEFAULT_TOOL_ICON

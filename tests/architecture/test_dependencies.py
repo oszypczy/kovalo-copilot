@@ -357,10 +357,20 @@ def test_workflow_allowlist():
         ),
         # jedyny moduł z Postgresem
         "workflow/checkpoint.py": ("psycopg", "psycopg_pool", "langgraph.checkpoint.postgres"),
+        # F6 (kontrakt F6, 2.2): koszt tury to widok w serwisie, nie stan grafu ani węzeł
+        "workflow/service.py": ("kovalo.cost.usage",),
     }
     exact = ("kovalo.rag", "kovalo.agents")
     assert _allowlist_violations(files, allowed, exact=exact, extra=extra) == []
     assert not any("kovalo.rag.citations" in _import_targets(f) for f in files), "R1-5"
+    pricing_users = [
+        str(f.relative_to(SRC))
+        for f in files
+        if any(n.startswith("kovalo.cost") for n in _imports(f))
+    ]
+    assert pricing_users in ([], ["workflow/service.py"]), (
+        f"cena modelu nie trafia do grafu ani do węzłów: {pricing_users}"
+    )
 
 
 def test_rag_allowlist():
@@ -400,6 +410,7 @@ def test_ui_allowlist():
         "pydantic",
         "kovalo.config",
         "kovalo.health",
+        "kovalo.text_pl",  # F6 P1: liczby w linii kosztu (czysty moduł, tylko stdlib)
         "kovalo.ui",
     )
     extra = {"ui/server.py": ("fastapi", "uvicorn")}
@@ -804,3 +815,76 @@ def test_api_and_ui_do_not_learn_about_mcp():
     assert (
         _violations(_py_files("api", "ui"), ("mcp", "kovalo.mcp_client", "kovalo.mcp_server")) == []
     )
+
+
+# ---------------------------------------------------------------------------
+# F6 (kontrakt: docs/contracts/f6.md, sekcja 2.2)
+# ---------------------------------------------------------------------------
+
+
+def test_f6_modules_exist():
+    for rel in (
+        "cost/usage.py",
+        "eval/dashboard/__init__.py",
+        "eval/dashboard/spec.py",
+        "eval/dashboard/models.py",
+        "eval/dashboard/stages.py",
+        "eval/dashboard/render.py",
+        "eval/dashboard/build.py",
+    ):
+        assert (SRC / rel).is_file(), f"brak src/kovalo/{rel}"
+
+
+def test_cost_usage_allowlist():
+    """Biblioteka standardowa, pydantic, kovalo.config, kovalo.cost.pricing; bez LangChaina,
+    tiktoken, kovalo.llm i kovalo.workflow."""
+    path = SRC / "cost" / "usage.py"
+    assert path.is_file(), "brak cost/usage.py"
+    allowed = ("pydantic", "kovalo.config", "kovalo.cost.pricing")
+    assert _allowlist_violations([path], allowed) == []
+    forbidden = ("langchain", "langchain_core", "langgraph", "tiktoken", "kovalo.llm")
+    assert _violations([path], (*forbidden, "kovalo.workflow", "kovalo.cost.tokens")) == []
+
+
+def test_cost_init_has_no_imports():
+    """`workflow/` importuje `kovalo.cost.usage`: `cost/__init__.py` nie wciąga tiktoken."""
+    init = SRC / "cost" / "__init__.py"
+    assert init.is_file()
+    assert _import_targets(init) == set()
+
+
+def test_ui_has_no_prices():
+    """UI dostaje gotowe kwoty w `usage.cost`: nie zna cen ani `kovalo.cost`."""
+    files = _py_files("ui")
+    assert _violations(files, ("kovalo.cost",)) == []
+    assert _violations(files, ("kovalo.config.CostConfig", "kovalo.config.TokenPrice")) == []
+    assert not [f for f in files if "CostConfig" in f.read_text(encoding="utf-8")]
+
+
+def test_dashboard_allowlist():
+    """Dashboard czyta pliki, nie uruchamia ewaluacji: bez LangChaina, kovalo.llm, workflow, agents,
+    mcp_*, knowledge, innych pakietów kovalo.eval.* i bez sieci."""
+    assert (SRC / "eval" / "dashboard").is_dir(), "brak eval/dashboard"
+    files = _py_files("eval/dashboard")
+    assert files
+    allowed = ("pydantic", "yaml", "kovalo.config", "kovalo.text_pl", "kovalo.eval.dashboard")
+    assert _allowlist_violations(files, allowed) == []
+    forbidden = (
+        "langchain",
+        "langchain_core",
+        "langgraph",
+        "kovalo.llm",
+        "kovalo.workflow",
+        "kovalo.agents",
+        "kovalo.mcp_client",
+        "kovalo.mcp_server",
+        "kovalo.knowledge",
+        "kovalo.cost",
+        "httpx",
+        "requests",
+        "urllib3",
+        "socket",
+    )
+    assert _violations(files, forbidden) == []
+    siblings = ("retrieval", "rag", "workflow", "trace", "assistant")
+    assert _violations(files, tuple(f"kovalo.eval.{n}" for n in siblings)) == []

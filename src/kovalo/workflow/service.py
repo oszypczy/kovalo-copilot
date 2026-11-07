@@ -29,10 +29,12 @@ from pydantic import BaseModel
 
 from kovalo.agents.show import brief, format_trace
 from kovalo.agents.trace import Trace, trace_from_record
+from kovalo.config import CostConfig
+from kovalo.cost.usage import ModelUsage, TurnCost, group_by_model, price_usage
 from kovalo.text_pl import PauseType, human_answer
 from kovalo.workflow.checkpoint import CONNECTION_ERRORS, CheckpointerUnavailableError
 from kovalo.workflow.graph import APPROVAL_OPTIONS, is_valid_margin
-from kovalo.workflow.replies import describe_request
+from kovalo.workflow.replies import INTERRUPTED_TURN_REPLY, describe_request
 from kovalo.workflow.schemas import Status
 
 __all__ = [
@@ -73,6 +75,8 @@ class TurnUsage(BaseModel):
     output_tokens: int
     reasoning_tokens: int | None = None
     models: list[str]  # faktyczne modele (fallback widoczny)
+    by_model: list[ModelUsage] = []  # F6: podział na modele (fallback daje dwie pozycje)
+    cost: TurnCost | None = None  # F6: None, gdy serwis nie dostał cennika (E3, testy F3-F5)
 
 
 class PauseRef(BaseModel):
@@ -186,7 +190,8 @@ class ThreadBusyError(RuntimeError):
 
 
 class ThreadStuckError(RuntimeError):
-    """Checkpoint z niedokończonym krokiem bez pauzy (wyjątek w węźle przerwał turę)."""
+    """Checkpoint z niedokończonym krokiem bez pauzy, którego nie udało się zamknąć (F6: błąd
+    awaryjny; zwykle przerwaną turę zamyka _close_interrupted_turn)."""
 
 
 def _config(thread_id: str) -> RunnableConfig:
@@ -266,17 +271,22 @@ def _agent_sources(trace: Mapping[str, Any]) -> list[Source]:
     return sources
 
 
-def _usage(calls: Sequence[Mapping[str, Any]]) -> TurnUsage | None:
+def _usage(calls: Sequence[Mapping[str, Any]], pricing: CostConfig | None) -> TurnUsage | None:
+    """Wywołania LLM-a tury; koszt tylko z cennikiem (kontrakt F6, 6.3). Koszt to widok tury,
+    nie stan: nie trafia do checkpointu."""
     if not calls:
         return None
     usages = [c["usage"] for c in calls if c.get("usage")]
     reasoning = [u["reasoning_tokens"] for u in usages if u.get("reasoning_tokens") is not None]
+    by_model = group_by_model(calls)
     return TurnUsage(
         calls=len(calls),
         input_tokens=sum(int(u["input_tokens"]) for u in usages),
         output_tokens=sum(int(u["output_tokens"]) for u in usages),
         reasoning_tokens=sum(reasoning) if reasoning else None,
         models=[str(c["model"]) for c in calls if c.get("model")],
+        by_model=by_model,
+        cost=price_usage(by_model, pricing) if pricing is not None else None,
     )
 
 
@@ -409,9 +419,11 @@ class CopilotService:
         *,
         max_message_chars: int = 4000,
         max_workers: int = 4,
+        pricing: CostConfig | None = None,
     ) -> None:
         self.graph = graph
         self.max_message_chars = max_message_chars
+        self.pricing = pricing
         self._locks: dict[str, _Slot] = {}
         self._locks_guard = threading.Lock()
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="turn")
@@ -446,6 +458,40 @@ class CopilotService:
             return self.graph.get_state(cfg)
         except CONNECTION_ERRORS as exc:
             raise _unavailable(exc) from None
+
+    # --- zamknięcie przerwanej tury (kontrakt F6, 7) ---
+    def _close_interrupted_turn(
+        self, config: RunnableConfig, snapshot: StateSnapshot
+    ) -> StateSnapshot:
+        """Zapis jako `reply_other` (krawędź do END), więc nowy checkpoint ma next == ().
+
+        Wywoływane pod blokadą wątku: przy jednym procesie API nikt tej tury nie dokończy.
+        Stan wniosku zostaje. Błąd zapisu → ThreadStuckError; utrata Postgresa →
+        CheckpointerUnavailableError.
+        """
+        thread_id = config["configurable"]["thread_id"]
+        logger.warning(
+            "Wątek %s: zamykam przerwaną turę (niedokończone kroki: %s)",
+            thread_id,
+            ", ".join(snapshot.next),
+        )
+        update = {
+            "status": "error",
+            "error": "turn_interrupted",
+            "calls": [],
+            "messages": [AIMessage(INTERRUPTED_TURN_REPLY)],
+        }
+        try:
+            self.graph.update_state(config, update, as_node="reply_other")
+        except CONNECTION_ERRORS as exc:
+            raise _unavailable(exc) from None
+        except Exception as exc:
+            logger.exception("Wątek %s: nie udało się zamknąć przerwanej tury", thread_id)
+            raise ThreadStuckError(
+                f"Wątek {thread_id} ma przerwaną turę (krok {', '.join(snapshot.next)}), "
+                "której nie udało się zamknąć."
+            ) from exc
+        return self._state(config)
 
     # --- tura w wątku roboczym ---
     def _start(
@@ -508,9 +554,10 @@ class CopilotService:
     def start_message(self, thread_id: str, text: str) -> TurnStream:
         """Nowa wiadomość menedżera jako strumień tury.
 
-        Pusta albo za długa → ValueError; wątek w pauzie → ThreadPausedError; checkpoint
-        z przerwaną turą → ThreadStuckError; inna tura w wątku → ThreadBusyError; utrata
-        Postgresa → CheckpointerUnavailableError. Wszystko przed startem strumienia.
+        Pusta albo za długa → ValueError; wątek w pauzie → ThreadPausedError; przerwana tura
+        jest zamykana (odpowiedź INTERRUPTED_TURN_REPLY trafia do replies tej tury), a gdy się
+        nie da → ThreadStuckError; inna tura w wątku → ThreadBusyError; utrata Postgresa →
+        CheckpointerUnavailableError. Wszystko przed startem strumienia.
         """
         if not text.strip():
             raise ValueError("Wiadomość jest pusta.")
@@ -518,15 +565,15 @@ class CopilotService:
             raise ValueError(f"Wiadomość ma {len(text)} znaków; limit to {self.max_message_chars}.")
         slot = self._acquire(thread_id)
         try:
-            snapshot = self._state(_config(thread_id))
+            cfg = _config(thread_id)
+            snapshot = self._state(cfg)
             pending = _first_pending(snapshot.interrupts)
             if pending is not None:
                 raise ThreadPausedError(pending)
-            if snapshot.next:
-                raise ThreadStuckError(
-                    f"Wątek {thread_id} ma przerwaną turę (krok {', '.join(snapshot.next)})."
-                )
+            # przed zamknięciem: odpowiedź zamykająca trafia do replies nowej tury
             before = len(snapshot.values.get("messages") or [])
+            if snapshot.next:
+                self._close_interrupted_turn(cfg, snapshot)
         except BaseException:
             self._release(thread_id, slot)
             raise
@@ -542,20 +589,22 @@ class CopilotService:
     ) -> TurnStream:
         """Odpowiedź na bieżącą pauzę jako strumień tury: dokładnie jedno z value/text.
 
-        Brak pauzy → NotPausedError; pause_ref ≠ bieżąca pauza → StalePauseError (stan bez
-        zmian). Nieprawidłowa wartość i tak trafia do grafu (pyta ponownie, jak w kursie),
-        a TurnResult.resume_rejected = True.
+        Brak pauzy → NotPausedError (przerwana tura jest najpierw zamykana); pause_ref ≠
+        bieżąca pauza → StalePauseError (stan bez zmian). Nieprawidłowa wartość i tak trafia
+        do grafu (pyta ponownie, jak w kursie), a TurnResult.resume_rejected = True.
         """
         if (value is None) == (text is None):
             raise ValueError("Podaj dokładnie jedno: value albo text.")
         slot = self._acquire(thread_id)
         try:
-            snapshot = self._state(_config(thread_id))
+            cfg = _config(thread_id)
+            snapshot = self._state(cfg)
             pending = _first_pending(snapshot.interrupts)
             if pending is None:
                 if snapshot.next:
-                    raise ThreadStuckError(
-                        f"Wątek {thread_id} ma przerwaną turę (krok {', '.join(snapshot.next)})."
+                    self._close_interrupted_turn(cfg, snapshot)
+                    raise NotPausedError(
+                        "Poprzednia tura została przerwana; rozmowa nie czeka na odpowiedź."
                     )
                 raise NotPausedError(f"Wątek {thread_id} nie czeka na odpowiedź.")
             if pause_ref is not None and pause_ref != pending.ref:
@@ -667,7 +716,7 @@ class CopilotService:
             approvals=dict(values.get("approvals") or {}),
             sources=_agent_sources(trace) if trace is not None else _sources(record),
             # wznowienie nie wywołuje modelu: tokeny tury raportuje tylko send_message
-            usage=_usage(values.get("calls") or []) if fresh else None,
+            usage=_usage(values.get("calls") or [], self.pricing) if fresh else None,
             error=values.get("error"),
             trace=trace,
             evidence_path=format_trace(Trace.model_validate(trace)) if trace is not None else None,

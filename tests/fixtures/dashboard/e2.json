@@ -1,0 +1,2433 @@
+{
+ "run_id": "20261102-155513-ccd9ddd2",
+ "created_at": "2026-11-02T15:55:13.237988Z",
+ "provider": "google_genai",
+ "model": "gemini-3.5-flash-lite",
+ "judge_model": "gemini-3.5-flash-lite",
+ "reference_model": "gpt-5.4-mini",
+ "embedding_model": "intfloat/multilingual-e5-large",
+ "reference_embedding_model": "text-embedding-3-small",
+ "our_cost_model": "gemini-3.5-flash-lite",
+ "our_prices_checked_on": "2026-11-02",
+ "k": 3,
+ "judge": true,
+ "chunk_stats": {
+  "mp1": {
+   "n_chunks": 47,
+   "avg_chars": 603.7,
+   "max_chars": 798,
+   "most_chunked_document": "CON-101"
+  },
+  "ctx": {
+   "n_chunks": 87,
+   "avg_chars": 385.6,
+   "max_chars": 775,
+   "most_chunked_document": "MTG-401"
+  }
+ },
+ "chunks_not_in_course_cache": {
+  "mp1": 0,
+  "ctx": 0
+ },
+ "retrieval": [
+  {
+   "side": "reference",
+   "embedding_model": "text-embedding-3-small",
+   "variant": "mp1",
+   "n_chunks": 47,
+   "hit_at_1": 9,
+   "hit_at_3": 9,
+   "evidence_phrases_complete": 9,
+   "all_required_found": [
+    1,
+    1
+   ],
+   "avg_prompt_tokens": 850.3,
+   "rows": [
+    {
+     "id": "M01",
+     "question": "Kto musi zatwierdzić rabat 15% dla dużej sieci handlowej?",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#002",
+      "POL-001#001",
+      "POL-001#000"
+     ],
+     "top_scores": [
+      0.5826,
+      0.5779,
+      0.5361
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 905
+    },
+    {
+     "id": "M02",
+     "question": "Jaką karę płaci Mleczna Dolina za lipiec i dlaczego?",
+     "relevant_docs": [
+      "CON-101",
+      "MTG-403"
+     ],
+     "requires_all": true,
+     "top_chunk_ids": [
+      "CON-101#000",
+      "CON-101#001",
+      "MTG-403#000"
+     ],
+     "top_scores": [
+      0.5945,
+      0.562,
+      0.5042
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": true,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 950
+    },
+    {
+     "id": "M03",
+     "question": "Co SUP-114 mówi o karach?",
+     "relevant_docs": [
+      "CON-101"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PRO-203#002",
+      "PRO-202#001",
+      "CON-102#000"
+     ],
+     "top_scores": [
+      0.3744,
+      0.3739,
+      0.372
+     ],
+     "hit_at_1": false,
+     "hit_at_3": false,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 0.0,
+     "prompt_tokens": 848
+    },
+    {
+     "id": "M04",
+     "question": "Kto może jeździć wózkiem widłowym w magazynie w Gdańsku?",
+     "relevant_docs": [
+      "PL-601"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PL-601#000",
+      "PRO-203#001",
+      "PRO-203#002"
+     ],
+     "top_scores": [
+      0.5597,
+      0.5168,
+      0.477
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 741
+    },
+    {
+     "id": "M05",
+     "question": "Kto zatwierdza spisanie w straty towaru o wartości powyżej 25 000 PLN?",
+     "relevant_docs": [
+      "PRO-202"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PRO-202#001",
+      "POL-005#000",
+      "POL-001#001"
+     ],
+     "top_scores": [
+      0.6114,
+      0.5432,
+      0.5412
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 980
+    },
+    {
+     "id": "M06",
+     "question": "Kto może uznać reklamację uszkodzonego towaru na kwotę powyżej 2000 PLN?",
+     "relevant_docs": [
+      "POL-003"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-003#000",
+      "POL-003#002",
+      "POL-003#001"
+     ],
+     "top_scores": [
+      0.6935,
+      0.6451,
+      0.6406
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 784
+    },
+    {
+     "id": "M07",
+     "question": "Kiedy nowa umowa dostawy wymaga formalnego przetargu?",
+     "relevant_docs": [
+      "POL-005"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-005#000",
+      "POL-005#001",
+      "CON-103#001"
+     ],
+     "top_scores": [
+      0.6631,
+      0.5362,
+      0.5313
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 801
+    },
+    {
+     "id": "M08",
+     "question": "Jaka jest minimalna marża przy rabatach i kto zatwierdza rabat, który by ją naru",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#001",
+      "POL-001#002",
+      "POL-001#000"
+     ],
+     "top_scores": [
+      0.6779,
+      0.618,
+      0.585
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 911
+    },
+    {
+     "id": "M09",
+     "question": "Dlaczego klienci przechodzą do firmy Hurtix?",
+     "relevant_docs": [
+      "MTG-402",
+      "REP-302"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "MTG-402#001",
+      "REP-302#002",
+      "REP-302#001"
+     ],
+     "top_scores": [
+      0.644,
+      0.5229,
+      0.5203
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 820
+    },
+    {
+     "id": "M10",
+     "question": "Co dostarcza nam dostawca SUP-207?",
+     "relevant_docs": [
+      "CON-102"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-102#000",
+      "PRO-201#002",
+      "PRO-201#000"
+     ],
+     "top_scores": [
+      0.5445,
+      0.4936,
+      0.4797
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 763
+    }
+   ],
+   "pg_consistent": null
+  },
+  {
+   "side": "reference",
+   "embedding_model": "text-embedding-3-small",
+   "variant": "ctx",
+   "n_chunks": 87,
+   "hit_at_1": 9,
+   "hit_at_3": 9,
+   "evidence_phrases_complete": 8,
+   "all_required_found": [
+    1,
+    1
+   ],
+   "avg_prompt_tokens": 610.4,
+   "rows": [
+    {
+     "id": "M01",
+     "question": "Kto musi zatwierdzić rabat 15% dla dużej sieci handlowej?",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#ctx002",
+      "POL-001#ctx004",
+      "POL-001#ctx005"
+     ],
+     "top_scores": [
+      0.6022,
+      0.6015,
+      0.5737
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 671
+    },
+    {
+     "id": "M02",
+     "question": "Jaką karę płaci Mleczna Dolina za lipiec i dlaczego?",
+     "relevant_docs": [
+      "CON-101",
+      "MTG-403"
+     ],
+     "requires_all": true,
+     "top_chunk_ids": [
+      "CON-101#ctx003",
+      "CON-101#ctx001",
+      "MTG-403#ctx003"
+     ],
+     "top_scores": [
+      0.6064,
+      0.6,
+      0.5912
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": true,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 636
+    },
+    {
+     "id": "M03",
+     "question": "Co SUP-114 mówi o karach?",
+     "relevant_docs": [
+      "CON-101"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-102#ctx004",
+      "CON-102#ctx002",
+      "CON-102#ctx001"
+     ],
+     "top_scores": [
+      0.4458,
+      0.4431,
+      0.4049
+     ],
+     "hit_at_1": false,
+     "hit_at_3": false,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 0.0,
+     "prompt_tokens": 557
+    },
+    {
+     "id": "M04",
+     "question": "Kto może jeździć wózkiem widłowym w magazynie w Gdańsku?",
+     "relevant_docs": [
+      "PL-601"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PL-601#ctx002",
+      "PL-601#ctx003",
+      "PL-601#ctx004"
+     ],
+     "top_scores": [
+      0.6129,
+      0.6117,
+      0.5619
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 446
+    },
+    {
+     "id": "M05",
+     "question": "Kto zatwierdza spisanie w straty towaru o wartości powyżej 25 000 PLN?",
+     "relevant_docs": [
+      "PRO-202"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PRO-202#ctx002",
+      "POL-004#ctx004",
+      "POL-005#ctx000"
+     ],
+     "top_scores": [
+      0.6517,
+      0.5517,
+      0.549
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 616
+    },
+    {
+     "id": "M06",
+     "question": "Kto może uznać reklamację uszkodzonego towaru na kwotę powyżej 2000 PLN?",
+     "relevant_docs": [
+      "POL-003"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-003#ctx002",
+      "POL-003#ctx000",
+      "POL-003#ctx001"
+     ],
+     "top_scores": [
+      0.7445,
+      0.6937,
+      0.6856
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 661
+    },
+    {
+     "id": "M07",
+     "question": "Kiedy nowa umowa dostawy wymaga formalnego przetargu?",
+     "relevant_docs": [
+      "POL-005"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-005#ctx000",
+      "MTG-401#ctx004",
+      "MTG-403#ctx003"
+     ],
+     "top_scores": [
+      0.7486,
+      0.5674,
+      0.5582
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 611
+    },
+    {
+     "id": "M08",
+     "question": "Jaka jest minimalna marża przy rabatach i kto zatwierdza rabat, który by ją naru",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#ctx003",
+      "POL-001#ctx004",
+      "POL-001#ctx002"
+     ],
+     "top_scores": [
+      0.7529,
+      0.6439,
+      0.6005
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 682
+    },
+    {
+     "id": "M09",
+     "question": "Dlaczego klienci przechodzą do firmy Hurtix?",
+     "relevant_docs": [
+      "MTG-402",
+      "REP-302"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "REP-302#ctx002",
+      "MTG-402#ctx002",
+      "REP-302#ctx004"
+     ],
+     "top_scores": [
+      0.6103,
+      0.5951,
+      0.5133
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 711
+    },
+    {
+     "id": "M10",
+     "question": "Co dostarcza nam dostawca SUP-207?",
+     "relevant_docs": [
+      "CON-102"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-102#ctx004",
+      "CON-102#ctx002",
+      "CON-102#ctx003"
+     ],
+     "top_scores": [
+      0.5859,
+      0.5646,
+      0.5572
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 0.0,
+     "prompt_tokens": 513
+    }
+   ],
+   "pg_consistent": null
+  },
+  {
+   "side": "reference",
+   "embedding_model": "text-embedding-3-small",
+   "variant": "hybrid",
+   "n_chunks": 87,
+   "hit_at_1": 9,
+   "hit_at_3": 10,
+   "evidence_phrases_complete": 10,
+   "all_required_found": [
+    1,
+    1
+   ],
+   "avg_prompt_tokens": 631.0,
+   "rows": [
+    {
+     "id": "M01",
+     "question": "Kto musi zatwierdzić rabat 15% dla dużej sieci handlowej?",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#ctx004",
+      "POL-001#ctx002",
+      "POL-001#ctx000"
+     ],
+     "top_scores": [
+      0.0163,
+      0.016,
+      0.0159
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 684
+    },
+    {
+     "id": "M02",
+     "question": "Jaką karę płaci Mleczna Dolina za lipiec i dlaczego?",
+     "relevant_docs": [
+      "CON-101",
+      "MTG-403"
+     ],
+     "requires_all": true,
+     "top_chunk_ids": [
+      "MTG-403#ctx003",
+      "CON-101#ctx003",
+      "CON-101#ctx000"
+     ],
+     "top_scores": [
+      0.0161,
+      0.016,
+      0.0158
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": true,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 693
+    },
+    {
+     "id": "M03",
+     "question": "Co SUP-114 mówi o karach?",
+     "relevant_docs": [
+      "CON-101"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-101#ctx002",
+      "CON-101#ctx003",
+      "CON-101#ctx000"
+     ],
+     "top_scores": [
+      0.0154,
+      0.0149,
+      0.0082
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 673
+    },
+    {
+     "id": "M04",
+     "question": "Kto może jeździć wózkiem widłowym w magazynie w Gdańsku?",
+     "relevant_docs": [
+      "PL-601"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-103#ctx000",
+      "PL-601#ctx002",
+      "POL-003#ctx004"
+     ],
+     "top_scores": [
+      0.0143,
+      0.0082,
+      0.0082
+     ],
+     "hit_at_1": false,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 518
+    },
+    {
+     "id": "M05",
+     "question": "Kto zatwierdza spisanie w straty towaru o wartości powyżej 25 000 PLN?",
+     "relevant_docs": [
+      "PRO-202"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PRO-202#ctx002",
+      "POL-005#ctx000",
+      "POL-004#ctx004"
+     ],
+     "top_scores": [
+      0.0164,
+      0.016,
+      0.0159
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 616
+    },
+    {
+     "id": "M06",
+     "question": "Kto może uznać reklamację uszkodzonego towaru na kwotę powyżej 2000 PLN?",
+     "relevant_docs": [
+      "POL-003"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-003#ctx002",
+      "POL-003#ctx000",
+      "POL-003#ctx004"
+     ],
+     "top_scores": [
+      0.0164,
+      0.0156,
+      0.015
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 662
+    },
+    {
+     "id": "M07",
+     "question": "Kiedy nowa umowa dostawy wymaga formalnego przetargu?",
+     "relevant_docs": [
+      "POL-005"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-005#ctx000",
+      "PRO-201#ctx004",
+      "CON-103#ctx004"
+     ],
+     "top_scores": [
+      0.0164,
+      0.0152,
+      0.0152
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 534
+    },
+    {
+     "id": "M08",
+     "question": "Jaka jest minimalna marża przy rabatach i kto zatwierdza rabat, który by ją naru",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#ctx003",
+      "POL-001#ctx002",
+      "POL-001#ctx004"
+     ],
+     "top_scores": [
+      0.0164,
+      0.016,
+      0.0159
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 682
+    },
+    {
+     "id": "M09",
+     "question": "Dlaczego klienci przechodzą do firmy Hurtix?",
+     "relevant_docs": [
+      "MTG-402",
+      "REP-302"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "MTG-402#ctx002",
+      "REP-302#ctx002",
+      "POL-002#ctx001"
+     ],
+     "top_scores": [
+      0.0163,
+      0.0163,
+      0.0155
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 707
+    },
+    {
+     "id": "M10",
+     "question": "Co dostarcza nam dostawca SUP-207?",
+     "relevant_docs": [
+      "CON-102"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-102#ctx002",
+      "CON-102#ctx000",
+      "CON-102#ctx003"
+     ],
+     "top_scores": [
+      0.0163,
+      0.0159,
+      0.0159
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 541
+    }
+   ],
+   "pg_consistent": null
+  },
+  {
+   "side": "ours",
+   "embedding_model": "intfloat/multilingual-e5-large",
+   "variant": "mp1",
+   "n_chunks": 47,
+   "hit_at_1": 9,
+   "hit_at_3": 10,
+   "evidence_phrases_complete": 9,
+   "all_required_found": [
+    1,
+    1
+   ],
+   "avg_prompt_tokens": 874.6,
+   "rows": [
+    {
+     "id": "M01",
+     "question": "Kto musi zatwierdzić rabat 15% dla dużej sieci handlowej?",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#002",
+      "POL-001#001",
+      "MTG-402#001"
+     ],
+     "top_scores": [
+      0.8637,
+      0.853,
+      0.829
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 930
+    },
+    {
+     "id": "M02",
+     "question": "Jaką karę płaci Mleczna Dolina za lipiec i dlaczego?",
+     "relevant_docs": [
+      "CON-101",
+      "MTG-403"
+     ],
+     "requires_all": true,
+     "top_chunk_ids": [
+      "MTG-403#000",
+      "CON-101#001",
+      "MTG-403#002"
+     ],
+     "top_scores": [
+      0.8359,
+      0.8321,
+      0.8315
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": true,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 817
+    },
+    {
+     "id": "M03",
+     "question": "Co SUP-114 mówi o karach?",
+     "relevant_docs": [
+      "CON-101"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "MTG-403#001",
+      "CON-101#000",
+      "CON-102#000"
+     ],
+     "top_scores": [
+      0.8084,
+      0.8057,
+      0.7929
+     ],
+     "hit_at_1": false,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 0.0,
+     "prompt_tokens": 879
+    },
+    {
+     "id": "M04",
+     "question": "Kto może jeździć wózkiem widłowym w magazynie w Gdańsku?",
+     "relevant_docs": [
+      "PL-601"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PL-601#000",
+      "REP-301#001",
+      "PL-601#001"
+     ],
+     "top_scores": [
+      0.8362,
+      0.8053,
+      0.8038
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 784
+    },
+    {
+     "id": "M05",
+     "question": "Kto zatwierdza spisanie w straty towaru o wartości powyżej 25 000 PLN?",
+     "relevant_docs": [
+      "PRO-202"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PRO-202#001",
+      "POL-003#001",
+      "POL-001#002"
+     ],
+     "top_scores": [
+      0.8754,
+      0.8262,
+      0.8136
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 881
+    },
+    {
+     "id": "M06",
+     "question": "Kto może uznać reklamację uszkodzonego towaru na kwotę powyżej 2000 PLN?",
+     "relevant_docs": [
+      "POL-003"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-003#001",
+      "POL-003#000",
+      "PRO-202#001"
+     ],
+     "top_scores": [
+      0.8607,
+      0.8508,
+      0.8443
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 851
+    },
+    {
+     "id": "M07",
+     "question": "Kiedy nowa umowa dostawy wymaga formalnego przetargu?",
+     "relevant_docs": [
+      "POL-005"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-005#000",
+      "POL-005#001",
+      "CON-102#001"
+     ],
+     "top_scores": [
+      0.8625,
+      0.8218,
+      0.8145
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 900
+    },
+    {
+     "id": "M08",
+     "question": "Jaka jest minimalna marża przy rabatach i kto zatwierdza rabat, który by ją naru",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#002",
+      "POL-001#001",
+      "POL-001#000"
+     ],
+     "top_scores": [
+      0.8799,
+      0.8691,
+      0.8459
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 911
+    },
+    {
+     "id": "M09",
+     "question": "Dlaczego klienci przechodzą do firmy Hurtix?",
+     "relevant_docs": [
+      "MTG-402",
+      "REP-302"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "REP-302#001",
+      "MTG-402#001",
+      "REP-302#000"
+     ],
+     "top_scores": [
+      0.8516,
+      0.8351,
+      0.8142
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 881
+    },
+    {
+     "id": "M10",
+     "question": "Co dostarcza nam dostawca SUP-207?",
+     "relevant_docs": [
+      "CON-102"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-102#000",
+      "CON-101#000",
+      "CON-102#001"
+     ],
+     "top_scores": [
+      0.8419,
+      0.8398,
+      0.8092
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 912
+    }
+   ],
+   "pg_consistent": null
+  },
+  {
+   "side": "ours",
+   "embedding_model": "intfloat/multilingual-e5-large",
+   "variant": "ctx",
+   "n_chunks": 87,
+   "hit_at_1": 10,
+   "hit_at_3": 10,
+   "evidence_phrases_complete": 9,
+   "all_required_found": [
+    1,
+    1
+   ],
+   "avg_prompt_tokens": 649.3,
+   "rows": [
+    {
+     "id": "M01",
+     "question": "Kto musi zatwierdzić rabat 15% dla dużej sieci handlowej?",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#ctx004",
+      "POL-001#ctx002",
+      "MTG-402#ctx003"
+     ],
+     "top_scores": [
+      0.8606,
+      0.8564,
+      0.8457
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 725
+    },
+    {
+     "id": "M02",
+     "question": "Jaką karę płaci Mleczna Dolina za lipiec i dlaczego?",
+     "relevant_docs": [
+      "CON-101",
+      "MTG-403"
+     ],
+     "requires_all": true,
+     "top_chunk_ids": [
+      "MTG-403#ctx003",
+      "CON-101#ctx003",
+      "MTG-401#ctx004"
+     ],
+     "top_scores": [
+      0.8637,
+      0.8504,
+      0.8428
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": true,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 615
+    },
+    {
+     "id": "M03",
+     "question": "Co SUP-114 mówi o karach?",
+     "relevant_docs": [
+      "CON-101"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-101#ctx003",
+      "CON-101#ctx000",
+      "MTG-403#ctx003"
+     ],
+     "top_scores": [
+      0.822,
+      0.8067,
+      0.806
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 684
+    },
+    {
+     "id": "M04",
+     "question": "Kto może jeździć wózkiem widłowym w magazynie w Gdańsku?",
+     "relevant_docs": [
+      "PL-601"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PL-601#ctx004",
+      "PL-601#ctx003",
+      "MTG-401#ctx003"
+     ],
+     "top_scores": [
+      0.8369,
+      0.8315,
+      0.8232
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 0.0,
+     "prompt_tokens": 489
+    },
+    {
+     "id": "M05",
+     "question": "Kto zatwierdza spisanie w straty towaru o wartości powyżej 25 000 PLN?",
+     "relevant_docs": [
+      "PRO-202"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PRO-202#ctx002",
+      "PRO-202#ctx001",
+      "POL-004#ctx004"
+     ],
+     "top_scores": [
+      0.8931,
+      0.8357,
+      0.8206
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 621
+    },
+    {
+     "id": "M06",
+     "question": "Kto może uznać reklamację uszkodzonego towaru na kwotę powyżej 2000 PLN?",
+     "relevant_docs": [
+      "POL-003"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-003#ctx002",
+      "POL-003#ctx000",
+      "PRO-202#ctx001"
+     ],
+     "top_scores": [
+      0.8732,
+      0.8557,
+      0.8367
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 682
+    },
+    {
+     "id": "M07",
+     "question": "Kiedy nowa umowa dostawy wymaga formalnego przetargu?",
+     "relevant_docs": [
+      "POL-005"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-005#ctx000",
+      "POL-005#ctx002",
+      "PRO-201#ctx004"
+     ],
+     "top_scores": [
+      0.9009,
+      0.8267,
+      0.8195
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 575
+    },
+    {
+     "id": "M08",
+     "question": "Jaka jest minimalna marża przy rabatach i kto zatwierdza rabat, który by ją naru",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#ctx003",
+      "POL-001#ctx004",
+      "POL-001#ctx002"
+     ],
+     "top_scores": [
+      0.8833,
+      0.8781,
+      0.8521
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 682
+    },
+    {
+     "id": "M09",
+     "question": "Dlaczego klienci przechodzą do firmy Hurtix?",
+     "relevant_docs": [
+      "MTG-402",
+      "REP-302"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "REP-302#ctx002",
+      "MTG-402#ctx002",
+      "REP-301#ctx000"
+     ],
+     "top_scores": [
+      0.8634,
+      0.8301,
+      0.7966
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 813
+    },
+    {
+     "id": "M10",
+     "question": "Co dostarcza nam dostawca SUP-207?",
+     "relevant_docs": [
+      "CON-102"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-102#ctx000",
+      "CON-102#ctx002",
+      "CON-101#ctx000"
+     ],
+     "top_scores": [
+      0.8556,
+      0.838,
+      0.837
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 607
+    }
+   ],
+   "pg_consistent": null
+  },
+  {
+   "side": "ours",
+   "embedding_model": "intfloat/multilingual-e5-large",
+   "variant": "hybrid",
+   "n_chunks": 87,
+   "hit_at_1": 9,
+   "hit_at_3": 10,
+   "evidence_phrases_complete": 9,
+   "all_required_found": [
+    1,
+    1
+   ],
+   "avg_prompt_tokens": 638.5,
+   "rows": [
+    {
+     "id": "M01",
+     "question": "Kto musi zatwierdzić rabat 15% dla dużej sieci handlowej?",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#ctx004",
+      "POL-001#ctx002",
+      "POL-001#ctx000"
+     ],
+     "top_scores": [
+      0.0164,
+      0.0159,
+      0.0154
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 684
+    },
+    {
+     "id": "M02",
+     "question": "Jaką karę płaci Mleczna Dolina za lipiec i dlaczego?",
+     "relevant_docs": [
+      "CON-101",
+      "MTG-403"
+     ],
+     "requires_all": true,
+     "top_chunk_ids": [
+      "MTG-403#ctx003",
+      "CON-101#ctx003",
+      "MTG-403#ctx001"
+     ],
+     "top_scores": [
+      0.0164,
+      0.0159,
+      0.0157
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": true,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 730
+    },
+    {
+     "id": "M03",
+     "question": "Co SUP-114 mówi o karach?",
+     "relevant_docs": [
+      "CON-101"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-101#ctx000",
+      "CON-101#ctx003",
+      "CON-101#ctx001"
+     ],
+     "top_scores": [
+      0.0163,
+      0.0154,
+      0.0152
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 633
+    },
+    {
+     "id": "M04",
+     "question": "Kto może jeździć wózkiem widłowym w magazynie w Gdańsku?",
+     "relevant_docs": [
+      "PL-601"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-103#ctx000",
+      "PL-601#ctx004",
+      "POL-003#ctx004"
+     ],
+     "top_scores": [
+      0.0148,
+      0.0082,
+      0.0082
+     ],
+     "hit_at_1": false,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 0.0,
+     "prompt_tokens": 495
+    },
+    {
+     "id": "M05",
+     "question": "Kto zatwierdza spisanie w straty towaru o wartości powyżej 25 000 PLN?",
+     "relevant_docs": [
+      "PRO-202"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "PRO-202#ctx002",
+      "POL-004#ctx004",
+      "POL-001#ctx002"
+     ],
+     "top_scores": [
+      0.0164,
+      0.0157,
+      0.0152
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 683
+    },
+    {
+     "id": "M06",
+     "question": "Kto może uznać reklamację uszkodzonego towaru na kwotę powyżej 2000 PLN?",
+     "relevant_docs": [
+      "POL-003"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-003#ctx002",
+      "POL-003#ctx000",
+      "PRO-202#ctx002"
+     ],
+     "top_scores": [
+      0.0164,
+      0.0156,
+      0.0154
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 734
+    },
+    {
+     "id": "M07",
+     "question": "Kiedy nowa umowa dostawy wymaga formalnego przetargu?",
+     "relevant_docs": [
+      "POL-005"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-005#ctx000",
+      "PRO-201#ctx004",
+      "CON-102#ctx004"
+     ],
+     "top_scores": [
+      0.0164,
+      0.0153,
+      0.0081
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 546
+    },
+    {
+     "id": "M08",
+     "question": "Jaka jest minimalna marża przy rabatach i kto zatwierdza rabat, który by ją naru",
+     "relevant_docs": [
+      "POL-001"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "POL-001#ctx003",
+      "POL-001#ctx002",
+      "POL-001#ctx004"
+     ],
+     "top_scores": [
+      0.0164,
+      0.016,
+      0.0159
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 682
+    },
+    {
+     "id": "M09",
+     "question": "Dlaczego klienci przechodzą do firmy Hurtix?",
+     "relevant_docs": [
+      "MTG-402",
+      "REP-302"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "MTG-402#ctx002",
+      "REP-302#ctx002",
+      "REP-302#ctx001"
+     ],
+     "top_scores": [
+      0.0163,
+      0.0163,
+      0.0146
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 657
+    },
+    {
+     "id": "M10",
+     "question": "Co dostarcza nam dostawca SUP-207?",
+     "relevant_docs": [
+      "CON-102"
+     ],
+     "requires_all": false,
+     "top_chunk_ids": [
+      "CON-102#ctx000",
+      "CON-102#ctx002",
+      "CON-102#ctx003"
+     ],
+     "top_scores": [
+      0.0163,
+      0.0163,
+      0.0155
+     ],
+     "hit_at_1": true,
+     "hit_at_3": true,
+     "all_required_found": null,
+     "evidence_phrase_coverage": 1.0,
+     "prompt_tokens": 541
+    }
+   ],
+   "pg_consistent": null
+  }
+ ],
+ "llm": [
+  {
+   "side": "ours",
+   "variant": "ctx",
+   "summary": {
+    "questions": 12,
+    "errors": 0,
+    "judge_errors": 0,
+    "retrieval_hit": [
+     10,
+     10
+    ],
+    "evidence_phrases_complete": [
+     9,
+     10
+    ],
+    "answered": [
+     9,
+     10
+    ],
+    "key_facts_complete": [
+     9,
+     9
+    ],
+    "judge_correct": [
+     9,
+     9
+    ],
+    "judge_grounded": [
+     9,
+     9
+    ],
+    "citations_valid": [
+     9,
+     9
+    ],
+    "cites_relevant": [
+     9,
+     9
+    ],
+    "refusals_correct": [
+     2,
+     2
+    ],
+    "refusals_on_answerable": {
+     "phrases_missing": 1,
+     "phrases_present": 0
+    }
+   },
+   "rows": [
+    {
+     "id": "M01",
+     "question": "Kto musi zatwierdzić rabat 15% dla dużej sieci handlowej?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Rabat w wysokości 15% (powyżej 12% do 20% włącznie) musi zatwierdzić dyrektor ha",
+     "citations": [
+      "POL-001"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": null,
+     "record": null
+    },
+    {
+     "id": "M02",
+     "question": "Jaką karę płaci Mleczna Dolina za lipiec i dlaczego?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Za lipiec Mleczna Dolina płaci karę umowną w wysokości 4% wartości faktury. Kara",
+     "citations": [
+      "MTG-403",
+      "CON-101"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": {
+      "correct": true,
+      "grounded": true,
+      "reason": "Odpowiedź poprawnie podaje wysokość kary oraz powód wynikający z kontekstu i zga",
+      "error": null,
+      "judged_by": "gemini-3.5-flash-lite",
+      "usage": {
+       "input_tokens": 888,
+       "output_tokens": 55,
+       "reasoning_tokens": null
+      },
+      "seconds": 0.0016204999992623925
+     },
+     "record": null
+    },
+    {
+     "id": "M03",
+     "question": "Co SUP-114 mówi o karach?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": null,
+     "citations": [
+      "CON-101"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": {
+      "correct": true,
+      "grounded": true,
+      "reason": "Odpowiedź poprawnie przedstawia zasady dotyczące kar umownych zawarte w kontekśc",
+      "error": null,
+      "judged_by": "gemini-3.5-flash-lite",
+      "usage": {
+       "input_tokens": 1019,
+       "output_tokens": 51,
+       "reasoning_tokens": null
+      },
+      "seconds": 0.0018668339471332729
+     },
+     "record": null
+    },
+    {
+     "id": "M04",
+     "question": "Kto może jeździć wózkiem widłowym w magazynie w Gdańsku?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Dostarczone dokumenty nie zawierają informacji na temat tego, kto może jeździć w",
+     "citations": [],
+     "error": null,
+     "score": {
+      "outcome": "refused",
+      "evidence_phrase_coverage": 0.0,
+      "answer_coverage": null,
+      "citations_present": null,
+      "citations_valid": null,
+      "cites_relevant": null,
+      "refusal": "phrases_missing"
+     },
+     "verdict": {
+      "correct": null,
+      "grounded": null,
+      "reason": null,
+      "error": null,
+      "judged_by": null,
+      "usage": null,
+      "seconds": null
+     },
+     "record": null
+    },
+    {
+     "id": "M05",
+     "question": "Kto zatwierdza spisanie w straty towaru o wartości powyżej 25 000 PLN?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Spisanie w straty towaru o wartości powyżej 25 000 PLN zatwierdza CFO.",
+     "citations": [
+      "PRO-202"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": null,
+     "record": null
+    },
+    {
+     "id": "M06",
+     "question": "Kto może uznać reklamację uszkodzonego towaru na kwotę powyżej 2000 PLN?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Reklamacje powyżej 2000 PLN wymagają zgody kierownika działu obsługi klienta.",
+     "citations": [
+      "POL-003"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": null,
+     "record": null
+    },
+    {
+     "id": "M07",
+     "question": "Kiedy nowa umowa dostawy wymaga formalnego przetargu?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Nowa umowa dostawy o przewidywanej wartości rocznej powyżej 500 000 PLN wymaga f",
+     "citations": [
+      "POL-005"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": {
+      "correct": true,
+      "grounded": true,
+      "reason": "Odpowiedź podaje kluczowe fakty z odpowiedzi wzorcowej i jest w pełni poparta ko",
+      "error": null,
+      "judged_by": "gemini-3.5-flash-lite",
+      "usage": {
+       "input_tokens": 767,
+       "output_tokens": 48,
+       "reasoning_tokens": null
+      },
+      "seconds": 0.0016354579711332917
+     },
+     "record": null
+    },
+    {
+     "id": "M08",
+     "question": "Jaka jest minimalna marża przy rabatach i kto zatwierdza rabat, który by ją naru",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Minimalna marża brutto pozycji zamówienia wynosi 9%. Rabat, który naruszałby tę ",
+     "citations": [
+      "POL-001"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": {
+      "correct": true,
+      "grounded": true,
+      "reason": "Odpowiedź poprawnie podaje minimalną marżę oraz osobę zatwierdzającą rabat zgodn",
+      "error": null,
+      "judged_by": "gemini-3.5-flash-lite",
+      "usage": {
+       "input_tokens": 889,
+       "output_tokens": 55,
+       "reasoning_tokens": null
+      },
+      "seconds": 0.0013764590257778764
+     },
+     "record": null
+    },
+    {
+     "id": "M09",
+     "question": "Dlaczego klienci przechodzą do firmy Hurtix?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Klienci przechodzą do firmy Hurtix głównie z powodu lepszych cen oferowanych prz",
+     "citations": [
+      "REP-302"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": {
+      "correct": true,
+      "grounded": true,
+      "reason": "Odpowiedź poprawnie wskazuje lepsze ceny w firmie Hurtix jako przyczynę odejść k",
+      "error": null,
+      "judged_by": "gemini-3.5-flash-lite",
+      "usage": {
+       "input_tokens": 1083,
+       "output_tokens": 63,
+       "reasoning_tokens": null
+      },
+      "seconds": 0.0014022919931448996
+     },
+     "record": null
+    },
+    {
+     "id": "M10",
+     "question": "Co dostarcza nam dostawca SUP-207?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Dostawca SUP-207 (Aqua Kryształ S.A.) dostarcza butelkowaną wodę mineralną i źró",
+     "citations": [
+      "CON-102"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": {
+      "correct": true,
+      "grounded": true,
+      "reason": "Odpowiedź poprawnie podaje fakty z odpowiedzi wzorcowej i są one w pełni oparte ",
+      "error": null,
+      "judged_by": "gemini-3.5-flash-lite",
+      "usage": {
+       "input_tokens": 824,
+       "output_tokens": 53,
+       "reasoning_tokens": null
+      },
+      "seconds": 0.0013717920519411564
+     },
+     "record": null
+    },
+    {
+     "id": "M11",
+     "question": "Ile zarabia nasz CEO?",
+     "answerable": false,
+     "retrieval_hit": false,
+     "answer": "Przedstawione dokumenty nie zawierają informacji o tym, ile zarabia nasz CEO.",
+     "citations": [],
+     "error": null,
+     "score": {
+      "outcome": "refused",
+      "evidence_phrase_coverage": null,
+      "answer_coverage": null,
+      "citations_present": null,
+      "citations_valid": null,
+      "cites_relevant": null,
+      "refusal": "correct"
+     },
+     "verdict": {
+      "correct": null,
+      "grounded": null,
+      "reason": null,
+      "error": null,
+      "judged_by": null,
+      "usage": null,
+      "seconds": null
+     },
+     "record": null
+    },
+    {
+     "id": "M12",
+     "question": "Kiedy otworzymy nowy magazyn w Krakowie?",
+     "answerable": false,
+     "retrieval_hit": false,
+     "answer": "Przekazane dokumenty nie zawierają informacji na temat otwarcia nowego magazynu ",
+     "citations": [],
+     "error": null,
+     "score": {
+      "outcome": "refused",
+      "evidence_phrase_coverage": null,
+      "answer_coverage": null,
+      "citations_present": null,
+      "citations_valid": null,
+      "cites_relevant": null,
+      "refusal": "correct"
+     },
+     "verdict": {
+      "correct": null,
+      "grounded": null,
+      "reason": null,
+      "error": null,
+      "judged_by": null,
+      "usage": null,
+      "seconds": null
+     },
+     "record": null
+    }
+   ],
+   "calls": {
+    "answer": 0,
+    "judge": 0,
+    "from_cache": 21,
+    "errors": 0
+   },
+   "answered_by": {
+    "gemini-3.5-flash-lite": 12
+   },
+   "judged_by": {
+    "gemini-3.5-flash-lite": 9
+   },
+   "avg_usage": {
+    "input_tokens": 635,
+    "output_tokens": 71,
+    "reasoning_tokens": null
+   },
+   "meets_target": {
+    "retrieval_hit": true,
+    "evidence_phrases_complete": true,
+    "answered": true,
+    "key_facts_complete": true,
+    "judge_correct": true,
+    "judge_grounded": true,
+    "citations_valid": true,
+    "cites_relevant": true,
+    "refusals_correct": true
+   },
+   "from_cache": [
+    "M01",
+    "M02",
+    "M03",
+    "M04",
+    "M05",
+    "M06",
+    "M07",
+    "M08",
+    "M09",
+    "M10",
+    "M11",
+    "M12"
+   ]
+  },
+  {
+   "side": "ours",
+   "variant": "hybrid",
+   "summary": {
+    "questions": 12,
+    "errors": 0,
+    "judge_errors": 0,
+    "retrieval_hit": [
+     10,
+     10
+    ],
+    "evidence_phrases_complete": [
+     9,
+     10
+    ],
+    "answered": [
+     9,
+     10
+    ],
+    "key_facts_complete": [
+     9,
+     9
+    ],
+    "judge_correct": [
+     9,
+     9
+    ],
+    "judge_grounded": [
+     9,
+     9
+    ],
+    "citations_valid": [
+     9,
+     9
+    ],
+    "cites_relevant": [
+     9,
+     9
+    ],
+    "refusals_correct": [
+     2,
+     2
+    ],
+    "refusals_on_answerable": {
+     "phrases_missing": 1,
+     "phrases_present": 0
+    }
+   },
+   "rows": [
+    {
+     "id": "M01",
+     "question": "Kto musi zatwierdzić rabat 15% dla dużej sieci handlowej?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Rabat w wysokości 15% (powyżej 5% do 12% włącznie to próg regionalnego kierownik",
+     "citations": [
+      "POL-001"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": {
+      "correct": true,
+      "grounded": true,
+      "reason": "Odpowiedź poprawnie wskazuje dyrektora handlowego jako osobę uprawnioną do zatwi",
+      "error": null,
+      "judged_by": "gemini-3.5-flash-lite",
+      "usage": {
+       "input_tokens": 908,
+       "output_tokens": 70,
+       "reasoning_tokens": null
+      },
+      "seconds": 0.0013871669652871788
+     },
+     "record": null
+    },
+    {
+     "id": "M02",
+     "question": "Jaką karę płaci Mleczna Dolina za lipiec i dlaczego?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Za lipiec Mleczna Dolina płaci karę umowną w wysokości 4% wartości faktury, poni",
+     "citations": [
+      "MTG-403",
+      "CON-101"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": {
+      "correct": true,
+      "grounded": true,
+      "reason": "Odpowiedź poprawnie podaje wysokość kary za lipiec oraz powód wynikający z odpow",
+      "error": null,
+      "judged_by": "gemini-3.5-flash-lite",
+      "usage": {
+       "input_tokens": 993,
+       "output_tokens": 52,
+       "reasoning_tokens": null
+      },
+      "seconds": 0.0013813750119879842
+     },
+     "record": null
+    },
+    {
+     "id": "M03",
+     "question": "Co SUP-114 mówi o karach?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Jeśli miesięczny wskaźnik OTIF spadnie poniżej 97%, Mleczna Dolina przyznaje Kov",
+     "citations": [
+      "CON-101"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": {
+      "correct": true,
+      "grounded": true,
+      "reason": "Odpowiedź poprawnie przedstawia zasady dotyczące kar umownych zawarte w kontekśc",
+      "error": null,
+      "judged_by": "gemini-3.5-flash-lite",
+      "usage": {
+       "input_tokens": 953,
+       "output_tokens": 55,
+       "reasoning_tokens": null
+      },
+      "seconds": 0.0013633750495500863
+     },
+     "record": null
+    },
+    {
+     "id": "M04",
+     "question": "Kto może jeździć wózkiem widłowym w magazynie w Gdańsku?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Dokumenty kontekstu nie zawierają informacji o tym, kto może jeździć wózkiem wid",
+     "citations": [],
+     "error": null,
+     "score": {
+      "outcome": "refused",
+      "evidence_phrase_coverage": 0.0,
+      "answer_coverage": null,
+      "citations_present": null,
+      "citations_valid": null,
+      "cites_relevant": null,
+      "refusal": "phrases_missing"
+     },
+     "verdict": {
+      "correct": null,
+      "grounded": null,
+      "reason": null,
+      "error": null,
+      "judged_by": null,
+      "usage": null,
+      "seconds": null
+     },
+     "record": null
+    },
+    {
+     "id": "M05",
+     "question": "Kto zatwierdza spisanie w straty towaru o wartości powyżej 25 000 PLN?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Spisanie w straty towaru o wartości powyżej 25 000 PLN zatwierdza CFO.",
+     "citations": [
+      "PRO-202"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": null,
+     "record": null
+    },
+    {
+     "id": "M06",
+     "question": "Kto może uznać reklamację uszkodzonego towaru na kwotę powyżej 2000 PLN?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Reklamacje powyżej 2000 PLN wymagają zgody kierownika działu obsługi klienta.",
+     "citations": [
+      "POL-003"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": null,
+     "record": null
+    },
+    {
+     "id": "M07",
+     "question": "Kiedy nowa umowa dostawy wymaga formalnego przetargu?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Nowa umowa dostawy o przewidywanej wartości powyżej 500 000,00 PLN rocznie wymag",
+     "citations": [
+      "POL-005"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": null,
+     "record": null
+    },
+    {
+     "id": "M08",
+     "question": "Jaka jest minimalna marża przy rabatach i kto zatwierdza rabat, który by ją naru",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Minimalna marża brutto pozycji zamówienia wynosi 9%. Rabat, który naruszałby tę ",
+     "citations": [
+      "POL-001"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": null,
+     "record": null
+    },
+    {
+     "id": "M09",
+     "question": "Dlaczego klienci przechodzą do firmy Hurtix?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Klienci przechodzą do firmy Hurtix głównie z powodu lepszych cen oferowanych prz",
+     "citations": [
+      "REP-302"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": null,
+     "record": null
+    },
+    {
+     "id": "M10",
+     "question": "Co dostarcza nam dostawca SUP-207?",
+     "answerable": true,
+     "retrieval_hit": true,
+     "answer": "Dostawca SUP-207 (Aqua Kryształ S.A.) dostarcza butelkowaną wodę mineralną i źró",
+     "citations": [
+      "CON-102"
+     ],
+     "error": null,
+     "score": {
+      "outcome": "answered",
+      "evidence_phrase_coverage": 1.0,
+      "answer_coverage": 1.0,
+      "citations_present": true,
+      "citations_valid": true,
+      "cites_relevant": true,
+      "refusal": null
+     },
+     "verdict": {
+      "correct": true,
+      "grounded": true,
+      "reason": "Odpowiedź poprawnie podaje fakty z odpowiedzi wzorcowej i jest w pełni oparta na",
+      "error": null,
+      "judged_by": "gemini-3.5-flash-lite",
+      "usage": {
+       "input_tokens": 752,
+       "output_tokens": 52,
+       "reasoning_tokens": null
+      },
+      "seconds": 0.0013704579905606806
+     },
+     "record": null
+    },
+    {
+     "id": "M11",
+     "question": "Ile zarabia nasz CEO?",
+     "answerable": false,
+     "retrieval_hit": false,
+     "answer": "Przedstawione dokumenty nie zawierają informacji o zarobkach CEO.",
+     "citations": [],
+     "error": null,
+     "score": {
+      "outcome": "refused",
+      "evidence_phrase_coverage": null,
+      "answer_coverage": null,
+      "citations_present": null,
+      "citations_valid": null,
+      "cites_relevant": null,
+      "refusal": "correct"
+     },
+     "verdict": {
+      "correct": null,
+      "grounded": null,
+      "reason": null,
+      "error": null,
+      "judged_by": null,
+      "usage": null,
+      "seconds": null
+     },
+     "record": null
+    },
+    {
+     "id": "M12",
+     "question": "Kiedy otworzymy nowy magazyn w Krakowie?",
+     "answerable": false,
+     "retrieval_hit": false,
+     "answer": "Przepraszam, ale dostarczone dokumenty nie zawierają informacji na temat tego, k",
+     "citations": [],
+     "error": null,
+     "score": {
+      "outcome": "refused",
+      "evidence_phrase_coverage": null,
+      "answer_coverage": null,
+      "citations_present": null,
+      "citations_valid": null,
+      "cites_relevant": null,
+      "refusal": "correct"
+     },
+     "verdict": {
+      "correct": null,
+      "grounded": null,
+      "reason": null,
+      "error": null,
+      "judged_by": null,
+      "usage": null,
+      "seconds": null
+     },
+     "record": null
+    }
+   ],
+   "calls": {
+    "answer": 0,
+    "judge": 0,
+    "from_cache": 21,
+    "errors": 0
+   },
+   "answered_by": {
+    "gemini-3.5-flash-lite": 12
+   },
+   "judged_by": {
+    "gemini-3.5-flash-lite": 9
+   },
+   "avg_usage": {
+    "input_tokens": 626,
+    "output_tokens": 77,
+    "reasoning_tokens": null
+   },
+   "meets_target": {
+    "retrieval_hit": true,
+    "evidence_phrases_complete": true,
+    "answered": true,
+    "key_facts_complete": true,
+    "judge_correct": true,
+    "judge_grounded": true,
+    "citations_valid": true,
+    "cites_relevant": true,
+    "refusals_correct": true
+   },
+   "from_cache": [
+    "M01",
+    "M02",
+    "M03",
+    "M04",
+    "M05",
+    "M06",
+    "M07",
+    "M08",
+    "M09",
+    "M10",
+    "M11",
+    "M12"
+   ]
+  }
+ ],
+ "llm_side": "ours",
+ "llm_calls_planned": 48,
+ "cache": {
+  "hits": 42,
+  "misses": 0
+ },
+ "costs": [
+  {
+   "variant": "mp1",
+   "avg_prompt_tokens": 874.6,
+   "reference_monthly_usd": 18.74,
+   "ours_monthly_usd": 9.55,
+   "ours_actual_monthly_usd": null
+  },
+  {
+   "variant": "ctx",
+   "avg_prompt_tokens": 649.3,
+   "reference_monthly_usd": 17.32,
+   "ours_monthly_usd": 8.99,
+   "ours_actual_monthly_usd": 3.09
+  },
+  {
+   "variant": "hybrid",
+   "avg_prompt_tokens": 638.5,
+   "reference_monthly_usd": 17.25,
+   "ours_monthly_usd": 8.96,
+   "ours_actual_monthly_usd": 3.19
+  }
+ ],
+ "recommended_mode": "vector",
+ "configured_mode": "vector"
+}

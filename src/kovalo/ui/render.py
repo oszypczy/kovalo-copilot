@@ -2,22 +2,36 @@
 
 UI nie formatuje logiki biznesowej: opis wniosku (`summary`), pytania i odpowiedzi przychodzą
 z api. Tu tylko układ wiadomości, przyciski pauzy i etykiety statusów po polsku.
+F6: koszt tury i suma rozmowy w panelu bocznym „Koszt tury” (kontrakt F6, 6.4): kwoty liczy
+api, UI je sumuje i formatuje (bez cen i bez kovalo.cost).
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from decimal import ROUND_HALF_UP, Decimal
 
-from kovalo.ui.client import ApiCallError, PendingView, ToolEventView, TurnView, pause_ref
+from kovalo.text_pl import number
+from kovalo.ui.client import (
+    ApiCallError,
+    PendingView,
+    ToolEventView,
+    TurnView,
+    UsageView,
+    pause_ref,
+)
 
 __all__ = [
     "ACTION_LABELS",
     "CLARIFY_HINT",
+    "COST_STEP",
     "EVIDENCE_LINK",
     "EVIDENCE_STEP",
     "INTERRUPTED",
     "MCP_SUFFIX",
+    "NOT_PAUSED",
+    "NO_TEXT",
     "RESUME_REJECTED",
     "STATUS_LABELS",
     "TRACE_STATUS_LABELS",
@@ -25,13 +39,17 @@ __all__ = [
     "UiMessage",
     "UiSource",
     "UiStep",
+    "UsageTotal",
+    "add_usage",
     "message_text",
+    "render_cost",
     "render_error",
     "render_evidence",
     "render_pending",
     "render_tool_end",
     "render_tool_start",
     "render_turn",
+    "render_usage",
 ]
 
 ACTION_LABELS = {"approved": "Zatwierdź", "rejected": "Odrzuć", "cancel": "Anuluj"}
@@ -50,11 +68,15 @@ TRACE_STATUS_LABELS = {
     "limit": "limit kroków lub czasu",
 }
 EVIDENCE_STEP = "Ścieżka dowodowa"
+COST_STEP = "Koszt tury"  # F6: panel boczny z kosztem tury i sumą rozmowy
 # linia w treści odpowiedzi: Chainlit linkuje nazwę elementu bocznego (cl.Text display="side")
 EVIDENCE_LINK = f"Szczegóły: {EVIDENCE_STEP}"
 INTERRUPTED = "(przerwane)"
+# wiadomość bez tekstu (np. sam załącznik): copilot odpowiada tylko na pytania tekstowe
+NO_TEXT = "Wpisz pytanie tekstem: copilot nie czyta załączników ani obrazów."
 MCP_SUFFIX = " (przez MCP)"  # F5: krok narzędzia wywołanego przez serwer MCP
 CLARIFY_HINT = "Wpisz marżę w polu czatu (np. 7,5)."
+NOT_PAUSED = "Ta decyzja jest nieaktualna: rozmowa nie czeka już na odpowiedź."
 RESUME_REJECTED = (
     "Nie rozpoznałem odpowiedzi. Kliknij przycisk albo napisz „zatwierdź”, „odrzuć” lub "
     "„anuluj” (przy pytaniu o marżę: liczbę, np. 7,5)."
@@ -91,12 +113,24 @@ class UiStep:
     input: str  # argumenty jako JSON (ensure_ascii=False, wcięcie 2)
     output: str  # tool_end: brief, przy błędzie 'Błąd: …'; tool_start: ''
     is_error: bool = False
+    icon: str | None = None  # ikona lucide zamiast pustego awatara kroku (Chainlit: metadata.icon)
 
 
 def _step_name(event: ToolEventView) -> str:
     if event.parent_call_id is not None:
         return f"↳ {event.tool} (odczyt narzędzia)"
     return event.tool
+
+
+# ikony lucide przy krokach narzędzi (inaczej Chainlit rysuje szare kółko pustego awatara)
+TOOL_ICONS = {"search_documents": "file-search"}
+ORIGIN_ICONS = {"data": "database", "calculation": "calculator"}
+DEFAULT_TOOL_ICON = "wrench"
+
+
+def step_icon(event: ToolEventView) -> str:
+    """Ikona kroku: wyszukiwanie w dokumentach, odczyt danych, obliczenie, inne narzędzie."""
+    return TOOL_ICONS.get(event.tool) or ORIGIN_ICONS.get(event.origin or "", DEFAULT_TOOL_ICON)
 
 
 def _arguments(event: ToolEventView) -> str:
@@ -111,6 +145,7 @@ def render_tool_start(event: ToolEventView) -> UiStep:
         name=_step_name(event),
         input=_arguments(event),
         output="",
+        icon=step_icon(event),
     )
 
 
@@ -155,15 +190,32 @@ def render_evidence(view: TurnView, number: int = 1) -> UiStep | None:
     )
 
 
-def message_text(message: UiMessage, evidence: UiStep | None = None) -> str:
-    """Treść wiadomości w czacie: odpowiedź, potem nazwy elementów bocznych (źródła i ścieżka
-    dowodowa), żeby Chainlit podlinkował ich panele."""
+def message_text(
+    message: UiMessage, evidence: UiStep | None = None, cost: UiStep | None = None
+) -> str:
+    """Treść wiadomości w czacie: odpowiedź, potem nazwy elementów bocznych (źródła, ścieżka
+    dowodowa, F6: koszt tury), żeby Chainlit podlinkował ich panele."""
     parts = [message.content] if message.content else []
     if message.sources:
         parts.append("Fragmenty: " + ", ".join(s.name for s in message.sources))
-    if evidence is not None:
-        parts.append(f"Szczegóły: {evidence.name}")
+    details = [step.name for step in (evidence, cost) if step is not None]
+    if details:
+        parts.append("Szczegóły: " + ", ".join(details))
     return "\n\n".join(parts)
+
+
+def render_cost(details: str | None, number: int = 1) -> UiStep | None:
+    """Element boczny „Koszt tury” z listą z render_usage; numerowany w rozmowie jak ścieżka
+    dowodowa (Chainlit łączy link z panelem po nazwie). None bez usage."""
+    if details is None:
+        return None
+    return UiStep(
+        key="cost",
+        parent_key=None,
+        name=COST_STEP if number == 1 else f"{COST_STEP} {number}",
+        input="",
+        output=details,
+    )
 
 
 def render_pending(pending: PendingView) -> UiMessage:
@@ -228,6 +280,8 @@ def render_error(error: ApiCallError) -> UiMessage:
         )
     elif error.error == "stale_pause":
         text = "Ta decyzja jest nieaktualna: wątek czeka już na inną odpowiedź."
+    elif error.error == "not_paused":
+        text = NOT_PAUSED
     elif error.error == "thread_busy":
         text = "Poprzednia wiadomość jest jeszcze przetwarzana. Poczekaj chwilę."
     elif error.error == "thread_stuck":
@@ -237,3 +291,100 @@ def render_error(error: ApiCallError) -> UiMessage:
     else:
         text = f"Wystąpił błąd ({error.status} {error.error}): {error.detail}"
     return UiMessage(content=text)
+
+
+# --- F6: licznik tokenów i kosztu (kontrakt F6, 6.4) ---
+
+
+@dataclass(frozen=True)
+class UsageTotal:
+    """Suma rozmowy (sesja Chainlita). Kwoty w USD, jak w `usage.cost`."""
+
+    turns: int = 0
+    calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    ours_usd: float = 0.0
+    reference_usd: float = 0.0
+    partial: bool = False  # któraś tura bez ceny (ours_usd None albo cost None)
+
+
+def add_usage(total: UsageTotal, usage: UsageView | None) -> UsageTotal:
+    """Dodaje turę do sumy; None (wznowienie pauzy, tura bez LLM-a) → suma bez zmian."""
+    if usage is None:
+        return total
+    cost = usage.cost
+    ours = cost.ours_usd if cost is not None else None
+    return replace(
+        total,
+        turns=total.turns + 1,
+        calls=total.calls + usage.calls,
+        input_tokens=total.input_tokens + usage.input_tokens,
+        output_tokens=total.output_tokens + usage.output_tokens,
+        ours_usd=total.ours_usd + (ours or 0.0),
+        reference_usd=total.reference_usd + (cost.reference_usd if cost is not None else 0.0),
+        partial=total.partial or ours is None,
+    )
+
+
+def _plural(count: int, one: str, few: str, many: str) -> str:
+    """Odmiana po liczebniku: 1; 2-4 (poza 12-14); reszta."""
+    if count == 1:
+        return one
+    if count % 10 in (2, 3, 4) and count % 100 not in (12, 13, 14):
+        return few
+    return many
+
+
+_CENT_STEP = Decimal("0.01")
+
+
+def _cents(usd: float) -> str:
+    """USD → centy z dwoma miejscami po przecinku; dodatnia kwota poniżej 0,005 centa → „< 0,01”."""
+    cents = Decimal(str(usd)) * 100
+    rounded = cents.quantize(_CENT_STEP, rounding=ROUND_HALF_UP)
+    if cents > 0 and rounded == 0:
+        return "< 0,01"
+    return f"{rounded:.2f}".replace(".", ",")
+
+
+def _models(usage: UsageView) -> str:
+    names = [m.model for m in usage.by_model if m.model]
+    return ", ".join(dict.fromkeys(names))
+
+
+def render_usage(usage: UsageView | None, total: UsageTotal) -> str | None:
+    """Koszt tury jako lista Markdown do panelu bocznego „Koszt tury” (z sumą rozmowy `total`,
+    już z tą turą).
+
+    None, gdy tura nie ma usage. Bez cennika w api (cost None): bez części o koszcie.
+    """
+    if usage is None:
+        return None
+    calls = f"{number(usage.calls)} {_plural(usage.calls, 'wywołanie', 'wywołania', 'wywołań')}"
+    models = _models(usage)
+    if models:
+        calls = f"{calls} ({models})"
+    lines = [
+        f"- **Tura:** {calls}",
+        f"- **Tokeny:** {number(usage.input_tokens)} wejścia, "
+        f"{number(usage.output_tokens)} wyjścia",
+    ]
+    cost = usage.cost
+    if cost is not None:
+        reference = f"{_cents(cost.reference_usd)} centa (cennik kursu)"
+        if cost.ours_usd is None:
+            missing = ", ".join(cost.unpriced_models) or "nieznany model"
+            paid = f"po cenach płatnych: brak ceny dla {missing} / {reference}"
+        else:
+            paid = f"po cenach płatnych {_cents(cost.ours_usd)} centa (Gemini) / {reference}"
+        lines.append(f"- **Koszt tury:** 0 USD w darmowym tierze; {paid}")
+        turns = f"{number(total.turns)} {_plural(total.turns, 'tura', 'tury', 'tur')}"
+        conversation = (
+            f"- **Rozmowa:** {turns}, {_cents(total.ours_usd)} / "
+            f"{_cents(total.reference_usd)} centa"
+        )
+        if total.partial:
+            conversation += " (część tur bez ceny)"
+        lines.append(conversation)
+    return "\n".join(lines)

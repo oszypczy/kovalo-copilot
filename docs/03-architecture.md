@@ -1,6 +1,6 @@
 # 03. Architektura
 
-Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-architecture.drawio). Plik ma siedem stron: kontenery, graf copilota, indeksowanie i wyszukiwanie, odpowiedź ze źródłami i ewaluacja E2, workflow F3 (API, UI, checkpointy, E3), agent F4 (narzędzia, trace, SSE, E4), MCP i końcowy asystent F5 (serwer, klient, E5). Eksporty PNG leżą obok pliku.
+Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-architecture.drawio). Plik ma osiem stron: kontenery, graf copilota, indeksowanie i wyszukiwanie, odpowiedź ze źródłami i ewaluacja E2, workflow F3 (API, UI, checkpointy, E3), agent F4 (narzędzia, trace, SSE, E4), MCP i końcowy asystent F5 (serwer, klient, E5), koszty, dashboard i przerwana tura F6. Eksporty PNG (z osadzonym XML-em, edytowalne w draw.io) leżą obok pliku.
 
 ![Kontenery](architecture/kovalo-architecture-1-containers.png)
 
@@ -8,12 +8,12 @@ Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-archit
 
 | Usługa | Obraz / technologia | Port | Odpowiedzialność |
 |---|---|---|---|
-| `ui` | Chainlit | 8000 | czat, kroki agenta, przyciski akceptacji, źródła; rozmawia tylko z `api` |
+| `ui` | Chainlit | 8000 | czat, kroki agenta, przyciski akceptacji, źródła, licznik kosztów (linia tury i suma rozmowy z gotowych kwot `usage.cost`; UI nie zna cen); rozmawia tylko z `api` |
 | `api` | FastAPI + LangGraph | 8080 (na hoście `API_PORT`) | graf copilota (`understand`, routing, workflow akceptacji, agent), checkpointy, koszty, trace |
 | `mcp-server` | FastMCP (`mcp` SDK 1.30), streamable HTTP (`/mcp`) | 8765 | 7 narzędzi tylko do odczytu (6 kursu + `check_termination_condition`), szablon zasobu `kovalo://documents/{doc_id}`, zasób `kovalo://policy/course-v1`, prompt `supplier_review`; `pgvector` (`kovalo_ctx`) i `./data` tylko do odczytu; bez klucza LLM-a ([ADR-0013](adr/0013-mcp-server-client-f5.md)) |
 | `postgres` | `pgvector/pgvector:pg16` | 5432 | indeks wektorowy (`langchain-postgres`, `PGVectorStore`: tabela na kolekcję), checkpointy LangGraph (`langgraph-checkpoint-postgres`), w nich trace agenta (koperta `agent_trace` w stanie wątku, [ADR-0011](adr/0011-agent-tools-f4.md)) |
 
-Indeksowanie i ewaluacja to **nie osobne usługi**, tylko polecenia CLI (`kovalo ingest`, `kovalo eval`) uruchamiane jednorazowo w obrazie `api`: `make ingest` = `docker compose run --rm api kovalo ingest` (korpus → chunki MP1 i chunki z kontekstem → embeddingi → podmiana tabel `kovalo_mp1` i `kovalo_ctx`), `make eval STAGE=e2` = `docker compose run --rm api kovalo eval e2` (raport w `reports/`, montowanym jako wolumen).
+Indeksowanie, ewaluacja i dashboard to **nie osobne usługi**, tylko polecenia CLI (`kovalo ingest`, `kovalo eval`) uruchamiane jednorazowo w obrazie `api`: `make ingest` = `docker compose run --rm api kovalo ingest` (korpus → chunki MP1 i chunki z kontekstem → embeddingi → podmiana tabel `kovalo_mp1` i `kovalo_ctx`), `make eval STAGE=e2` = `docker compose run --rm api kovalo eval e2` (raport w `reports/`, montowanym jako wolumen). Dashboard (`make dashboard` = `uv run kovalo eval dashboard`, w obrazie `make eval STAGE=dashboard`) czyta raporty i `reports/dashboard.yaml` i pisze `reports/dashboard.md` i `.json`, bez LLM-a i bez sieci.
 
 Zewnętrznie: **Gemini API** (domyślny LLM, darmowy klucz z Google AI Studio), opcjonalnie **LangSmith** (tracing, darmowy plan dla jednej osoby).
 
@@ -88,6 +88,7 @@ START → understand ─┬─ document_question ─> answer_documents   (E3: RA
 - **Pauzy:** ładunki 1:1 z kursu: `interrupt({"type": "clarification", "field": "margin_after_pct", "question": ...})` i `interrupt({"type": "approval", "role": ..., "revision": ..., "approvers": [...], "request": {...}})`. Jedno `interrupt()` na wywołanie węzła; zła odpowiedź wraca krawędzią do tego samego węzła. Wznowienie: `Command(resume=liczba | "approved" | "rejected" | "cancel")`; polskie słowa i „7,5” zamienia `text_pl.human_answer` w serwisie.
 - **Serwis** `workflow.CopilotService` (`send_message`, `resume`, `get_thread`) to jedyne wejście do grafu dla API i E3: strażnik pauzy (nowa wiadomość w pauzie → `ThreadPausedError`, w API 409), jedna tura naraz na wątek, `TurnResult` (odpowiedzi tury, pauza, wniosek, źródła, tokeny).
 - **Węzeł `answer_documents`** dostaje przez `CopilotDeps` dokładnie jedno: `document_answerer` (RAG z F2, `rag.build_document_answerer`, [contracts/f2.md §7.4](contracts/f2.md); E3) albo `agent` (od F4 w aplikacji; w F5 ta sama ścieżka z narzędziami MCP). Obie wersje używają tej samej fabryki grafu.
+- **Serwis od F6:** `TurnResult.usage` (z kanału `calls` tury) ma podział na faktyczne modele (`by_model`) i koszt (`cost`: `ours_usd` po cenach `cost.our_prices_per_1m_tokens`, `reference_usd` po cenach `cost.reference_model`), liczony przez `cost/usage.py` przy składaniu wyniku; koszt nie trafia do stanu grafu. Przerwana tura (ostatni checkpoint z `next != ()` bez pauzy, np. po zabiciu `api` w trakcie węzła) jest zamykana leniwie przy następnej wiadomości, pod blokadą wątku: `update_state(..., as_node="reply_other")` ze statusem `error` (`turn_interrupted`) i komunikatem o niedokończonej odpowiedzi, potem nowa wiadomość biegnie normalnie; przerwanej tury nie dokańczamy ([ADR-0015](adr/0015-polish-f6.md), [contracts/f6.md §7](contracts/f6.md)). Warunek: jeden proces `api`.
 - **Serwis od F4:** `start_message` / `start_resume` zwracają `TurnStream` (tura w wątku roboczym, zdarzenia z `stream_mode=["custom", "updates"]`), `send_message` / `resume` czytają go do `final`; `get_trace` czyta ostatnią kopertę `agent_trace` z historii stanu. Błędy połączenia z Postgresem → `CheckpointerUnavailableError` (API: 503).
 
 ![Workflow F3](architecture/kovalo-architecture-5-workflow.png)
@@ -113,8 +114,8 @@ Kontrakt F3: [contracts/f3.md §8](contracts/f3.md), decyzje: [ADR-0010](adr/001
 | Metoda | Ścieżka | Ciało / wynik | Od |
 |---|---|---|---|
 | POST | `/threads` | → 201 `{thread_id}` (UUID) | F3 |
-| POST | `/threads/{id}/messages` | `{text}` → `TurnResult`; 409 `thread_paused` (z ładunkiem pauzy), `thread_busy`, `thread_stuck`; 422 `invalid_request`; 503 `copilot_unavailable` | F3 (SSE: `/messages/stream`, F4) |
-| POST | `/threads/{id}/resume` | `{value}` (liczba / `approved` / `rejected` / `cancel`) albo `{text}` („7,5”, „zatwierdź”), opcjonalnie `pause_ref` → `TurnResult`; 409 `not_paused`, `stale_pause` | F3 |
+| POST | `/threads/{id}/messages` | `{text}` → `TurnResult`; 409 `thread_paused` (z ładunkiem pauzy), `thread_busy`, `thread_stuck` (od F6 tylko awaryjnie, gdy zamknięcie przerwanej tury się nie uda); 422 `invalid_request`; 503 `copilot_unavailable` | F3 (SSE: `/messages/stream`, F4) |
+| POST | `/threads/{id}/resume` | `{value}` (liczba / `approved` / `rejected` / `cancel`) albo `{text}` („7,5”, „zatwierdź”), opcjonalnie `pause_ref` → `TurnResult`; 409 `not_paused` (także po zamknięciu przerwanej tury), `stale_pause` | F3 |
 | GET | `/threads/{id}` | `ThreadState`: status, aktywna pauza, wniosek, decyzja, akceptacje, wiadomości | F3 |
 | POST | `/threads/{id}/resume/stream` | jak `/resume`, odpowiedź SSE | F4 |
 | GET | `/threads/{id}/trace` | `TraceView`: ostatni trace agenta w wątku (z historii checkpointów) i ścieżka dowodowa; wątek bez tury agenta (także nieznany) → 200 z `trace: null` | F4 |
@@ -136,7 +137,10 @@ Wyszukiwanie (`knowledge.Retriever`): tryb `retrieval.mode` = `vector` (cosine, 
 
 ## 6. Obserwowalność i koszty
 
-- Licznik tokenów i kosztów per tura z `usage_metadata` (przeliczany po cenach referencyjnych z configu i po faktycznych cenach dostawcy; free tier = 0 USD).
-- Trace agenta w checkpointach Postgresa (kanał `record`, koperta `agent_trace` v1 z MP5; bez osobnej tabeli `agent_traces`, ADR-0011 pkt 7), widoczny w UI (kroki `cl.Step` na żywo, „Ścieżka dowodowa”) i przez `GET /threads/{id}/trace`.
+![Koszty, dashboard i przerwana tura F6](architecture/kovalo-architecture-8-costs.png)
+
+- Licznik tokenów i kosztów per tura z `usage_metadata` (kanał `calls` stanu tury → `group_by_model` → `price_usage` → `TurnResult.usage.cost`). Ceny z sekcji `cost` w `config.yaml`: `our_prices_per_1m_tokens` dla faktycznego modelu (płatny tier Gemini, NASZE) i `prices_per_1m_tokens[reference_model]` (cennik kursu, PINNED); ta sama funkcja `tokens_cost` co w raportach E2–E5. Nieznany model daje „brak ceny”, nie zgadywanie; free tier = 0 USD. UI pokazuje linię kosztu na końcu ostatniej wiadomości tury i sumę rozmowy z sesji Chainlita ([ADR-0015](adr/0015-polish-f6.md)).
+- Dashboard ewaluacji: `reports/dashboard.md` i `.json` z JSON-ów raportów E1–E5 (gdy są), poprzedniego `dashboard.json` i ręcznych danych w `reports/dashboard.yaml` (liczby oryginalnych przebiegów na żywo, zużycie limitu na etap, znane ograniczenia); wynik deterministyczny, `--check` w CI ([contracts/f6.md §8](contracts/f6.md)).
+- Trace agenta w checkpointach Postgresa (kanał `record`, koperta `agent_trace` v1 z MP5; bez osobnej tabeli `agent_traces`: decyzja ostateczna, ADR-0011 pkt 7 i ADR-0015; dashboard czyta raporty ewaluacji, nie tury produkcyjne), widoczny w UI (kroki `cl.Step` na żywo, „Ścieżka dowodowa”) i przez `GET /threads/{id}/trace`.
 - Opcjonalnie LangSmith (`LANGSMITH_TRACING=true`); od F5 run agenta jest zagnieżdżony pod turą grafu (callbacki węzła, R1-2 z F4).
 - Wywołania MCP: `invocation_id` w trace (koperta w checkpoincie) i w logu `mcp-server` (stderr, z czasem i statusem rekordu).

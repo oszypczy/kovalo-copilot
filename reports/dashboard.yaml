@@ -1,0 +1,56 @@
+# Ręczna część dashboardu ewaluacji (kontrakt F6, 8.1; ADR-0015). Edytujemy tylko ten plik:
+# `reports/dashboard.md` i `reports/dashboard.json` generuje `uv run kovalo eval dashboard`
+# z tego pliku, z JSON-ów raportów (poza gitem, gdy są na dysku) i z poprzedniego dashboard.json.
+# Ścieżki raportów są względne wobec katalogu reports/. Liczby, których nie ma w JSON-ach
+# (oryginalne przebiegi na żywo, zużycie limitu), mają podane źródło.
+version: 1
+stages:
+  - stage: e1
+    report: mp1/2026-11-02-e1.json
+    markdown: mp1/2026-11-02-e1.md
+    notes:
+      - "Koszt miesięczny liczony dla tokenów przebiegu kursu (wiersz „referencja kursu” raportu E1) po cenach gemini-3.6-flash, modelu z pomiaru E1. Od F2 model odpowiedzi i cost.our_model to gemini-3.5-flash-lite: $9,17 / $30,00 (FR-1.2, ADR-0006); model embeddingów z configu (intfloat/multilingual-e5-large) daje po cenach gemini-3.6-flash $15,66 / $67,65, i tę kwotę podaje 06-evaluation."
+      - "Koszt E1 w scenariuszu to dolna granica: faktyczne wywołanie z myśleniem zużyło 959 tokenów wyjścia (w tym 714 myślenia) wobec 350 w scenariuszu kursu (raport E1, przebieg 20261102-104911). ADR-0006 podaje 677 tokenów: to starszy pomiar z F1 (06-evaluation podaje oba); raport E1 jest nowszy i to jego liczbę bierze dashboard."
+  - stage: e2
+    report: mp2/2026-11-02-e2.json
+    markdown: mp2/2026-11-02-e2.md
+    notes:
+      - "JSON E2 to przeliczenie z cache (--with-llm --cache-only): 0 wywołań sieciowych, 42 z cache. Pierwszy przebieg na gemini-3.5-flash-lite (20261102-153627-87b0e6c8): 11 wywołań, 31 z cache (przegląd w raporcie E2)."
+      - "Wiersz hybrid (poziomy 1–2) bez kolumny „Kurs”: kurs nie ma wariantu hybrid. Z embeddingami referencyjnymi kursu hybrid daje 9/10, 10/10, 10/10, 631 tokenów (raport E2)."
+      - "Tokeny i koszt E2 to szacunek: średnie tokeny odpowiedzi z raportu razy liczba odpowiedzi (ctx i hybrid, bez sędziego)."
+      - "Sędzia to ten sam model co odpowiedzi: „sędzia 9/9” to górna granica (M09, ADR-0008); M04 to realne pudło wyszukiwania (pytanie PL, dokument EN)."
+  - stage: e3
+    report: mp3/2026-11-03-e3.json
+    markdown: mp3/2026-11-03-e3.md
+    notes:
+      - "JSON E3 to powtórka --live --cache-only (0 wywołań sieciowych, 14 z cache). Oryginalny przebieg na żywo: 14 wywołań (13 understand + 1 odpowiedź RAG), 64 s, bez fallbacku (contracts/f3.md, A9); identyfikatora tamtego przebiegu nie zapisano, więc bez first_live."
+      - "D2-t2: na żywo pola 10/11, model nie przejął marży 10% z rozmowy; skutek zerowy (reports/mp3/review.yaml). Cel E3 dla pól to odtworzenie 100%."
+  - stage: e4
+    report: mp4/2026-11-03-e4.json           # przebieg na żywo z narzędziami bezpośrednio
+    markdown: mp4/2026-11-03-e4.md
+    related: [mp4/2026-11-04-e4.md]          # E4 przez MCP z cache F4
+    notes:
+      - "B1: agent poprawnie odmówił zatwierdzenia, ale nie wywołał check_discount_policy (narzędzia 0%, fakty 50%), więc testy 1 i 3 są poniżej celu 9/9; agent_system bez zmian (U10 z F5)."
+      - "JSON E4 to powtórka --live --cache-only (0 wywołań sieciowych, 24 z cache). Oryginalny przebieg A10 szedł w dwóch dniach (--ids, --max-calls 20): 24 tury modelu, 0 błędów, bez fallbacku (contracts/f4.md, reports/mp4/review.yaml); liczby sieciowe obu części nie są zapisane w jednym przebiegu, więc bez first_live."
+  - stage: e5
+    report: mp5/2026-11-04-e5.json
+    markdown: mp5/2026-11-04-e5.md
+    first_live:                              # R1-2 z F5: JSON po powtórce --cache-only nie ma liczb oryginału
+      run_id: 20261104T092904-0f4dd55b
+      network_calls: 30
+      cached_calls: 4
+      failed_attempts: 1                     # R1-1 z F5: D7-t2, model główny, odebrane przez fallback
+      seconds: 132
+      source: reports/mp5/review.yaml
+    notes:
+      - "Tokeny i koszt E5 liczą też tury z cache (około +20%, R1-3 z F5)."
+      - "R1-1 z F5: nieudana próba modelu głównego w D7-t2 (odebrana przez fallback gemini-3.6-flash) nie jest liczona ani jako błąd tury, ani do --max-calls; w first_live jest jako failed_attempts."
+      - "R1-2 z F5: JSON E5 to powtórka --live --cache-only (0 wywołań sieciowych, 34 z cache), liczby wywołań oryginalnego przebiegu pochodzą z reports/mp5/review.yaml."
+gemini_usage:                                # wywołania darmowego limitu na etap (07-roadmap, kontrakty)
+  - {stage: F0, calls: null, note: "first-call i test_first_call_live; odpowiedź dopiero z fallbacku po 131 s (contracts/f0.md, 9.4); pomiaru modeli w ADR-0006 nie zliczono"}
+  - {stage: F1, calls: null, note: "E1 --with-llm: 1 wywołanie (raport E1) i testy na żywo: 2 (contracts/f1.md); pomiaru modeli w ADR-0006 nie zliczono"}
+  - {stage: F2, calls: null, note: "E2 na Flash-Lite: 11 wywołań (31 z cache, raport E2) i test na żywo: 2; wcześniejszy przebieg na gemini-3.6-flash wyczerpał limit 20 zapytań, a pomiaru 8 modeli (ADR-0006) nie zliczono"}
+  - {stage: F3, calls: 18, note: "16 + 2 na przeklikanie D2 w UI (07-roadmap)"}
+  - {stage: F4, calls: 47, note: "około (07-roadmap)"}
+  - {stage: F5, calls: 55, note: "około (07-roadmap)"}
+  - {stage: F6, calls: 9, note: "około: weryfikacja w compose (przerwana tura ≈ 4) i przeklikanie UI (≈ 5, jedno przez fallback); pokaz na żywo osobno, bez nagrania (07-roadmap)"}

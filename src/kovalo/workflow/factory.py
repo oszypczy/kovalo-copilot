@@ -273,7 +273,11 @@ def open_copilot_service(settings: Settings) -> Iterator[CopilotService]:
     )
     with open_checkpointer(settings) as saver:
         graph = build_copilot_graph(deps, checkpointer=saver)
-        service = CopilotService(graph, max_message_chars=settings.workflow.max_message_chars)
+        service = CopilotService(
+            graph,
+            max_message_chars=settings.workflow.max_message_chars,
+            pricing=settings.cost,  # F6: koszt tury w TurnResult.usage (kontrakt F6, 6.3)
+        )
         try:
             yield service
         finally:

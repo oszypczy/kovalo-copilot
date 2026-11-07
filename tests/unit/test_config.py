@@ -677,3 +677,28 @@ def test_f5_config_yaml_text():
     assert ours["tools"]["source"] == "mcp" and ours["tools"]["mcp_transport"] == "http"
     assert ours["mcp_server"] == {"search": "pgvector"}
     assert ours["mcp"] == _load(COURSE_CONFIG)["mcp"]
+
+
+# ---------------------------------------------------------------------------
+# F6: paths.reports_dir (kontrakt F6, 4); PINNED bez zmian
+# ---------------------------------------------------------------------------
+
+
+def test_reports_dir():
+    from kovalo.config import load_settings
+
+    s = load_settings()
+    assert s.paths.reports_dir == s.root / "reports", "względna wobec root jak pozostałe ścieżki"
+    assert s.paths.reports_dir.is_absolute()
+    assert s.paths.mini_project_5_output_dir.parent == s.paths.reports_dir, (
+        "katalogi raportów MP1-MP5 leżą w reports_dir"
+    )
+    assert _load(REPO_CONFIG)["paths"]["reports_dir"] == "reports", "klucz NASZ jest w config.yaml"
+    assert "reports_dir" not in _load(COURSE_CONFIG)["paths"], "to nie jest klucz kursu"
+
+
+def test_reports_dir_env_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    from kovalo.config import load_settings
+
+    monkeypatch.setenv("KOVALO_PATHS__REPORTS_DIR", str(tmp_path / "inne"))
+    assert load_settings().paths.reports_dir == tmp_path / "inne"

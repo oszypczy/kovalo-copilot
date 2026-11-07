@@ -75,6 +75,7 @@ class PathsConfig(_Section):
     mini_project_5_conversations: Path
     mini_project_5_output_dir: Path
     llm_cache_dir: Path  # NASZE (ADR-0008): cache odpowiedzi LLM-a w ewaluacjach
+    reports_dir: Path = Path("reports")  # NASZE (F6, ADR-0015): raporty i dashboard ewaluacji
 
 
 class CorpusConfig(_Section):

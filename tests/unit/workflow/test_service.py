@@ -10,6 +10,7 @@ from tests.fakes import TOY_CHUNKS
 from tests.workflow_fakes import (
     ReplayLLM,
     answers,
+    graph_with,
     service_and_llm,
     service_with,
     toy_answerer,
@@ -246,20 +247,8 @@ class _Abort(BaseException):
     """Awaria spoza Exception: węzeł jej nie łapie, więc wychodzi z grafu."""
 
 
-def test_thread_stuck_after_failure_in_a_node(settings):
-    """Wyjątek w węźle zostawia snapshot.next bez pauzy: kolejna wiadomość to ThreadStuckError."""
-    from kovalo.workflow.service import ThreadStuckError
-
-    def aborting(question):
-        raise _Abort
-
-    service = service_with(
-        settings, [turn(kind="document_question", standalone="P?")], answerer=aborting
-    )
-    with pytest.raises(_Abort):
-        service.send_message("t", "P?")
-    with pytest.raises(ThreadStuckError):
-        service.send_message("t", "Jeszcze raz")
+# F6: zamiast `thread_stuck` przerwana tura jest zamykana przy następnej wiadomości (test
+# `test_thread_stuck_after_failure_in_a_node` z F5 zastąpiły `test_interrupted_turn_*` niżej).
 
 
 def test_error_classes_hierarchy():
@@ -704,3 +693,312 @@ def test_tool_end_carries_transport(settings):
     final = items[-1]
     stored = final.data["trace"]["events"][0]
     assert (stored["transport"], stored["invocation_id"]) == ("mcp", "inv-0001")
+
+
+# ---------------------------------------------------------------------------
+# F6: koszt tury (kontrakt F6, 6) i zamknięcie przerwanej tury (kontrakt F6, 7)
+# ---------------------------------------------------------------------------
+
+import logging  # noqa: E402
+
+from langchain_core.runnables import RunnableLambda  # noqa: E402
+
+
+def _two_model_trace():
+    """Agent: tura na modelu głównym i tura na fallbacku (dwa modele w jednej turze)."""
+    from kovalo.agents.trace import ModelCallInfo
+
+    trace = agent_trace()
+    trace.model_calls = [
+        ModelCallInfo(model="gemini-3.5-flash-lite", input_tokens=1000, output_tokens=100),
+        ModelCallInfo(
+            model="gemini-3.6-flash", input_tokens=2000, output_tokens=200, reasoning_tokens=30
+        ),
+    ]
+    return trace
+
+
+def _priced_service(settings, trace, *, pricing):
+    from kovalo.workflow.service import CopilotService
+
+    graph, _ = graph_with(settings, [DOC_TURN], agent=agent_answerer(trace))
+    return CopilotService(graph, pricing=pricing)
+
+
+def test_usage_has_by_model_and_cost(settings):
+    from kovalo.cost.usage import price_usage
+
+    service = _priced_service(settings, _two_model_trace(), pricing=settings.cost)
+    usage = service.send_message("t", "Ile wynosi kara?").usage
+    named = [m for m in usage.by_model if m.model is not None]
+    assert [m.model for m in named] == ["gemini-3.5-flash-lite", "gemini-3.6-flash"]
+    lite, flash = named
+    assert (lite.input_tokens, lite.output_tokens) == (1000, 100)
+    assert (flash.input_tokens, flash.output_tokens, flash.reasoning_tokens) == (2000, 200, 30)
+    assert sum(m.calls for m in usage.by_model) == usage.calls == 3, "understand + 2 tury agenta"
+    assert usage.cost is not None
+    assert usage.cost == price_usage(usage.by_model, settings.cost)
+    assert usage.cost.ours_usd is not None and usage.cost.unpriced_models == []
+    assert usage.cost.reference_usd > usage.cost.ours_usd > 0
+    assert (usage.input_tokens, usage.output_tokens) == (3000, 300), "jak w F5"
+
+
+def test_usage_cost_none_without_pricing(settings):
+    """Serwis bez cennika (E3, testy F3-F5): cost None, reszta usage jak w F5."""
+    service = _priced_service(settings, _two_model_trace(), pricing=None)
+    usage = service.send_message("t", "Ile wynosi kara?").usage
+    assert usage.cost is None
+    assert usage.calls == 3 and (usage.input_tokens, usage.output_tokens) == (3000, 300)
+    assert usage.reasoning_tokens == 30
+    assert set(usage.models) == {"gemini-3.5-flash-lite", "gemini-3.6-flash"}
+    assert usage.by_model, "podział na modele jest zawsze, cena tylko z cennikiem"
+
+
+def test_usage_serialises_by_model_and_cost(settings):
+    service = _priced_service(settings, _two_model_trace(), pricing=settings.cost)
+    dumped = service.send_message("t", "Ile wynosi kara?").model_dump(mode="json")["usage"]
+    assert {"by_model", "cost"} <= set(dumped)
+    assert set(dumped["cost"]) >= {
+        "ours_usd",
+        "reference_usd",
+        "unpriced_models",
+        "our_prices_checked_on",
+    }
+    assert dumped["cost"]["our_prices_checked_on"] == str(settings.cost.our_prices_checked_on)
+
+
+def test_usage_unpriced_model_is_reported(settings):
+    from kovalo.agents.trace import ModelCallInfo
+
+    trace = agent_trace()
+    trace.model_calls = [
+        ModelCallInfo(model="model-spoza-cennika", input_tokens=10, output_tokens=2)
+    ]
+    service = _priced_service(settings, trace, pricing=settings.cost)
+    cost = service.send_message("t", "Ile wynosi kara?").usage.cost
+    assert cost.ours_usd is None and cost.unpriced_models == ["model-spoza-cennika"]
+    assert cost.reference_usd > 0
+
+
+def test_resume_has_no_usage(settings):
+    """Wznowienie pauzy nie woła LLM-a: usage None także z cennikiem."""
+    from kovalo.workflow.service import CopilotService
+
+    graph, _ = graph_with(settings, [new_request(discount_pct=14, margin_after_pct=10)])
+    service = CopilotService(graph, pricing=settings.cost)
+    first = service.send_message("t", "Prześlij rabat 14%.")
+    assert first.usage is not None and first.usage.cost is not None
+    resumed = service.resume("t", value="approved")
+    assert resumed.status == "approved" and resumed.usage is None
+
+
+# --- zamknięcie przerwanej tury ---
+
+NODES_WITH_INTERRUPTION = ["understand", "answer_documents", "update_request", "decide", "approve"]
+FIRST_MESSAGE = "Pierwsza wiadomość."
+SECOND_MESSAGE = "Kto zatwierdza 3%?"
+SECOND_TURN = turn(kind="policy_question", discount_pct=3)
+
+
+def _service_interrupted_in(settings, node, monkeypatch):
+    """Serwis, w którym pierwsza tura pada (BaseException) w `node` przed pauzą/odpowiedzią,
+    a druga wiadomość (pytanie o politykę) przechodzi normalnie. Zwraca (service, thread_id)."""
+    from kovalo.workflow import graph as graph_module
+    from kovalo.workflow.checkpoint import memory_checkpointer
+    from kovalo.workflow.graph import build_copilot_graph
+    from kovalo.workflow.schemas import Turn
+    from kovalo.workflow.service import CopilotService
+
+    first_turns = {
+        "answer_documents": [turn(kind="document_question", standalone="P?")],
+        "update_request": [new_request(discount_pct=14, margin_after_pct=10)],
+        "decide": [new_request(discount_pct=14, margin_after_pct=10)],
+        "approve": [new_request(discount_pct=14, margin_after_pct=10)],
+    }.get(node, [])
+    llm = ReplayLLM([*first_turns, SECOND_TURN])
+    understand_model = None
+    answerer = None
+    if node == "understand":
+        inner = llm.with_structured_output(Turn)
+        state = {"failed": False}
+
+        def understand(messages):
+            if not state["failed"]:
+                state["failed"] = True
+                raise _Abort
+            return inner.invoke(messages)
+
+        understand_model = RunnableLambda(understand)
+    elif node == "answer_documents":
+
+        def answerer(question):
+            raise _Abort
+
+    else:
+        # funkcje pomocnicze grafu: n-te wywołanie pada raz (druga wiadomość nie jest dotknięta)
+        name, target = {
+            "update_request": ("required_approvers", 1),
+            "decide": ("_request", 1),
+            "approve": ("_request", 2),
+        }[node]
+        real, counter = getattr(graph_module, name), {"n": 0}
+
+        def flaky(*args, **kwargs):
+            counter["n"] += 1
+            if counter["n"] == target:
+                raise _Abort
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(graph_module, name, flaky)
+
+    deps, _ = make_deps(settings, llm=llm, answerer=answerer, understand_model=understand_model)
+    graph = build_copilot_graph(deps, checkpointer=memory_checkpointer())
+    service = CopilotService(graph, max_message_chars=settings.workflow.max_message_chars)
+    thread = f"t-{node}"
+    with pytest.raises(_Abort):
+        service.send_message(thread, FIRST_MESSAGE)
+    snapshot = graph.get_state({"configurable": {"thread_id": thread}})
+    assert snapshot.next and not snapshot.interrupts, "punkt wyjścia: przerwana tura bez pauzy"
+    return service, thread
+
+
+from tests.workflow_fakes import make_deps  # noqa: E402
+
+
+def test_interrupted_turn_is_closed_on_next_message(settings, monkeypatch, caplog):
+    from kovalo.workflow.replies import INTERRUPTED_TURN_REPLY
+
+    service, thread = _service_interrupted_in(settings, "answer_documents", monkeypatch)
+    with caplog.at_level(logging.WARNING):
+        result = service.send_message(thread, SECOND_MESSAGE)  # bez ThreadStuckError
+    assert result.status == "answered"
+    assert len(result.replies) == 2
+    assert result.replies[0] == INTERRUPTED_TURN_REPLY
+    assert "3%" in result.replies[1], "odpowiedź na nową wiadomość (pytanie o politykę)"
+    assert result.usage is not None and result.usage.calls == 1, "usage tylko nowej tury"
+    warned = [
+        r for r in caplog.records if r.levelno >= logging.WARNING and thread in r.getMessage()
+    ]
+    assert warned and any("answer_documents" in r.getMessage() for r in warned), (
+        "WARNING z thread_id i przerwanym krokiem"
+    )
+    state = service.get_thread(thread)
+    assert state.status == "answered" and state.pending is None
+    assistant = [m.content for m in state.messages if m.role == "assistant"]
+    assert assistant[0] == INTERRUPTED_TURN_REPLY
+    assert service.graph.get_state({"configurable": {"thread_id": thread}}).next == ()
+
+
+@pytest.mark.parametrize("node", NODES_WITH_INTERRUPTION)
+def test_interrupted_turn_in_each_node(settings, monkeypatch, node):
+    """Spike z kontraktu (7): `update_state(as_node="reply_other")` czyści `next` bez względu
+    na to, w którym węźle wątek przerwano (przed `interrupt`)."""
+    from kovalo.workflow.replies import INTERRUPTED_TURN_REPLY
+
+    service, thread = _service_interrupted_in(settings, node, monkeypatch)
+    assert node in service.graph.get_state({"configurable": {"thread_id": thread}}).next
+    result = service.send_message(thread, SECOND_MESSAGE)
+    assert result.replies[0] == INTERRUPTED_TURN_REPLY, node
+    assert result.status == "answered" and len(result.replies) == 2, node
+    snapshot = service.graph.get_state({"configurable": {"thread_id": thread}})
+    assert snapshot.next == () and not snapshot.interrupts, node
+    if node in ("decide", "approve"):
+        # stan wniosku zostaje (kontrakt 7): zamknięcie nie czyści `request`
+        assert service.get_thread(thread).request["discount_pct"] == 14
+
+
+def test_pause_is_not_an_interrupted_turn(settings):
+    from kovalo.workflow.service import ThreadPausedError
+
+    service = service_with(settings, [new_request(discount_pct=14, margin_after_pct=10)])
+    service.send_message("t", "Prześlij rabat 14%.")
+    cfg = {"configurable": {"thread_id": "t"}}
+    before = service.graph.get_state(cfg).config["configurable"]["checkpoint_id"]
+    with pytest.raises(ThreadPausedError):
+        service.send_message("t", "Dzięki!")
+    after = service.graph.get_state(cfg).config["configurable"]["checkpoint_id"]
+    assert after == before, "nic nie zamknięto ani nie zapisano"
+    assert service.get_thread("t").pending.role == "Dyrektor handlowy"
+    assert service.resume("t", value="approved").status == "approved", "pauza działa jak dotąd"
+
+
+def test_resume_after_interrupted_turn_is_not_paused(settings, monkeypatch):
+    from kovalo.workflow.replies import INTERRUPTED_TURN_REPLY
+    from kovalo.workflow.service import NotPausedError
+
+    service, thread = _service_interrupted_in(settings, "answer_documents", monkeypatch)
+    with pytest.raises(NotPausedError, match="przerwana"):
+        service.start_resume(thread, value="approved")
+    cfg = {"configurable": {"thread_id": thread}}
+    assert service.graph.get_state(cfg).next == (), "zamknięcie nastąpiło mimo odmowy wznowienia"
+    after = service.send_message(thread, SECOND_MESSAGE)
+    assert after.replies and INTERRUPTED_TURN_REPLY not in after.replies, "zamknięta tylko raz"
+    assert len(after.replies) == 1
+
+
+def test_close_failure_is_thread_stuck(settings, monkeypatch):
+    from langgraph.errors import InvalidUpdateError
+
+    from kovalo.workflow.service import ThreadStuckError
+
+    service, thread = _service_interrupted_in(settings, "answer_documents", monkeypatch)
+
+    def refuse(*args, **kwargs):
+        raise InvalidUpdateError("sztuczna odmowa")
+
+    monkeypatch.setattr(service.graph, "update_state", refuse)
+    with pytest.raises(ThreadStuckError):
+        service.send_message(thread, SECOND_MESSAGE)
+    with pytest.raises(ThreadStuckError):  # blokada zwolniona (nie ThreadBusyError)
+        service.send_message(thread, SECOND_MESSAGE)
+
+
+def test_close_connection_error_is_checkpointer_unavailable(settings, monkeypatch):
+    from kovalo.workflow.checkpoint import CONNECTION_ERRORS, CheckpointerUnavailableError
+
+    service, thread = _service_interrupted_in(settings, "answer_documents", monkeypatch)
+
+    def down(*args, **kwargs):
+        raise CONNECTION_ERRORS[0]("brak połączenia")
+
+    monkeypatch.setattr(service.graph, "update_state", down)
+    with pytest.raises(CheckpointerUnavailableError):
+        service.send_message(thread, SECOND_MESSAGE)
+
+
+def test_busy_thread_is_not_closed(settings, monkeypatch):
+    """Trwająca tura (blokada wątku): ThreadBusyError, stan nietknięty."""
+    from kovalo.workflow.service import ThreadBusyError
+
+    entered, release = threading.Event(), threading.Event()
+    llm = ReplayLLM([turn(kind="policy_question", discount_pct=22)], gate=(entered, release))
+    service = service_with(settings, llm=llm)
+    updates = []
+    real_update = service.graph.update_state
+    monkeypatch.setattr(
+        service.graph, "update_state", lambda *a, **k: updates.append(1) or real_update(*a, **k)
+    )
+    worker = threading.Thread(target=lambda: service.send_message("busy", "Kto zatwierdza 22%?"))
+    worker.start()
+    try:
+        assert entered.wait(timeout=10)
+        with pytest.raises(ThreadBusyError):
+            service.send_message("busy", "Jeszcze raz")
+        with pytest.raises(ThreadBusyError):
+            service.start_resume("busy", value="approved")
+        assert updates == [], "stan nie został zmieniony pod trwającą turą"
+    finally:
+        release.set()
+        worker.join(timeout=10)
+    assert service.get_thread("busy").status == "answered"
+
+
+def test_get_thread_and_trace_do_not_close_interrupted_turn(settings, monkeypatch):
+    """Odczyt nie zmienia stanu (kontrakt 7): zamyka dopiero start_message / start_resume."""
+    service, thread = _service_interrupted_in(settings, "answer_documents", monkeypatch)
+    cfg = {"configurable": {"thread_id": thread}}
+    before = service.graph.get_state(cfg).config["configurable"]["checkpoint_id"]
+    service.get_thread(thread)
+    service.get_trace(thread)
+    after = service.graph.get_state(cfg).config["configurable"]["checkpoint_id"]
+    assert after == before and service.graph.get_state(cfg).next

@@ -1,0 +1,4178 @@
+{
+ "created_at": "2026-11-04T09:45:16.131980Z",
+ "conversations": [
+  "C1",
+  "C2",
+  "C3",
+  "C4",
+  "C5",
+  "D1",
+  "D2",
+  "D3",
+  "D4",
+  "D5",
+  "D6",
+  "D7",
+  "D8"
+ ],
+ "transport": "stdio",
+ "backend": "memory",
+ "embedding_model": "intfloat/multilingual-e5-large",
+ "reference": {
+  "route": [
+   25,
+   25
+  ],
+  "status": [
+   25,
+   25
+  ],
+  "fields": [
+   11,
+   11
+  ],
+  "pauses": [
+   22,
+   22
+  ],
+  "approvers": [
+   19,
+   19
+  ],
+  "request": [
+   15,
+   15
+  ],
+  "agent_trace": [
+   25,
+   25
+  ],
+  "tool_coverage": [
+   4,
+   4
+  ],
+  "arguments_correct": [
+   1,
+   1
+  ],
+  "answer_facts": [
+   4,
+   4
+  ],
+  "numbers_backed": [
+   4,
+   4
+  ],
+  "no_approval_claim": [
+   4,
+   4
+  ],
+  "mcp_calls": 7,
+  "mcp_failures": 0,
+  "tokens_in": 41993,
+  "tokens_out": 2866,
+  "cost_cents": 4.4
+ },
+ "parity": [
+  {
+   "tool": "get_supplier_otif",
+   "arguments": {
+    "supplier": "Mleczna Dolina",
+    "from_month": "2026-08",
+    "to_month": "2026-10"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "get_supplier_otif",
+   "arguments": {
+    "supplier": "SUP-114",
+    "from_month": "2026-05",
+    "to_month": "2026-07"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "get_supplier_otif",
+   "arguments": {
+    "supplier": "SUP-114",
+    "from_month": "2026-10",
+    "to_month": "2026-10"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "get_supplier_otif",
+   "arguments": {
+    "supplier": "Nordic Fish",
+    "from_month": "2026-07",
+    "to_month": "2026-07"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "get_supplier_otif",
+   "arguments": {
+    "supplier": "SUP-114",
+    "from_month": "2026-7",
+    "to_month": "2026-07"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "get_invoice_value",
+   "arguments": {
+    "supplier": "SUP-114",
+    "month": "2026-07"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "get_invoice_value",
+   "arguments": {
+    "supplier": "SUP-207",
+    "month": "2026-08"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "get_contract_terms",
+   "arguments": {
+    "supplier": "Mleczna Dolina"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "get_contract_terms",
+   "arguments": {
+    "supplier": "SUP-207"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "get_contract_terms",
+   "arguments": {
+    "supplier": "TransBałt"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "calculate_otif_penalty",
+   "arguments": {
+    "otif_pct": 94.6,
+    "target_pct": 97,
+    "rate_per_full_point_pct": 2,
+    "cap_pct": 10,
+    "invoice_grosze": 18240000
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "calculate_otif_penalty",
+   "arguments": {
+    "otif_pct": 101,
+    "target_pct": 97,
+    "rate_per_full_point_pct": 2,
+    "cap_pct": 10,
+    "invoice_grosze": 1
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "check_discount_policy",
+   "arguments": {
+    "discount_pct": 22,
+    "margin_after_pct": 7,
+    "strategic_account": true
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "check_discount_policy",
+   "arguments": {
+    "discount_pct": 30,
+    "margin_after_pct": 4,
+    "clearance": true
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "check_discount_policy",
+   "arguments": {
+    "discount_pct": 14,
+    "competitor_offer": true
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "check_discount_policy",
+   "arguments": {
+    "discount_pct": 4,
+    "contractual_volume_rebate": true
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "search_documents",
+   "arguments": {
+    "question": "TransBałt terminowe dostawy palet"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "check_termination_condition",
+   "arguments": {
+    "supplier": "Mleczna Dolina",
+    "as_of_month": "2026-09"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "check_termination_condition",
+   "arguments": {
+    "supplier": "SUP-114",
+    "as_of_month": "2026-10"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  },
+  {
+   "tool": "check_termination_condition",
+   "arguments": {
+    "supplier": "SUP-207",
+    "as_of_month": "2026-07"
+   },
+   "same": true,
+   "differences": [],
+   "error": null
+  }
+ ],
+ "replay": {
+  "mode": "replay",
+  "run": {
+   "run_id": "20261104T094520-03c886a0",
+   "date": "2026-11-04",
+   "provider": "scripted",
+   "model": "idealne rozumienie ze wzorca, agent ze skryptu",
+   "transport": "stdio",
+   "backend": "memory",
+   "policy_version": "course-v1",
+   "terms_version": "terms-v1",
+   "tools_variant": "ours",
+   "understand_prompt": "assistant_understand_system",
+   "agent_prompt": "agent_system",
+   "budget": {
+    "max_steps": 24,
+    "timeout_s": 180
+   },
+   "understand_calls": 25,
+   "agent_calls": 4,
+   "expected_calls": {
+    "understand": 25,
+    "agent": 4
+   }
+  },
+  "turns": [
+   {
+    "dialogue": "C1",
+    "n": 1,
+    "expected_kind": "document_question",
+    "entry": {
+     "user": "Ile wynosi kara, którą Mleczna Dolina jest winna Kovalo za lipiec 2026 r.? Podaj",
+     "turn": {
+      "kind": "document_question",
+      "request_action": "none",
+      "standalone": "Ile wynosi kara, którą Mleczna Dolina jest winna Kovalo za lipiec 2026 r.? Podaj",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "(odpowiedź agenta)",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00020333402790129185,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": null,
+       "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      }
+     ],
+     "seconds": 0.008503207995090634
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C1",
+    "n": 2,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Teraz prześlij do akceptacji rabat 14% na wodę niegazowaną dla Biedronki z marżą",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 14% na wodę niegazowaną dla Biedronki z marżą po ra",
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela "
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Dyrektor handlowy. To symulacja: nic nie trafia",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00014749995898455381,
+       "error": null
+      }
+     ],
+     "seconds": 0.006132584006991237
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C1",
+    "n": 3,
+    "expected_kind": "document_question",
+    "entry": {
+     "user": "A jaki był OTIF dostawcy Aqua Kryształ w lipcu 2026 r.?",
+     "turn": {
+      "kind": "document_question",
+      "request_action": "none",
+      "standalone": "Jaki był OTIF dostawcy Aqua Kryształ w lipcu 2026 r.?",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {
+      "Dyrektor handlowy": "approved"
+     },
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "(odpowiedź agenta)",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.0001302079763263464,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": null,
+       "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      }
+     ],
+     "seconds": 0.0038337919977493584
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C1",
+    "n": 4,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij jeszcze raz ten sam rabat dla Biedronki.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "update",
+      "standalone": "Prześlij ponownie do akceptacji rabat 14% na wodę niegazowaną dla Biedronki z ma",
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela "
+     ],
+     "pauses": [],
+     "approvals": {
+      "Dyrektor handlowy": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Już zatwierdzone (wersja 1): Dyrektor handlowy zatwierdzili ten wniosek bez zmia",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00014341605128720403,
+       "error": null
+      }
+     ],
+     "seconds": 0.004581083019729704
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C2",
+    "n": 1,
+    "expected_kind": "policy_question",
+    "entry": {
+     "user": "Kto musi zatwierdzić rabat 22% dla naszego klienta strategicznego Carrefour Expr",
+     "turn": {
+      "kind": "policy_question",
+      "request_action": "none",
+      "standalone": "Kto musi zatwierdzić rabat 22% dla klienta strategicznego Carrefour Express przy",
+      "discount_pct": 22.0,
+      "margin_after_pct": 7.0,
+      "clearance": null,
+      "strategic_account": true,
+      "competitor_offer": null,
+      "customer": "Carrefour Express",
+      "product": null
+     },
+     "request": null,
+     "approvers": [
+      "Dyrektor handlowy",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "wyjątek: klient strategiczny (do 25%); zatwierdza: Dyrektor handlowy (POL-001)",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Rabat 22% (klient strategiczny, marża po rabacie 7%) zatwierdza: Dyrektor handlo",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.0001218329998664558,
+       "error": null
+      }
+     ],
+     "seconds": 0.002570167009253055
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C2",
+    "n": 2,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij to.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 22% dla klienta strategicznego Carrefour Express z ",
+      "discount_pct": 22.0,
+      "margin_after_pct": 7.0,
+      "clearance": null,
+      "strategic_account": true,
+      "competitor_offer": null,
+      "customer": "Carrefour Express",
+      "product": null
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 22.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": true,
+      "competitor_offer": false,
+      "customer": "Carrefour Express",
+      "product": null
+     },
+     "approvers": [
+      "Dyrektor handlowy",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "wyjątek: klient strategiczny (do 25%); zatwierdza: Dyrektor handlowy (POL-001)",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "approved",
+      "CFO": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Dyrektor handlowy i CFO. To symulacja: nic nie ",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00013191701145842671,
+       "error": null
+      }
+     ],
+     "seconds": 0.007727916003204882
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C3",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Zatwierdź rabat 14% na wodę niegazowaną dla Biedronki, marża po rabacie 10%. Pot",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Zatwierdź rabat 14% na wodę niegazowaną dla Biedronki z marżą po rabacie 10%.",
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela "
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "rejected"
+     },
+     "status": "rejected",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek odrzucony (wersja 1) przez: Dyrektor handlowy. To symulacja: nic nie tra",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00013099994976073503,
+       "error": null
+      }
+     ],
+     "seconds": 0.0053084169630892575
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C3",
+    "n": 2,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Spróbuj jeszcze raz na tych samych warunkach.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "update",
+      "standalone": "Prześlij ponownie do akceptacji rabat 14% na wodę niegazowaną dla Biedronki z ma",
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela "
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Dyrektor handlowy. To symulacja: nic nie trafia",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00032133294735103846,
+       "error": null
+      }
+     ],
+     "seconds": 0.005615166970528662
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C4",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 8% na chipsy dla Delikatesów Pod Lipami.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 8% na chipsy dla Delikatesów Pod Lipami.",
+      "discount_pct": 8.0,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 8.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "approvers": [
+      "Regionalny kierownik sprzedaży",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 8% mieści się w przedziale do 12%; zatwierdza: Regionalny kierownik sprzed",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [
+      [
+       "clarification",
+       "margin_after_pct"
+      ],
+      [
+       "approval",
+       "Regionalny kierownik sprzedaży"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "Regionalny kierownik sprzedaży": "approved",
+      "CFO": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Regionalny kierownik sprzedaży i CFO. To symula",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00013508403208106756,
+       "error": null
+      }
+     ],
+     "seconds": 0.010000458976719528
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C4",
+    "n": 2,
+    "expected_kind": "policy_question",
+    "entry": {
+     "user": "Przy tej samej marży kto zatwierdziłby 12%?",
+     "turn": {
+      "kind": "policy_question",
+      "request_action": "none",
+      "standalone": "Kto zatwierdziłby rabat 12% przy marży po rabacie 7%?",
+      "discount_pct": 12.0,
+      "margin_after_pct": 7.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 8.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "approvers": [
+      "Regionalny kierownik sprzedaży",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 12% mieści się w przedziale do 12%; zatwierdza: Regionalny kierownik sprze",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [],
+     "approvals": {
+      "Regionalny kierownik sprzedaży": "approved",
+      "CFO": "approved"
+     },
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Rabat 12% (marża po rabacie 7%) zatwierdza: Regionalny kierownik sprzedaży i CFO",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00014662503963336349,
+       "error": null
+      }
+     ],
+     "seconds": 0.0027880409616045654
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C5",
+    "n": 1,
+    "expected_kind": "document_question",
+    "entry": {
+     "user": "Jaki był OTIF Mlecznej Doliny w październiku 2026 r.?",
+     "turn": {
+      "kind": "document_question",
+      "request_action": "none",
+      "standalone": "Jaki był OTIF Mlecznej Doliny w październiku 2026 r.?",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "(odpowiedź agenta)",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00013158301590010524,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": null,
+       "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      }
+     ],
+     "seconds": 0.004268707998562604
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C5",
+    "n": 2,
+    "expected_kind": "other",
+    "entry": {
+     "user": "Dzięki!",
+     "turn": {
+      "kind": "other",
+      "request_action": "none",
+      "standalone": "Dzięki!",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Jestem Kovalo Decision Copilot. Mogę:\n- odpowiedzieć na pytania o dokumenty Kova",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00011804100358858705,
+       "error": null
+      }
+     ],
+     "seconds": 0.002351250033825636
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D1",
+    "n": 1,
+    "expected_kind": "policy_question",
+    "entry": {
+     "user": "Kto zatwierdza rabat 15% dla zwykłego klienta?",
+     "turn": {
+      "kind": "policy_question",
+      "request_action": "none",
+      "standalone": "Kto zatwierdza rabat 15% dla zwykłego klienta?",
+      "discount_pct": 15.0,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 15% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela ",
+      "marża po rabacie nieznana: minimalnej marży nie sprawdzono"
+     ],
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Rabat 15% zatwierdza: Dyrektor handlowy.\nUzasadnienie (course-v1):\n- rabat 15% m",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.0001285409671254456,
+       "error": null
+      }
+     ],
+     "seconds": 0.0024720420478843153
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D1",
+    "n": 2,
+    "expected_kind": "policy_question",
+    "entry": {
+     "user": "A 22%?",
+     "turn": {
+      "kind": "policy_question",
+      "request_action": "none",
+      "standalone": "Kto zatwierdza rabat 22% dla zwykłego klienta?",
+      "discount_pct": 22.0,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": [
+      "CEO",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "marża po rabacie nieznana: minimalnej marży nie sprawdzono"
+     ],
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Rabat 22% zatwierdza: CEO i CFO.\nUzasadnienie (course-v1):\n- rabat 22% mieści si",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00011566700413823128,
+       "error": null
+      }
+     ],
+     "seconds": 0.0026447090203873813
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D1",
+    "n": 3,
+    "expected_kind": "policy_question",
+    "entry": {
+     "user": "Kto zatwierdza 3% dla klienta strategicznego przy marży po rabacie 10%?",
+     "turn": {
+      "kind": "policy_question",
+      "request_action": "none",
+      "standalone": "Kto zatwierdza rabat 3% dla klienta strategicznego przy marży po rabacie 10%?",
+      "discount_pct": 3.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": true,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": [
+      "Przedstawiciel handlowy"
+     ],
+     "reasons": [
+      "rabat 3% mieści się w przedziale do 5%; zatwierdza: Przedstawiciel handlowy (tab"
+     ],
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Rabat 3% (klient strategiczny, marża po rabacie 10%) zatwierdza: Przedstawiciel ",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00012325000716373324,
+       "error": null
+      }
+     ],
+     "seconds": 0.002672458009328693
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D2",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 14% na wodę dla Biedronki Express; marża po rabacie",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 14% na wodę dla Biedronki Express z marżą po rabaci",
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Biedronka Express",
+      "product": "woda"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka Express",
+      "product": "woda"
+     },
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela "
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Dyrektor handlowy. To symulacja: nic nie trafia",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.0001289580250158906,
+       "error": null
+      }
+     ],
+     "seconds": 0.0056357909925282
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D2",
+    "n": 2,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Jednak zróbmy 22%, marża bez zmian.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "update",
+      "standalone": "Zmień rabat na wodę dla Biedronki Express na 22% przy marży po rabacie 10%.",
+      "discount_pct": 22.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": {
+      "revision": 2,
+      "discount_pct": 22.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka Express",
+      "product": "woda"
+     },
+     "approvers": [
+      "CEO",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "CEO"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "CEO": "approved",
+      "CFO": "rejected"
+     },
+     "status": "rejected",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek odrzucony (wersja 2) przez: CFO. To symulacja: nic nie trafia do CRM-u.",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00011566601460799575,
+       "error": null
+      }
+     ],
+     "seconds": 0.007191833050455898
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D3",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 8% na chipsy dla Delikatesów Pod Lipami.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 8% na chipsy dla Delikatesów Pod Lipami.",
+      "discount_pct": 8.0,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 8.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "approvers": [
+      "Regionalny kierownik sprzedaży",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 8% mieści się w przedziale do 12%; zatwierdza: Regionalny kierownik sprzed",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [
+      [
+       "clarification",
+       "margin_after_pct"
+      ],
+      [
+       "approval",
+       "Regionalny kierownik sprzedaży"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "Regionalny kierownik sprzedaży": "approved",
+      "CFO": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Regionalny kierownik sprzedaży i CFO. To symula",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00014775001909583807,
+       "error": null
+      }
+     ],
+     "seconds": 0.009463375026825815
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D4",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 30% na jogurt z wyprzedaży końcówek; marża po rabac",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 30% na jogurt z wyprzedaży końcówek z marżą po raba",
+      "discount_pct": 30.0,
+      "margin_after_pct": 4.0,
+      "clearance": true,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": "jogurt"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 30.0,
+      "margin_after_pct": 4.0,
+      "clearance": true,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": null,
+      "product": "jogurt"
+     },
+     "approvers": [
+      "Regionalny kierownik sprzedaży"
+     ],
+     "reasons": [
+      "rabat 30% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "wyjątek: wyprzedaż końcówek (do 35%); zatwierdza: Regionalny kierownik sprzedaży",
+      "wyprzedaż końcówek jest zwolniona z minimalnej marży (POL-001)"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Regionalny kierownik sprzedaży"
+      ]
+     ],
+     "approvals": {
+      "Regionalny kierownik sprzedaży": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Regionalny kierownik sprzedaży. To symulacja: n",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00013420800678431988,
+       "error": null
+      }
+     ],
+     "seconds": 0.006236957968212664
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D4",
+    "n": 2,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Nowe zamówienie – 30% rabatu na wodę niegazowaną dla Żabki nr 12, marża po rabac",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 30% na wodę niegazowaną dla Żabki nr 12 z marżą po ",
+      "discount_pct": 30.0,
+      "margin_after_pct": 11.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Żabka nr 12",
+      "product": "woda niegazowana"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 30.0,
+      "margin_after_pct": 11.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Żabka nr 12",
+      "product": "woda niegazowana"
+     },
+     "approvers": [
+      "CEO",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 30% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "CEO"
+      ]
+     ],
+     "approvals": {},
+     "status": "cancelled",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek anulowany. Nic nie zostało złożone.",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00027133303228765726,
+       "error": null
+      }
+     ],
+     "seconds": 0.005442499998025596
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D5",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 22% dla naszego klienta strategicznego Carrefour Ex",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 22% dla klienta strategicznego Carrefour Express z ",
+      "discount_pct": 22.0,
+      "margin_after_pct": 7.0,
+      "clearance": null,
+      "strategic_account": true,
+      "competitor_offer": null,
+      "customer": "Carrefour Express",
+      "product": null
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 22.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": true,
+      "competitor_offer": false,
+      "customer": "Carrefour Express",
+      "product": null
+     },
+     "approvers": [
+      "Dyrektor handlowy",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "wyjątek: klient strategiczny (do 25%); zatwierdza: Dyrektor handlowy (POL-001)",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "approved",
+      "CFO": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Dyrektor handlowy i CFO. To symulacja: nic nie ",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.0001285409671254456,
+       "error": null
+      }
+     ],
+     "seconds": 0.007538125035353005
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D6",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji 14% dla klienta strategicznego Auchan Moje, żeby dorównać",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 14% dla klienta strategicznego Auchan Moje w odpowi",
+      "discount_pct": 14.0,
+      "margin_after_pct": 7.0,
+      "clearance": null,
+      "strategic_account": true,
+      "competitor_offer": true,
+      "customer": "Auchan Moje",
+      "product": null
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": true,
+      "competitor_offer": true,
+      "customer": "Auchan Moje",
+      "product": null
+     },
+     "approvers": [
+      "Regionalny kierownik sprzedaży",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela ",
+      "wyjątek: oferta konkurencji (do 15%); zatwierdza: Regionalny kierownik sprzedaży",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Regionalny kierownik sprzedaży"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "Regionalny kierownik sprzedaży": "approved",
+      "CFO": "rejected"
+     },
+     "status": "rejected",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek odrzucony (wersja 1) przez: CFO. To symulacja: nic nie trafia do CRM-u.",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00012091698590666056,
+       "error": null
+      }
+     ],
+     "seconds": 0.007021541998255998
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D7",
+    "n": 1,
+    "expected_kind": "document_question",
+    "entry": {
+     "user": "Co komitet cenowy postanowił w sprawie cen wody butelkowanej?",
+     "turn": {
+      "kind": "document_question",
+      "request_action": "none",
+      "standalone": "Co komitet cenowy postanowił w sprawie cen wody butelkowanej?",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "(odpowiedź agenta)",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00012575002619996667,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": null,
+       "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      }
+     ],
+     "seconds": 0.0039283750229515135
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D7",
+    "n": 2,
+    "expected_kind": "other",
+    "entry": {
+     "user": "Dzięki!",
+     "turn": {
+      "kind": "other",
+      "request_action": "none",
+      "standalone": "Dzięki!",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Jestem Kovalo Decision Copilot. Mogę:\n- odpowiedzieć na pytania o dokumenty Kova",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.0001313330139964819,
+       "error": null
+      }
+     ],
+     "seconds": 0.002794707950670272
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D8",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 36% na jogurt z wyprzedaży końcówek; marża po rabac",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 36% na jogurt z wyprzedaży końcówek z marżą po raba",
+      "discount_pct": 36.0,
+      "margin_after_pct": 4.0,
+      "clearance": true,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": "jogurt"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 36.0,
+      "margin_after_pct": 4.0,
+      "clearance": true,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": null,
+      "product": "jogurt"
+     },
+     "approvers": [
+      "CEO",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 36% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "wyjątek: wyprzedaż końcówek nie ma zastosowania: rabat 36% przekracza limit 35%",
+      "wyprzedaż końcówek jest zwolniona z minimalnej marży (POL-001)"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "CEO"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "CEO": "approved",
+      "CFO": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): CEO i CFO. To symulacja: nic nie trafia do CRM-",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": null,
+       "usage": null,
+       "seconds": 0.00013504200614988804,
+       "error": null
+      }
+     ],
+     "seconds": 0.007096084009390324
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   }
+  ],
+  "totals": {
+   "route": [
+    25,
+    25
+   ],
+   "status": [
+    25,
+    25
+   ],
+   "fields": [
+    11,
+    11
+   ],
+   "pauses": [
+    22,
+    22
+   ],
+   "approvers": [
+    19,
+    19
+   ],
+   "request": [
+    15,
+    15
+   ],
+   "agent_trace": [
+    25,
+    25
+   ],
+   "tool_coverage": [
+    0,
+    0
+   ],
+   "arguments_correct": [
+    0,
+    0
+   ],
+   "answer_facts": [
+    0,
+    0
+   ],
+   "numbers_backed": [
+    0,
+    0
+   ],
+   "no_approval_claim": [
+    0,
+    0
+   ]
+  },
+  "calls": {
+   "understand_network": 0,
+   "understand_cache": 0,
+   "agent_network": 0,
+   "agent_cache": 0,
+   "errors": 0,
+   "mcp_calls": 0,
+   "mcp_failures": {}
+  },
+  "answered_by": {},
+  "tokens_in": 0,
+  "tokens_out": 0,
+  "seconds": 0.23
+ },
+ "live": {
+  "mode": "live",
+  "run": {
+   "run_id": "20261104T094520-81a7435e",
+   "date": "2026-11-04",
+   "provider": "google_genai",
+   "model": "gemini-3.5-flash-lite",
+   "transport": "stdio",
+   "backend": "memory",
+   "policy_version": "course-v1",
+   "terms_version": "terms-v1",
+   "tools_variant": "ours",
+   "understand_prompt": "assistant_understand_system",
+   "agent_prompt": "agent_system",
+   "budget": {
+    "max_steps": 24,
+    "timeout_s": 180
+   }
+  },
+  "turns": [
+   {
+    "dialogue": "C1",
+    "n": 1,
+    "expected_kind": "document_question",
+    "entry": {
+     "user": "Ile wynosi kara, którą Mleczna Dolina jest winna Kovalo za lipiec 2026 r.? Podaj",
+     "turn": {
+      "kind": "document_question",
+      "request_action": "none",
+      "standalone": "Ile wynosi kara, którą Mleczna Dolina jest winna Kovalo za lipiec 2026 r.? Podaj",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Mleczna Dolina",
+      "product": null
+     },
+     "request": null,
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Kara, którą Mleczna Dolina jest winna Kovalo za lipiec 2026 r., wynosi **7 296,0",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 442,
+        "output_tokens": 106,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0031714170472696424,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 2293,
+        "output_tokens": 107,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 2684,
+        "output_tokens": 64,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 2892,
+        "output_tokens": 301,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      }
+     ],
+     "seconds": 0.049400667019654065
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "agent_trace": true,
+     "agent_score": {
+      "outcome": "answered",
+      "tool_coverage": 1.0,
+      "arguments_correct": true,
+      "answer_fact_coverage": 1.0,
+      "numeric_source_coverage": 1.0,
+      "uncovered_numbers": [],
+      "user_stated_numbers": [],
+      "approval_claim": false,
+      "tool_calls": 4,
+      "failed_calls": 0
+     },
+     "tool_coverage": true,
+     "arguments_correct": true,
+     "answer_facts": true,
+     "numbers_backed": true,
+     "no_approval_claim": true
+    },
+    "mcp": [
+     {
+      "invocation_id": "37a922c33779",
+      "thread_id": "20261104T094520-81a7435e-C1",
+      "turn": 1,
+      "tool": "get_contract_terms",
+      "arguments": {
+       "supplier": "Mleczna Dolina"
+      },
+      "server": "kovalo",
+      "structured": {
+       "status": "ok",
+       "supplier_id": "SUP-114",
+       "supplier": "Mleczna Dolina",
+       "source_doc_id": "CON-101",
+       "otif_target_pct": 97.0,
+       "penalty_clause": true,
+       "rate_per_full_point_pct": 2.0,
+       "cap_pct": 10.0,
+       "settlement": "nota uznaniowa do faktury za następny miesiąc",
+       "terms_version": "terms-v1",
+       "message": null
+      },
+      "text": [
+       "{\n  \"status\": \"ok\",\n  \"supplier_id\": \"SUP-114\",\n  \"supplier\": \"Mleczna Dolina\",\n"
+      ],
+      "is_error": false,
+      "outcome": "ok"
+     },
+     {
+      "invocation_id": "805d18c2866f",
+      "thread_id": "20261104T094520-81a7435e-C1",
+      "turn": 1,
+      "tool": "get_supplier_otif",
+      "arguments": {
+       "to_month": "2026-07",
+       "supplier": "Mleczna Dolina",
+       "from_month": "2026-07"
+      },
+      "server": "kovalo",
+      "structured": {
+       "status": "ok",
+       "supplier_id": "SUP-114",
+       "supplier": "Mleczna Dolina",
+       "requested": {
+        "from": "2026-07",
+        "to": "2026-07"
+       },
+       "observations": [
+        {
+         "month": "2026-07",
+         "otif_pct": 94.6
+        }
+       ],
+       "missing_months": [],
+       "complete": true,
+       "message": null
+      },
+      "text": [
+       "{\n  \"status\": \"ok\",\n  \"supplier_id\": \"SUP-114\",\n  \"supplier\": \"Mleczna Dolina\",\n"
+      ],
+      "is_error": false,
+      "outcome": "ok"
+     },
+     {
+      "invocation_id": "af6e2dd08207",
+      "thread_id": "20261104T094520-81a7435e-C1",
+      "turn": 1,
+      "tool": "get_invoice_value",
+      "arguments": {
+       "supplier": "Mleczna Dolina",
+       "month": "2026-07"
+      },
+      "server": "kovalo",
+      "structured": {
+       "status": "ok",
+       "supplier_id": "SUP-114",
+       "supplier": "Mleczna Dolina",
+       "month": "2026-07",
+       "invoiced_grosze": 18240000,
+       "currency": "PLN",
+       "message": null
+      },
+      "text": [
+       "{\n  \"status\": \"ok\",\n  \"supplier_id\": \"SUP-114\",\n  \"supplier\": \"Mleczna Dolina\",\n"
+      ],
+      "is_error": false,
+      "outcome": "ok"
+     },
+     {
+      "invocation_id": "c26cfd07a2ea",
+      "thread_id": "20261104T094520-81a7435e-C1",
+      "turn": 1,
+      "tool": "calculate_otif_penalty",
+      "arguments": {
+       "rate_per_full_point_pct": 2,
+       "target_pct": 97,
+       "cap_pct": 10,
+       "otif_pct": 94.6,
+       "invoice_grosze": 18240000
+      },
+      "server": "kovalo",
+      "structured": {
+       "status": "ok",
+       "otif_pct": 94.6,
+       "target_pct": 97.0,
+       "rate_per_full_point_pct": 2.0,
+       "cap_pct": 10.0,
+       "invoice_grosze": 18240000,
+       "shortfall_points": 2.4,
+       "full_points": 2,
+       "penalty_pct_uncapped": 4.0,
+       "penalty_pct": 4.0,
+       "penalty_grosze": 729600,
+       "currency": "PLN",
+       "note": "arytmetyka na podanych danych wejściowych; nie przesądza, czy kara się należy",
+       "message": null
+      },
+      "text": [
+       "{\n  \"status\": \"ok\",\n  \"otif_pct\": 94.6,\n  \"target_pct\": 97.0,\n  \"rate_per_full_p"
+      ],
+      "is_error": false,
+      "outcome": "ok"
+     }
+    ]
+   },
+   {
+    "dialogue": "C1",
+    "n": 2,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Teraz prześlij do akceptacji rabat 14% na wodę niegazowaną dla Biedronki z marżą",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 14% na wodę niegazowaną dla Biedronki z marżą po ra",
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela "
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Dyrektor handlowy. To symulacja: nic nie trafia",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 781,
+        "output_tokens": 142,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0023851669975556433,
+       "error": null
+      }
+     ],
+     "seconds": 0.008045334019698203
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C1",
+    "n": 3,
+    "expected_kind": "document_question",
+    "entry": {
+     "user": "A jaki był OTIF dostawcy Aqua Kryształ w lipcu 2026 r.?",
+     "turn": {
+      "kind": "document_question",
+      "request_action": "none",
+      "standalone": "Jaki był OTIF dostawcy Aqua Kryształ w lipcu 2026 r.?",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": "Aqua Kryształ"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {
+      "Dyrektor handlowy": "approved"
+     },
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "OTIF dostawcy Aqua Kryształ (SUP-207) w lipcu 2026 r. wyniósł **95,1%** (dane z ",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 956,
+        "output_tokens": 114,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.002341749961487949,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 2280,
+        "output_tokens": 49,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 2426,
+        "output_tokens": 49,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      }
+     ],
+     "seconds": 0.017174000036902726
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "request": true,
+     "agent_trace": true,
+     "agent_score": {
+      "outcome": "answered",
+      "tool_coverage": 1.0,
+      "arguments_correct": null,
+      "answer_fact_coverage": 1.0,
+      "numeric_source_coverage": 1.0,
+      "uncovered_numbers": [],
+      "user_stated_numbers": [],
+      "approval_claim": false,
+      "tool_calls": 1,
+      "failed_calls": 0
+     },
+     "tool_coverage": true,
+     "answer_facts": true,
+     "numbers_backed": true,
+     "no_approval_claim": true
+    },
+    "mcp": [
+     {
+      "invocation_id": "e1fba981fb95",
+      "thread_id": "20261104T094520-81a7435e-C1",
+      "turn": 3,
+      "tool": "get_supplier_otif",
+      "arguments": {
+       "to_month": "2026-07",
+       "from_month": "2026-07",
+       "supplier": "Aqua Kryształ"
+      },
+      "server": "kovalo",
+      "structured": {
+       "status": "ok",
+       "supplier_id": "SUP-207",
+       "supplier": "Aqua Kryształ",
+       "requested": {
+        "from": "2026-07",
+        "to": "2026-07"
+       },
+       "observations": [
+        {
+         "month": "2026-07",
+         "otif_pct": 95.1
+        }
+       ],
+       "missing_months": [],
+       "complete": true,
+       "message": null
+      },
+      "text": [
+       "{\n  \"status\": \"ok\",\n  \"supplier_id\": \"SUP-207\",\n  \"supplier\": \"Aqua Kryształ\",\n "
+      ],
+      "is_error": false,
+      "outcome": "ok"
+     }
+    ]
+   },
+   {
+    "dialogue": "C1",
+    "n": 4,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij jeszcze raz ten sam rabat dla Biedronki.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "update",
+      "standalone": "Prześlij jeszcze raz ten sam rabat 14% na wodę niegazowaną dla Biedronki z marżą",
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela "
+     ],
+     "pauses": [],
+     "approvals": {
+      "Dyrektor handlowy": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Już zatwierdzone (wersja 1): Dyrektor handlowy zatwierdzili ten wniosek bez zmia",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 1022,
+        "output_tokens": 138,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0023958749952726066,
+       "error": null
+      }
+     ],
+     "seconds": 0.005960167036391795
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C2",
+    "n": 1,
+    "expected_kind": "policy_question",
+    "entry": {
+     "user": "Kto musi zatwierdzić rabat 22% dla naszego klienta strategicznego Carrefour Expr",
+     "turn": {
+      "kind": "policy_question",
+      "request_action": "none",
+      "standalone": "Kto musi zatwierdzić rabat 22% dla klienta strategicznego Carrefour Express przy",
+      "discount_pct": 22.0,
+      "margin_after_pct": 7.0,
+      "clearance": null,
+      "strategic_account": true,
+      "competitor_offer": null,
+      "customer": "Carrefour Express",
+      "product": null
+     },
+     "request": null,
+     "approvers": [
+      "Dyrektor handlowy",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "wyjątek: klient strategiczny (do 25%); zatwierdza: Dyrektor handlowy (POL-001)",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Rabat 22% (klient strategiczny, marża po rabacie 7%) zatwierdza: Dyrektor handlo",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 440,
+        "output_tokens": 125,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0021679580095224082,
+       "error": null
+      }
+     ],
+     "seconds": 0.004415999981574714
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C2",
+    "n": 2,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij to.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "update",
+      "standalone": "Prześlij wniosek o rabat 22% dla klienta strategicznego Carrefour Express przy m",
+      "discount_pct": 22.0,
+      "margin_after_pct": 7.0,
+      "clearance": null,
+      "strategic_account": true,
+      "competitor_offer": null,
+      "customer": "Carrefour Express",
+      "product": null
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 22.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": true,
+      "competitor_offer": false,
+      "customer": "Carrefour Express",
+      "product": null
+     },
+     "approvers": [
+      "Dyrektor handlowy",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "wyjątek: klient strategiczny (do 25%); zatwierdza: Dyrektor handlowy (POL-001)",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "approved",
+      "CFO": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Dyrektor handlowy i CFO. To symulacja: nic nie ",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 609,
+        "output_tokens": 95,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.002370250003878027,
+       "error": null
+      }
+     ],
+     "seconds": 0.010605374991428107
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C3",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Zatwierdź rabat 14% na wodę niegazowaną dla Biedronki, marża po rabacie 10%. Pot",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Zatwierdź rabat 14% na wodę niegazowaną dla Biedronki, marża po rabacie 10%. Pot",
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela "
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "rejected"
+     },
+     "status": "rejected",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek odrzucony (wersja 1) przez: Dyrektor handlowy. To symulacja: nic nie tra",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 451,
+        "output_tokens": 145,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0020933750201947987,
+       "error": null
+      }
+     ],
+     "seconds": 0.006840084039140493
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C3",
+    "n": 2,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Spróbuj jeszcze raz na tych samych warunkach.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "update",
+      "standalone": "Spróbuj jeszcze raz zatwierdzić rabat 14% na wodę niegazowaną dla Biedronki, mar",
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka",
+      "product": "woda niegazowana"
+     },
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela "
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Dyrektor handlowy. To symulacja: nic nie trafia",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 621,
+        "output_tokens": 150,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.002133832953404635,
+       "error": null
+      }
+     ],
+     "seconds": 0.007054334040731192
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C4",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 8% na chipsy dla Delikatesów Pod Lipami.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 8% na chipsy dla Delikatesów Pod Lipami.",
+      "discount_pct": 8.0,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 8.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "approvers": [
+      "Regionalny kierownik sprzedaży",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 8% mieści się w przedziale do 12%; zatwierdza: Regionalny kierownik sprzed",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [
+      [
+       "clarification",
+       "margin_after_pct"
+      ],
+      [
+       "approval",
+       "Regionalny kierownik sprzedaży"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "Regionalny kierownik sprzedaży": "approved",
+      "CFO": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Regionalny kierownik sprzedaży i CFO. To symula",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 433,
+        "output_tokens": 126,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0021143750054761767,
+       "error": null
+      }
+     ],
+     "seconds": 0.010742709040641785
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C4",
+    "n": 2,
+    "expected_kind": "policy_question",
+    "entry": {
+     "user": "Przy tej samej marży kto zatwierdziłby 12%?",
+     "turn": {
+      "kind": "policy_question",
+      "request_action": "none",
+      "standalone": "Kto zatwierdziłby rabat 12% przy marży 7% dla Delikatesów Pod Lipami na chipsy?",
+      "discount_pct": 12.0,
+      "margin_after_pct": 7.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 8.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "approvers": [
+      "Regionalny kierownik sprzedaży",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 12% mieści się w przedziale do 12%; zatwierdza: Regionalny kierownik sprze",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [],
+     "approvals": {
+      "Regionalny kierownik sprzedaży": "approved",
+      "CFO": "approved"
+     },
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Rabat 12% (marża po rabacie 7%) zatwierdza: Regionalny kierownik sprzedaży i CFO",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 649,
+        "output_tokens": 133,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0022332919761538506,
+       "error": null
+      }
+     ],
+     "seconds": 0.004765334015246481
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "approvers": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "C5",
+    "n": 1,
+    "expected_kind": "document_question",
+    "entry": {
+     "user": "Jaki był OTIF Mlecznej Doliny w październiku 2026 r.?",
+     "turn": {
+      "kind": "document_question",
+      "request_action": "none",
+      "standalone": "Jaki był wskaźnik OTIF dostawcy Mlecznej Doliny w październiku 2026 roku?",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Mleczna Dolina",
+      "product": null
+     },
+     "request": null,
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Wskaźnik OTIF dostawcy Mleczna Dolina w październiku 2026 roku jest niedostępny ",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 429,
+        "output_tokens": 98,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0019730000058189034,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 2286,
+        "output_tokens": 51,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 2441,
+        "output_tokens": 37,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      }
+     ],
+     "seconds": 0.016660750028677285
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "agent_trace": true,
+     "agent_score": {
+      "outcome": "answered",
+      "tool_coverage": 1.0,
+      "arguments_correct": null,
+      "answer_fact_coverage": 1.0,
+      "numeric_source_coverage": null,
+      "uncovered_numbers": [],
+      "user_stated_numbers": [],
+      "approval_claim": false,
+      "tool_calls": 1,
+      "failed_calls": 0
+     },
+     "tool_coverage": true,
+     "answer_facts": true,
+     "numbers_backed": true,
+     "no_approval_claim": true
+    },
+    "mcp": [
+     {
+      "invocation_id": "9212f9a6d6ab",
+      "thread_id": "20261104T094520-81a7435e-C5",
+      "turn": 1,
+      "tool": "get_supplier_otif",
+      "arguments": {
+       "supplier": "Mleczna Dolina",
+       "from_month": "2026-10",
+       "to_month": "2026-10"
+      },
+      "server": "kovalo",
+      "structured": {
+       "status": "no_data",
+       "supplier_id": "SUP-114",
+       "supplier": "Mleczna Dolina",
+       "requested": {
+        "from": "2026-10",
+        "to": "2026-10"
+       },
+       "observations": [],
+       "missing_months": [
+        "2026-10"
+       ],
+       "complete": false,
+       "message": "brak danych za 2026-10"
+      },
+      "text": [
+       "{\n  \"status\": \"no_data\",\n  \"supplier_id\": \"SUP-114\",\n  \"supplier\": \"Mleczna Doli"
+      ],
+      "is_error": false,
+      "outcome": "ok"
+     }
+    ]
+   },
+   {
+    "dialogue": "C5",
+    "n": 2,
+    "expected_kind": "other",
+    "entry": {
+     "user": "Dzięki!",
+     "turn": {
+      "kind": "other",
+      "request_action": "none",
+      "standalone": "Dzięki!",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Jestem Kovalo Decision Copilot. Mogę:\n- odpowiedzieć na pytania o dokumenty Kova",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 471,
+        "output_tokens": 90,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.002042541978880763,
+       "error": null
+      }
+     ],
+     "seconds": 0.004431749985087663
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D1",
+    "n": 1,
+    "expected_kind": "policy_question",
+    "entry": {
+     "user": "Kto zatwierdza rabat 15% dla zwykłego klienta?",
+     "turn": {
+      "kind": "policy_question",
+      "request_action": "none",
+      "standalone": "Kto zatwierdza rabat 15% dla zwykłego klienta?",
+      "discount_pct": 15.0,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 15% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela ",
+      "marża po rabacie nieznana: minimalnej marży nie sprawdzono"
+     ],
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Rabat 15% zatwierdza: Dyrektor handlowy.\nUzasadnienie (course-v1):\n- rabat 15% m",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 428,
+        "output_tokens": 110,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0028446659562177956,
+       "error": null
+      }
+     ],
+     "seconds": 0.005011542001739144
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D1",
+    "n": 2,
+    "expected_kind": "policy_question",
+    "entry": {
+     "user": "A 22%?",
+     "turn": {
+      "kind": "policy_question",
+      "request_action": "none",
+      "standalone": "Kto zatwierdza rabat 22% dla zwykłego klienta?",
+      "discount_pct": 22.0,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": [
+      "CEO",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "marża po rabacie nieznana: minimalnej marży nie sprawdzono"
+     ],
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Rabat 22% zatwierdza: CEO i CFO.\nUzasadnienie (course-v1):\n- rabat 22% mieści si",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 538,
+        "output_tokens": 76,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.002075917029287666,
+       "error": null
+      }
+     ],
+     "seconds": 0.0044092919561080635
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D1",
+    "n": 3,
+    "expected_kind": "policy_question",
+    "entry": {
+     "user": "Kto zatwierdza 3% dla klienta strategicznego przy marży po rabacie 10%?",
+     "turn": {
+      "kind": "policy_question",
+      "request_action": "none",
+      "standalone": "Kto zatwierdza rabat 3% dla klienta strategicznego przy marży po rabacie 10%?",
+      "discount_pct": 3.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": true,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": [
+      "Przedstawiciel handlowy"
+     ],
+     "reasons": [
+      "rabat 3% mieści się w przedziale do 5%; zatwierdza: Przedstawiciel handlowy (tab"
+     ],
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Rabat 3% (klient strategiczny, marża po rabacie 10%) zatwierdza: Przedstawiciel ",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 664,
+        "output_tokens": 119,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0021392919588834047,
+       "error": null
+      }
+     ],
+     "seconds": 0.004566250019706786
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D2",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 14% na wodę dla Biedronki Express; marża po rabacie",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 14% na wodę dla Biedronki Express; marża po rabacie",
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Biedronka Express",
+      "product": "woda"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka Express",
+      "product": "woda"
+     },
+     "approvers": [
+      "Dyrektor handlowy"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela "
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Dyrektor handlowy. To symulacja: nic nie trafia",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 444,
+        "output_tokens": 141,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.002026542031671852,
+       "error": null
+      }
+     ],
+     "seconds": 0.0069108749739825726
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D2",
+    "n": 2,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Jednak zróbmy 22%, marża bez zmian.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "update",
+      "standalone": "Zmień rabat na 22% dla Biedronki Express na wodę, marża po rabacie 10%.",
+      "discount_pct": 22.0,
+      "margin_after_pct": 10.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Biedronka Express",
+      "product": "woda"
+     },
+     "request": {
+      "revision": 2,
+      "discount_pct": 22.0,
+      "margin_after_pct": 10.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Biedronka Express",
+      "product": "woda"
+     },
+     "approvers": [
+      "CEO",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "CEO"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "CEO": "approved",
+      "CFO": "rejected"
+     },
+     "status": "rejected",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek odrzucony (wersja 2) przez: CFO. To symulacja: nic nie trafia do CRM-u.",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 612,
+        "output_tokens": 131,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.001984875008929521,
+       "error": null
+      }
+     ],
+     "seconds": 0.008899124979507178
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D3",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 8% na chipsy dla Delikatesów Pod Lipami.",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 8% na chipsy dla Delikatesów Pod Lipami.",
+      "discount_pct": 8.0,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 8.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Delikatesy Pod Lipami",
+      "product": "chipsy"
+     },
+     "approvers": [
+      "Regionalny kierownik sprzedaży",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 8% mieści się w przedziale do 12%; zatwierdza: Regionalny kierownik sprzed",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [
+      [
+       "clarification",
+       "margin_after_pct"
+      ],
+      [
+       "approval",
+       "Regionalny kierownik sprzedaży"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "Regionalny kierownik sprzedaży": "approved",
+      "CFO": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Regionalny kierownik sprzedaży i CFO. To symula",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 433,
+        "output_tokens": 126,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0016480829799547791,
+       "error": null
+      }
+     ],
+     "seconds": 0.01023291697492823
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D4",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 30% na jogurt z wyprzedaży końcówek; marża po rabac",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 30% na jogurt z wyprzedaży końcówek; marża po rabac",
+      "discount_pct": 30.0,
+      "margin_after_pct": 4.0,
+      "clearance": true,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": "jogurt"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 30.0,
+      "margin_after_pct": 4.0,
+      "clearance": true,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": null,
+      "product": "jogurt"
+     },
+     "approvers": [
+      "Regionalny kierownik sprzedaży"
+     ],
+     "reasons": [
+      "rabat 30% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "wyjątek: wyprzedaż końcówek (do 35%); zatwierdza: Regionalny kierownik sprzedaży",
+      "wyprzedaż końcówek jest zwolniona z minimalnej marży (POL-001)"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Regionalny kierownik sprzedaży"
+      ]
+     ],
+     "approvals": {
+      "Regionalny kierownik sprzedaży": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Regionalny kierownik sprzedaży. To symulacja: n",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 443,
+        "output_tokens": 107,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0020239170407876372,
+       "error": null
+      }
+     ],
+     "seconds": 0.006835749954916537
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D4",
+    "n": 2,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Nowe zamówienie – 30% rabatu na wodę niegazowaną dla Żabki nr 12, marża po rabac",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji 30% rabatu na wodę niegazowaną dla Żabka nr 12, marża po ",
+      "discount_pct": 30.0,
+      "margin_after_pct": 11.0,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": "Żabka nr 12",
+      "product": "woda niegazowana"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 30.0,
+      "margin_after_pct": 11.0,
+      "clearance": false,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": "Żabka nr 12",
+      "product": "woda niegazowana"
+     },
+     "approvers": [
+      "CEO",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 30% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "CEO"
+      ]
+     ],
+     "approvals": {},
+     "status": "cancelled",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek anulowany. Nic nie zostało złożone.",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 691,
+        "output_tokens": 106,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.002700291050132364,
+       "error": null
+      }
+     ],
+     "seconds": 0.00883350003277883
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D5",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 22% dla naszego klienta strategicznego Carrefour Ex",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 22% dla naszego klienta strategicznego Carrefour Ex",
+      "discount_pct": 22.0,
+      "margin_after_pct": 7.0,
+      "clearance": null,
+      "strategic_account": true,
+      "competitor_offer": null,
+      "customer": "Carrefour Express",
+      "product": null
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 22.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": true,
+      "competitor_offer": false,
+      "customer": "Carrefour Express",
+      "product": null
+     },
+     "approvers": [
+      "Dyrektor handlowy",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 22% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "wyjątek: klient strategiczny (do 25%); zatwierdza: Dyrektor handlowy (POL-001)",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Dyrektor handlowy"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "Dyrektor handlowy": "approved",
+      "CFO": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): Dyrektor handlowy i CFO. To symulacja: nic nie ",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 441,
+        "output_tokens": 132,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.002266541006974876,
+       "error": null
+      }
+     ],
+     "seconds": 0.009242124971933663
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D6",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji 14% dla klienta strategicznego Auchan Moje, żeby dorównać",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji 14% rabatu dla klienta strategicznego Auchan Moje, żeby d",
+      "discount_pct": 14.0,
+      "margin_after_pct": 7.0,
+      "clearance": null,
+      "strategic_account": true,
+      "competitor_offer": true,
+      "customer": "Auchan Moje",
+      "product": null
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 14.0,
+      "margin_after_pct": 7.0,
+      "clearance": false,
+      "strategic_account": true,
+      "competitor_offer": true,
+      "customer": "Auchan Moje",
+      "product": null
+     },
+     "approvers": [
+      "Regionalny kierownik sprzedaży",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 14% mieści się w przedziale do 20%; zatwierdza: Dyrektor handlowy (tabela ",
+      "wyjątek: oferta konkurencji (do 15%); zatwierdza: Regionalny kierownik sprzedaży",
+      "marża 7% jest niższa od minimalnej (9%); dochodzi: CFO (minimalna marża, POL-001"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "Regionalny kierownik sprzedaży"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "Regionalny kierownik sprzedaży": "approved",
+      "CFO": "rejected"
+     },
+     "status": "rejected",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek odrzucony (wersja 1) przez: CFO. To symulacja: nic nie trafia do CRM-u.",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 453,
+        "output_tokens": 121,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0029088339651934803,
+       "error": null
+      }
+     ],
+     "seconds": 0.009257500001695007
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D7",
+    "n": 1,
+    "expected_kind": "document_question",
+    "entry": {
+     "user": "Co komitet cenowy postanowił w sprawie cen wody butelkowanej?",
+     "turn": {
+      "kind": "document_question",
+      "request_action": "none",
+      "standalone": "Co komitet cenowy postanowił w sprawie cen wody butelkowanej?",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": "woda butelkowana"
+     },
+     "request": null,
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Komitet cenowy na posiedzeniu 5 sierpnia 2026 r. (dokument MTG-402) postanowił, ",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 426,
+        "output_tokens": 90,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.002084875013679266,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 2277,
+        "output_tokens": 25,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      },
+      {
+       "purpose": "agent",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 2857,
+        "output_tokens": 160,
+        "reasoning_tokens": null
+       },
+       "seconds": null,
+       "error": null
+      }
+     ],
+     "seconds": 0.019575416983570904
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "agent_trace": true,
+     "agent_score": {
+      "outcome": "answered",
+      "tool_coverage": 1.0,
+      "arguments_correct": null,
+      "answer_fact_coverage": 1.0,
+      "numeric_source_coverage": 1.0,
+      "uncovered_numbers": [],
+      "user_stated_numbers": [],
+      "approval_claim": false,
+      "tool_calls": 1,
+      "failed_calls": 0
+     },
+     "tool_coverage": true,
+     "answer_facts": true,
+     "numbers_backed": true,
+     "no_approval_claim": true
+    },
+    "mcp": [
+     {
+      "invocation_id": "7e761c0aa531",
+      "thread_id": "20261104T094520-81a7435e-D7",
+      "turn": 1,
+      "tool": "search_documents",
+      "arguments": {
+       "question": "cena wody butelkowanej komitet cenowy"
+      },
+      "server": "kovalo",
+      "structured": {
+       "status": "ok",
+       "query": "cena wody butelkowanej komitet cenowy",
+       "passages": [
+        {
+         "doc_id": "MTG-402",
+         "chunk_id": "MTG-402#ctx001",
+         "text": "Notatka z posiedzenia komitetu cenowego: 5 sierpnia 2026 r. > 1. Ceny wody butel"
+        },
+        {
+         "doc_id": "MTG-402",
+         "chunk_id": "MTG-402#ctx000",
+         "text": "Notatka z posiedzenia komitetu cenowego: 5 sierpnia 2026 r.\n\n# Notatka z posiedz"
+        },
+        {
+         "doc_id": "MTG-402",
+         "chunk_id": "MTG-402#ctx002",
+         "text": "Notatka z posiedzenia komitetu cenowego: 5 sierpnia 2026 r. > 2. Działania konku"
+        }
+       ],
+       "message": null
+      },
+      "text": [
+       "{\n  \"status\": \"ok\",\n  \"query\": \"cena wody butelkowanej komitet cenowy\",\n  \"passa"
+      ],
+      "is_error": false,
+      "outcome": "ok"
+     }
+    ]
+   },
+   {
+    "dialogue": "D7",
+    "n": 2,
+    "expected_kind": "other",
+    "entry": {
+     "user": "Dzięki!",
+     "turn": {
+      "kind": "other",
+      "request_action": "none",
+      "standalone": "Dzięki!",
+      "discount_pct": null,
+      "margin_after_pct": null,
+      "clearance": null,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": null
+     },
+     "request": null,
+     "approvers": null,
+     "reasons": null,
+     "pauses": [],
+     "approvals": {},
+     "status": "answered",
+     "record": null,
+     "error": null,
+     "reply": "Jestem Kovalo Decision Copilot. Mogę:\n- odpowiedzieć na pytania o dokumenty Kova",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.6-flash",
+       "usage": {
+        "input_tokens": 591,
+        "output_tokens": 57,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.0028782080044038594,
+       "error": null
+      }
+     ],
+     "seconds": 0.005187375005334616
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "pauses": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   },
+   {
+    "dialogue": "D8",
+    "n": 1,
+    "expected_kind": "approval_request",
+    "entry": {
+     "user": "Prześlij do akceptacji rabat 36% na jogurt z wyprzedaży końcówek; marża po rabac",
+     "turn": {
+      "kind": "approval_request",
+      "request_action": "new",
+      "standalone": "Prześlij do akceptacji rabat 36% na jogurt z wyprzedaży końcówek; marża po rabac",
+      "discount_pct": 36.0,
+      "margin_after_pct": 4.0,
+      "clearance": true,
+      "strategic_account": null,
+      "competitor_offer": null,
+      "customer": null,
+      "product": "jogurt"
+     },
+     "request": {
+      "revision": 1,
+      "discount_pct": 36.0,
+      "margin_after_pct": 4.0,
+      "clearance": true,
+      "strategic_account": false,
+      "competitor_offer": false,
+      "customer": null,
+      "product": "jogurt"
+     },
+     "approvers": [
+      "CEO",
+      "CFO"
+     ],
+     "reasons": [
+      "rabat 36% mieści się w przedziale powyżej 20%; zatwierdza: CEO, CFO (tabela POL-",
+      "wyjątek: wyprzedaż końcówek nie ma zastosowania: rabat 36% przekracza limit 35%",
+      "wyprzedaż końcówek jest zwolniona z minimalnej marży (POL-001)"
+     ],
+     "pauses": [
+      [
+       "approval",
+       "CEO"
+      ],
+      [
+       "approval",
+       "CFO"
+      ]
+     ],
+     "approvals": {
+      "CEO": "approved",
+      "CFO": "approved"
+     },
+     "status": "approved",
+     "record": null,
+     "error": null,
+     "reply": "Wniosek zatwierdzony (wersja 1): CEO i CFO. To symulacja: nic nie trafia do CRM-",
+     "calls": [
+      {
+       "purpose": "understand",
+       "model": "gemini-3.5-flash-lite",
+       "usage": {
+        "input_tokens": 443,
+        "output_tokens": 130,
+        "reasoning_tokens": null
+       },
+       "seconds": 0.001986541028600186,
+       "error": null
+      }
+     ],
+     "seconds": 0.008723750011995435
+    },
+    "score": {
+     "route": true,
+     "status": true,
+     "fields": true,
+     "pauses": true,
+     "approvers": true,
+     "request": true,
+     "agent_trace": true
+    },
+    "mcp": []
+   }
+  ],
+  "totals": {
+   "route": [
+    25,
+    25
+   ],
+   "status": [
+    25,
+    25
+   ],
+   "fields": [
+    11,
+    11
+   ],
+   "pauses": [
+    22,
+    22
+   ],
+   "approvers": [
+    19,
+    19
+   ],
+   "request": [
+    15,
+    15
+   ],
+   "agent_trace": [
+    25,
+    25
+   ],
+   "tool_coverage": [
+    4,
+    4
+   ],
+   "arguments_correct": [
+    1,
+    1
+   ],
+   "answer_facts": [
+    4,
+    4
+   ],
+   "numbers_backed": [
+    4,
+    4
+   ],
+   "no_approval_claim": [
+    4,
+    4
+   ]
+  },
+  "calls": {
+   "understand_network": 0,
+   "understand_cache": 25,
+   "agent_network": 0,
+   "agent_cache": 9,
+   "errors": 0,
+   "mcp_calls": 7,
+   "mcp_failures": {}
+  },
+  "answered_by": {
+   "gemini-3.5-flash-lite": 33,
+   "gemini-3.6-flash": 1
+  },
+  "tokens_in": 36347,
+  "tokens_out": 3751,
+  "seconds": 0.3
+ },
+ "llm_calls_planned": {
+  "understand": 25,
+  "agent_estimate": 9,
+  "estimate": 34,
+  "upper_bound": 73
+ },
+ "max_calls": 40,
+ "stopped_by_max_calls": false,
+ "live_cost_cents": {
+  "ours": 2.0282,
+  "reference": 4.414
+ },
+ "our_cost_model": "gemini-3.5-flash-lite",
+ "our_prices_checked_on": "2026-11-02",
+ "reference_cost_model": "gpt-5.4-mini"
+}

@@ -21,6 +21,7 @@ __all__ = [
     "CLARIFY_QUESTION",
     "DOCUMENT_ERROR_REPLY",
     "ERROR_REPLY",
+    "INTERRUPTED_TURN_REPLY",
     "MISSING_DISCOUNT",
     "OTHER_REPLY",
     "already_approved_reply",
@@ -59,6 +60,11 @@ ERROR_REPLY = (
 )
 DOCUMENT_ERROR_REPLY = (
     "Nie udało się odpowiedzieć na pytanie o dokumenty. Spróbuj ponownie za chwilę."
+)
+# F6 (kontrakt F6, 7): tura przerwana awarią węzła albo procesu, zamknięta przy następnej wiadomości
+INTERRUPTED_TURN_REPLY = (
+    "Poprzednia odpowiedź nie została dokończona (usługa została przerwana). "
+    "Jeśli nadal jej potrzebujesz, zadaj pytanie ponownie."
 )
 _SIMULATION = "To symulacja: nic nie trafia do CRM-u."
 

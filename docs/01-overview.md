@@ -24,7 +24,7 @@ Prowadzący dopuszcza jeden większy projekt zamiast pięciu osobnych. Kurs i ta
 | **MP3** workflow decyzyjny: reguły polityki, `understand`, graf z pauzami | graf copilota w LangGraph z `interrupt()` i akceptacjami | `policy/`, `workflow/` |
 | **MP4** agent z narzędziami: dane firmy, 6 narzędzi, trace, ocena, supervisor | agent ReAct z narzędziami i zapisem przebiegu | `company/`, `tools/`, `agents/`, `eval/trace/` |
 | **MP5** MCP i finalny asystent: serwer FastMCP, klient, podmiana węzła, pełna ewaluacja | serwer MCP jako osobny kontener, asystent korzystający z narzędzi przez MCP | `mcp_server/`, `mcp_client/`, `eval/assistant/` |
-| *(nasze rozszerzenie)* | API, UI czatu, Docker, CI | `api/`, `ui/`, `docker/` |
+| *(nasze rozszerzenie)* | API, UI czatu z licznikiem kosztów, dashboard ewaluacji, Docker, CI | `api/`, `ui/`, `eval/dashboard/`; obrazy w katalogu `docker/` w korzeniu repozytorium (nie moduł Pythona) |
 
 ## Czym różnimy się od wersji kursowej
 
@@ -44,4 +44,6 @@ Wartości kursu oznaczone `PINNED` (chunk 800/120, `top_k=3`, tokenizer `o200k_b
 - prawdziwe akceptacje i tożsamość osób zatwierdzających (akceptacje są symulowane w UI),
 - zapis do CRM-u i obietnice wobec klienta,
 - aktualizacja danych firmy na bieżąco (dane to stan na 2026-10-01),
-- uwierzytelnianie wielu użytkowników (jedna instancja, lokalnie).
+- uwierzytelnianie wielu użytkowników (jedna instancja, lokalnie),
+- lista rozmów i historia w UI (każde odświeżenie strony to nowa rozmowa; wymagałoby warstwy danych Chainlita i logowania, [ADR-0015](adr/0015-polish-f6.md)),
+- strumieniowanie tokenów odpowiedzi: UI dostaje na żywo kroki agenta i gotowy wynik tury (SSE), a nie tekst słowo po słowie ([ADR-0015](adr/0015-polish-f6.md)).

@@ -44,3 +44,28 @@ def test_api_waits_for_a_healthy_mcp_server_and_mcp_for_postgres():
     assert svc["mcp-server"]["depends_on"]["postgres"]["condition"] == "service_healthy"
     assert "./data:/app/data:ro" in svc["mcp-server"]["volumes"]
     assert svc["mcp-server"]["ports"] == ["127.0.0.1:8765:8765"], "port tylko na loopbacku"
+
+
+def test_api_single_process():
+    """Zamknięcie przerwanej tury (F6 §7) zakłada jeden proces Uvicorna: komenda bez `--workers`."""
+    command = services()["api"]["command"]
+    command = command.split() if isinstance(command, str) else command
+    assert command == ["kovalo-api"]
+    assert not any(arg.startswith("--workers") for arg in command)
+
+
+def test_chainlit_text_only_and_custom_assets():
+    """UI tylko tekstowe (bez załączników) i własny CSS kopiowany do obrazu ui."""
+    import tomllib
+
+    root = Path(__file__).resolve().parents[2]
+    config = tomllib.loads((root / ".chainlit" / "config.toml").read_text(encoding="utf-8"))
+    assert config["features"]["spontaneous_file_upload"]["enabled"] is False
+    css = config["UI"]["custom_css"]
+    assert css == "/public/kovalo.css"
+    assert (root / css.lstrip("/")).is_file()
+    js = config["UI"]["custom_js"]
+    assert js == "/public/kovalo.js", "panel boczny tylko po kliknięciu linku"
+    assert (root / js.lstrip("/")).is_file()
+    dockerfile = (root / "docker" / "Dockerfile").read_text(encoding="utf-8")
+    assert "public/kovalo.css" in dockerfile and "public/kovalo.js" in dockerfile

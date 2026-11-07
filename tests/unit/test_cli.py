@@ -962,3 +962,81 @@ def test_eval_e4_transport_and_count_errors_flags(capsys, tmp_path, fake_embeddi
     with pytest.raises(SystemExit) as info:
         main(["eval", "e4", "--transport", "smtp", "--out", str(out_dir)])
     assert info.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# F6: `kovalo eval dashboard [--check] [--reports-dir]` (kontrakt F6, 8.5)
+# ---------------------------------------------------------------------------
+
+
+def _dashboard_files(reports_dir):
+    return reports_dir / "dashboard.md", reports_dir / "dashboard.json"
+
+
+def test_eval_dashboard_ok_and_check(capsys, tmp_path):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model
+    from tests.dashboard_fakes import make_reports_dir
+    from tests.workflow_fakes import ExplodingChatModel
+
+    reports = make_reports_dir(tmp_path / "reports")
+    md, js = _dashboard_files(reports)
+    args = ["eval", "dashboard", "--reports-dir", str(reports)]
+    model = ExplodingChatModel()
+    with override_chat_model(model):  # zero wywołań LLM-a, bez klucza (isolated_env)
+        assert main([*args, "--check"]) == 1, "przed zapisem pliki wyjściowe nie istnieją"
+        assert not md.exists() and not js.exists(), "--check niczego nie zapisuje"
+        assert "dashboard.md" in capsys.readouterr().err
+
+        assert main(args) == 0
+        assert md.is_file() and js.is_file()
+        written = md.read_bytes(), js.read_bytes()
+        assert main([*args, "--check"]) == 0, "po zapisie --check nie widzi różnic"
+        assert main(args) == 0 and (md.read_bytes(), js.read_bytes()) == written
+
+        md.write_text(md.read_text(encoding="utf-8") + "ręczna poprawka\n", encoding="utf-8")
+        capsys.readouterr()
+        assert main([*args, "--check"]) == 1, "po zmianie dashboard.md"
+        err = capsys.readouterr().err
+        assert "dashboard.md" in err and "dashboard.json" not in err
+        assert md.read_text(encoding="utf-8").endswith("ręczna poprawka\n"), "nie nadpisuje"
+    assert model.calls == [], "dashboard nie woła modelu"
+
+
+def test_eval_dashboard_exit_codes(capsys, tmp_path):
+    from kovalo.cli import main
+    from tests.dashboard_fakes import SPEC_YAML, make_reports_dir
+
+    broken = make_reports_dir(tmp_path / "broken", spec_yaml="version: [\nstages: ]]\n")
+    assert main(["eval", "dashboard", "--reports-dir", str(broken)]) == 2
+    assert capsys.readouterr().err.strip(), "komunikat o błędnej specyfikacji"
+    assert main(["eval", "dashboard", "--reports-dir", str(broken), "--check"]) == 2
+
+    unknown = make_reports_dir(
+        tmp_path / "unknown", spec_yaml=SPEC_YAML.replace("stage: e5", "stage: e6")
+    )
+    assert main(["eval", "dashboard", "--reports-dir", str(unknown)]) == 2
+
+    assert main(["eval", "dashboard", "--reports-dir", str(tmp_path / "nie-ma")]) == 2
+
+
+def test_eval_dashboard_defaults_to_paths_reports_dir(capsys, tmp_path, monkeypatch):
+    from kovalo.cli import main
+    from tests.dashboard_fakes import make_reports_dir
+
+    reports = make_reports_dir(tmp_path / "moje-raporty")
+    monkeypatch.setenv("KOVALO_PATHS__REPORTS_DIR", str(reports))
+    assert main(["eval", "dashboard"]) == 0
+    assert (reports / "dashboard.md").is_file()
+    assert main(["eval", "dashboard", "--check"]) == 0
+
+
+def test_eval_dashboard_is_a_known_stage_and_e6_is_not(capsys, tmp_path):
+    from kovalo.cli import main
+    from tests.dashboard_fakes import make_reports_dir
+
+    assert main(["eval", "e6"]) == 2, "kolejny etap ewaluacji nie istnieje"
+    assert "e6" in capsys.readouterr().err
+    reports = make_reports_dir(tmp_path / "reports")
+    assert main(["eval", "dashboard", "--reports-dir", str(reports)]) == 0
+    assert "Etap dashboard jeszcze nie istnieje" not in capsys.readouterr().err

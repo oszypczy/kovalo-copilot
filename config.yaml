@@ -20,6 +20,7 @@ paths:
   mini_project_5_conversations: data/eval/mini_project_5_conversations.yaml
   mini_project_5_output_dir: reports/mp5
   llm_cache_dir: .cache/llm         # NASZE (ADR-0008): cache odpowiedzi LLM-a w ewaluacjach (JSON na dysku)
+  reports_dir: reports              # NASZE (F6): katalog raportów i dashboardu (dashboard.yaml, dashboard.md, dashboard.json)
 
 corpus:
   required_metadata: [doc_id, title, doc_type, department, owner, effective_date, language]
