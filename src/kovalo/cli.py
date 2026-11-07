@@ -1,5 +1,5 @@
 """Polecenie `kovalo`: first-call (F0, 7), ingest, eval e1 (F1, 7), e2 (F2, 8.7), e3 (F3, 10.6),
-eval e4, ask, show-trace (F4, 11.6)."""
+eval e4, ask, show-trace (F4, 11.6), eval e5 i eval e4 --transport (F5, 10.6)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import sys
 import time
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, TextIO
+from typing import TYPE_CHECKING, Literal, TextIO
 
 from kovalo.config import ConfigError, EmbeddingModelSpec, Settings, get_settings
 
@@ -27,6 +27,7 @@ EXIT_EMPTY = 4
 EXIT_CORPUS = 5
 EXIT_DB = 6
 EXIT_MAX_CALLS = 7
+EXIT_MCP_STARTUP = 8
 
 
 def _decimal(value: float) -> str:
@@ -217,13 +218,16 @@ def _e1_specs(
 def eval_command(
     settings: Settings, *, stage: str, args: argparse.Namespace, out: TextIO, err: TextIO
 ) -> int:
-    """`kovalo eval <stage>`: E1 (reports/mp1), E2 (reports/mp2), E3 (reports/mp3), E4 (mp4)."""
+    """`kovalo eval <stage>`: E1 (reports/mp1), E2 (reports/mp2), E3 (reports/mp3), E4 (mp4),
+    E5 (mp5)."""
     if stage == "e2":
         return eval_e2(settings, args=args, out=out, err=err)
     if stage == "e3":
         return eval_e3(settings, args=args, out=out, err=err)
     if stage == "e4":
         return eval_e4(settings, args=args, out=out, err=err)
+    if stage == "e5":
+        return eval_e5(settings, args=args, out=out, err=err)
     if stage != "e1":
         phase = f"F{stage[1:]}" if stage[:1] == "e" and stage[1:].isdigit() else "?"
         print(f"Etap {stage} jeszcze nie istnieje ({phase}).", file=err)
@@ -603,6 +607,7 @@ def eval_e4(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: T
     from kovalo.eval.trace.report import REVIEW_LABELS, write_reports
     from kovalo.knowledge.corpus import CorpusError
     from kovalo.knowledge.pgvector import IndexUnavailableError
+    from kovalo.mcp_client import McpStartupError
 
     if args.no_cache and args.cache_only:
         print("--no-cache i --cache-only wykluczają się.", file=err)
@@ -612,6 +617,13 @@ def eval_e4(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: T
         return EXIT_CONFIG
     live = bool(args.live)
     max_calls = 20 if args.max_calls is None else (args.max_calls or None)
+    transport: Literal["direct", "memory", "stdio", "http"] = args.transport or "direct"
+    if transport != "direct" and not live:
+        print(
+            "--transport inny niż direct wymaga --live (odtworzenie kursu jest bezpośrednie).",
+            file=err,
+        )
+        return EXIT_CONFIG
     try:
         ids = _split(args.ids) or None
         gold = load_agent_gold(settings.paths.mini_project_4_questions)
@@ -659,9 +671,12 @@ def eval_e4(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: T
             report = run_e4(
                 settings, live=live, ids=ids, cache=cache, offline=bool(args.cache_only),
                 max_calls=max_calls, backend=args.backend, variant=args.tools,
+                transport=transport, count_errors=bool(args.count_errors),
             )  # fmt: skip
         except E4AllErrorsError as exc:
             all_errors, report = exc, exc.report
+        except McpStartupError:
+            raise
         except ConfigError as exc:
             if not live:
                 raise
@@ -670,6 +685,9 @@ def eval_e4(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: T
     except reference.E4ReferenceMismatch as exc:
         print(f"Przeliczenie przebiegu kursu ≠ zapis kursu (błąd portu): {exc}", file=err)
         return EXIT_EMPTY
+    except McpStartupError as exc:
+        print(f"Serwer MCP nie wystartował: {exc}", file=err)
+        return EXIT_MCP_STARTUP
     except ConfigError as exc:
         print(str(exc), file=err)
         return EXIT_CONFIG
@@ -715,6 +733,187 @@ def eval_e4(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: T
     if all_errors is not None:
         print(
             f"Żadne pytanie na żywo się nie udało (przebieg {all_errors.run_id}), np.: "
+            f"{all_errors.first_error}\nSprawdź klucz i model (kovalo first-call) albo uzupełnij "
+            "cache (bez --cache-only).",
+            file=err,
+        )
+        return EXIT_PROVIDER
+    return EXIT_OK
+
+
+_E5_LINE = (
+    ("route", "ścieżka"),
+    ("status", "status"),
+    ("fields", "pola"),
+    ("pauses", "pauzy"),
+    ("approvers", "zatwierdzający"),
+    ("request", "wniosek"),
+    ("agent_trace", "trace"),
+    ("tool_coverage", "narzędzia"),
+    ("arguments_correct", "argumenty"),
+    ("answer_facts", "fakty"),
+    ("numbers_backed", "liczby z pokryciem"),
+    ("no_approval_claim", "bez twierdzenia o akceptacji"),
+)
+
+
+def _e5_line(name: str, totals: dict[str, list[int]]) -> str:
+    parts = [
+        f"{word} {totals[key][0]}/{totals[key][1]}" for key, word in _E5_LINE if totals[key][1]
+    ]
+    return f"{name}: {', '.join(parts)}"
+
+
+def eval_e5(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    """`kovalo eval e5`: zgodność MCP i odtworzenie rozmów (zawsze, 0 wywołań LLM-a), przebieg
+    na żywo (--live, z cache i wspólnym --max-calls), raporty w reports/mp5 (kontrakt F5, 10.6).
+    Kody (w tej kolejności): 2 konfiguracja, 8 serwer MCP nie wystartował, 4 zgodność albo
+    odtworzenie < 100% (błąd portu), 7 limit --max-calls, 3 każda tura na żywo z błędem;
+    5 CorpusError, 6 Postgres niedostępny."""
+    from kovalo.eval.assistant.e5 import (
+        E5AllErrorsError,
+        E5Report,
+        plan_llm_calls,
+        replay_problems,
+        run_e5,
+        select_conversations,
+    )
+    from kovalo.eval.assistant.report import REVIEW_LABELS, turn_id, write_reports
+    from kovalo.eval.datasets import load_conversations
+    from kovalo.eval.llm_cache import JsonFileLlmCache
+    from kovalo.eval.review import REVIEW_FILE, check_review_keys, load_review
+    from kovalo.knowledge.corpus import CorpusError
+    from kovalo.knowledge.pgvector import IndexUnavailableError
+    from kovalo.mcp_client import McpStartupError
+
+    if args.no_cache and args.cache_only:
+        print("--no-cache i --cache-only wykluczają się.", file=err)
+        return EXIT_CONFIG
+    if args.max_calls is not None and args.max_calls < 0:
+        print("--max-calls musi być liczbą ≥ 0 (0 = bez limitu).", file=err)
+        return EXIT_CONFIG
+    transport = args.transport or "stdio"
+    if transport == "direct":
+        print("E5 zawsze idzie przez MCP: --transport memory, stdio albo http.", file=err)
+        return EXIT_CONFIG
+    live = bool(args.live)
+    max_calls = 40 if args.max_calls is None else (args.max_calls or None)
+    paths = settings.paths
+    try:
+        ids = _split(args.ids) or None
+        everything = load_conversations(
+            paths.mini_project_5_conversations, paths.mini_project_3_dialogues
+        )
+        conversations = select_conversations(everything, ids)
+    except (ConfigError, FileNotFoundError, ValueError) as exc:
+        print(str(exc), file=err)
+        return EXIT_CONFIG
+
+    out_dir = Path(args.out) if args.out else paths.mini_project_5_output_dir
+    review_path = out_dir / REVIEW_FILE
+    try:
+        review = load_review(review_path)
+        if review is not None:
+            known = [turn_id(d.id, n) for d in everything for n in range(1, len(d.turns) + 1)]
+            check_review_keys(review, variants=REVIEW_LABELS, ids=known)
+    except ConfigError as exc:
+        message = str(exc)
+        print(message if str(review_path) in message else f"{review_path}: {message}", file=err)
+        return EXIT_CONFIG
+
+    plan = plan_llm_calls(conversations, max_steps=settings.agent.max_steps)
+    if live:
+        limit = str(max_calls) if max_calls is not None else "brak"
+        print(
+            f"Plan: understand {plan['understand']}, agent ≈ {plan['agent_estimate']}, szacunek "
+            f"{plan['estimate']}, górna granica {plan['upper_bound']}, limit {limit} (jeden "
+            f"licznik prób, także nieudanych; bez cache: {'tak' if args.no_cache else 'nie'}; "
+            f"tylko cache: {'tak' if args.cache_only else 'nie'}; transport {transport})",
+            file=out,
+        )
+    else:
+        print(
+            f"Plan: 0 wywołań LLM-a (zgodność MCP i odtworzenie, transport {transport}; "
+            "na żywo: --live)",
+            file=out,
+        )
+    if args.plan:
+        return EXIT_OK
+
+    cache = None
+    if live and not args.no_cache:
+        cache = JsonFileLlmCache(
+            paths.llm_cache_dir, mode="strict" if args.cache_only else "read_write"
+        )
+    common = {"ids": ids, "transport": transport, "backend": args.backend}
+    config_error: ConfigError | None = None
+    all_errors: E5AllErrorsError | None = None
+    report: E5Report
+    try:
+        try:
+            report = run_e5(
+                settings, live=live, cache=cache, offline=bool(args.cache_only),
+                max_calls=max_calls, **common,
+            )  # fmt: skip
+        except E5AllErrorsError as exc:
+            all_errors, report = exc, exc.report
+        except McpStartupError:
+            raise
+        except ConfigError as exc:
+            if not live:
+                raise
+            config_error = exc  # brak klucza: zgodność i odtworzenie i tak zapisujemy
+            report = run_e5(settings, **common)
+    except McpStartupError as exc:
+        print(f"Serwer MCP nie wystartował albo nie ma wymaganych narzędzi: {exc}", file=err)
+        return EXIT_MCP_STARTUP
+    except ConfigError as exc:
+        print(str(exc), file=err)
+        return EXIT_CONFIG
+    except CorpusError as exc:
+        print(str(exc), file=err)
+        return EXIT_CORPUS
+    except IndexUnavailableError as exc:
+        return _db_unavailable(settings, exc, err)
+
+    written = write_reports(report, out_dir, review=review)
+    same = sum(1 for row in report.parity if row.same)
+    print(f"zgodność MCP: {same}/{len(report.parity)}", file=out)
+    print(_e5_line("odtworzenie", report.replay.totals), file=out)
+    if report.live is not None:
+        c = report.live.calls
+        models = ", ".join(f"{m}: {n}" for m, n in report.live.answered_by.items()) or "brak"
+        print(
+            f"{_e5_line('na żywo', report.live.totals)}; wywołania modelu sieciowo "
+            f"{c.understand_network + c.agent_network} (understand {c.understand_network}, agent "
+            f"{c.agent_network}), z cache {c.understand_cache + c.agent_cache}, błędy {c.errors}; "
+            f"MCP {c.mcp_calls} (nieudane {sum(c.mcp_failures.values())}); modele: {models}",
+            file=out,
+        )
+    print("Raporty:", file=out)
+    for path in written:
+        print(f"  {path}", file=out)
+
+    if config_error is not None:
+        print(f"{config_error}\nZapisano tylko zgodność i odtworzenie.", file=err)
+        return EXIT_CONFIG
+    problems = replay_problems(report)
+    if problems:
+        print(
+            "Zgodność albo odtworzenie poniżej 100% (błąd portu): " + "; ".join(problems),
+            file=err,
+        )
+        return EXIT_EMPTY
+    if report.stopped_by_max_calls:
+        print(
+            f"Przerwano: wyczerpany limit --max-calls {max_calls}. Raport częściowy zapisany; "
+            "uruchom ponownie (np. następnego dnia), cache odtworzy wykonane tury.",
+            file=err,
+        )
+        return EXIT_MAX_CALLS
+    if all_errors is not None:
+        print(
+            f"Żadna tura na żywo się nie udała (przebieg {all_errors.run_id}), np.: "
             f"{all_errors.first_error}\nSprawdź klucz i model (kovalo first-call) albo uzupełnij "
             "cache (bez --cache-only).",
             file=err,
@@ -819,8 +1018,8 @@ def _parser() -> argparse.ArgumentParser:
         help="wariant chunków (domyślnie oba: mp1, potem ctx)",
     )
     ing.add_argument("--table", default=None, help="tabela indeksu (tylko z --chunks mp1 albo ctx)")
-    ev = sub.add_parser("eval", help="ewaluacja etapu (e1–e4), raporty w reports/")  # noqa: RUF001
-    ev.add_argument("stage", help="etap ewaluacji: e1, e2, e3 albo e4")
+    ev = sub.add_parser("eval", help="ewaluacja etapu (e1–e5), raporty w reports/")  # noqa: RUF001
+    ev.add_argument("stage", help="etap ewaluacji: e1, e2, e3, e4 albo e5")
     ev.add_argument("--candidates", action="store_true", help="e1: także embeddings.candidates")
     ev.add_argument("--model", action="append", help="e1: tylko wskazany model (można powtórzyć)")
     ev.add_argument(
@@ -843,7 +1042,20 @@ def _parser() -> argparse.ArgumentParser:
         "--max-calls",
         type=int,
         default=None,
-        help="e4: limit wywołań sieciowych modelu na żywo (domyślnie 20; 0 = bez limitu)",
+        help="e4: limit wywołań sieciowych modelu na żywo (domyślnie 20; 0 = bez limitu); "
+        "e5: wspólny limit prób understand + agent, także nieudanych (domyślnie 40)",
+    )
+    ev.add_argument(
+        "--transport",
+        choices=["direct", "memory", "stdio", "http"],
+        default=None,
+        help="e4: narzędzia agenta na żywo (domyślnie direct; inny = przez MCP); "
+        "e5: połączenie z serwerem MCP (domyślnie stdio; http = services.mcp_url)",
+    )
+    ev.add_argument(
+        "--count-errors",
+        action="store_true",
+        help="e4: nieudane próby modelu zjadają --max-calls (e5: zawsze)",
     )
     ev.add_argument(
         "--tools", choices=["course", "ours"], default=None, help="e4: wariant narzędzi na żywo"

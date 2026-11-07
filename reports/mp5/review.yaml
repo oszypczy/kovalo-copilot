@@ -1,0 +1,68 @@
+# Komentarze z przeglądu ręcznego raportu E5 (kontrakt F5, 10.5 i F2 14.3).
+# Generator (`kovalo eval e5`) wstawia je do sekcji „Rozbieżności przejrzane ręcznie”.
+# Wygenerowanego Markdownu nie edytujemy; komentarze zmieniamy tutaj.
+# Klucz wpisu: etykieta ours-replay / ours-live + id tury (C1-t1 … D8-t1).
+version: 1
+reviewed_on: 2026-11-04
+intro: |
+  Przegląd T2 (2026-11-04): raport i JSON przeczytane tura po turze, porównane z README MP5 (liczby
+  COURSE_E5: 25/25, 11/11, 22/22, 19/19, 15/15, 4/4, 7 wywołań MCP bez nieudanych) oraz z raportem E4
+  z tego samego dnia (to samo pytanie o karę, ta sama odpowiedź). Zgodność MCP 20/20, odtworzenie 100%,
+  na żywo wszystkie wymiary 100%; ewaluator niczego nie oznaczył jako niezaliczone, a przegląd ręczny
+  nie znalazł błędu, którego by nie zauważył. Poniżej: cztery rzeczy, które liczby bez opisu przesłaniają.
+  Uwaga: ten raport został przeliczony z cache (`--live --cache-only`, 0 wywołań, 34 trafienia), więc jego
+  nagłówek opisuje powtórkę. Liczby oryginalnego przebiegu na żywo (przebieg 20261104T092904-0f4dd55b,
+  132 s): sieciowo 30 (understand 24, agent 6), z cache 4, błędy 0; w komentarzach niżej „30” i „4” to te liczby.
+items:
+  - variants: [ours-live]
+    id: D7-t2
+    comment: |
+      jedyna tura rozumienia odebrana przez fallback (gemini-3.6-flash zamiast gemini-3.5-flash-lite):
+      15,2 s (inne tury 3 do 5 s), 591 / 57 tokenów. Wynik poprawny (kind „other”, „Dzięki!”), więc ocena
+      się nie zmienia. Model główny zawiódł tu błędem dostępności (limit albo przeciążenie), ale
+      „błędy 0” w nagłówku mówi prawdę tylko o turach: licznik rozumienia owija cały łańcuch modeli
+      (jak _CallTracker w E3), więc nieudana próba modelu głównego nie jest liczona ani jako błąd, ani do
+      --max-calls. Skoro odpowiedział fallback, w oryginalnym przebiegu prób sieciowych było o 1 więcej
+      niż „30”. Przy 25 turach to zaniedbywalne, ale przy awarii dostawcy limit chroniłby słabiej niż dla agenta (tam CallMeter jest
+      wewnątrz fallbacku i liczy każdą próbę). Powtórka --cache-only odtwarza tę turę dzięki ścieżce
+      fallbacku w trybie offline (CacheMissError): model główny nie ma wpisu, fallback ma; przed tą
+      poprawką powtórka nie odtwarzała tej tury (nagłówek powtórki: 34 z cache, błędy 0, modele 33 + 1).
+  - variants: [ours-live]
+    id: C1-t1
+    comment: |
+      te same liczby co P1 w E4 (kara 7 296,00 PLN = 729 600 groszy, cztery wywołania MCP:
+      get_contract_terms, get_supplier_otif, get_invoice_value, calculate_otif_penalty). Trzy z czterech
+      tur modelu agenta to trafienia w cache z przebiegu E4 (agent_cache 3): model nie podejmował decyzji
+      od nowa, tylko jego zapisane odpowiedzi zostały odtworzone na narzędziach z serwera MCP, a klucze
+      są te same, bo artefakt z invocation_id nie wchodzi do klucza (ADR-0013 pkt 4). To mocny dowód
+      równoważności narzędzi MCP i bezpośrednich, ale nie niezależny pomiar modelu dla tej tury: ten
+      pomiar to E4 z dnia 2026-11-03. Zdanie „nota uznaniowa do faktury za następny miesiąc” w odpowiedzi
+      pochodzi z pola settlement wyniku get_contract_terms (tabela w raporcie skraca wynik do kilku pól),
+      więc nie jest zmyślone; ewaluator liczb go nie sprawdza, bo to nie liczba.
+  - variants: [ours-live]
+    id: D3-t1
+    comment: |
+      0,003 s i trafienie w cache w przebiegu „na żywo”: wiadomość i historia są identyczne jak w C4-t1
+      („Prześlij do akceptacji rabat 8% na chipsy…”), więc to deduplikacja w obrębie jednego przebiegu
+      (understand_cache 1), nie błąd. Razem z trzema trafieniami agenta (C1-t1) wychodzi 4 wywołania z
+      cache i 30 sieciowych z planowanych 34. Tokeny (36 347 / 3 751) i koszt (2,03 centa) zawierają
+      tury z cache, więc zawyżają rzeczywiste zużycie o około 20% (tury z cache: około 8,9 tys. z 40,1 tys. tokenów, przy
+      założeniu, że trzy trafienia agenta to C1-t1); do porównania z kursem (41 993 / 2 866,
+      około 4,4 centa) wystarczają (inny model, inne odpowiedzi, więcej tokenów wyjściowych u nas).
+  - variants: [ours-live]
+    id: C5-t1
+    comment: |
+      zgodne z kursem i E4 (N1): get_supplier_otif zwrócił no_data z missing_months [2026-10], agent
+      napisał, że wskaźnik jest niedostępny, bez podawania liczby; ewaluator nie ma tu nic do zarzucenia
+      (liczby bez pokrycia 0). Nieobecność danych to nie odmowa i nie błąd narzędzia (0 nieudanych
+      wywołań MCP).
+  - variants: [ours-replay]
+    id: C1-t1
+    comment: |
+      odtworzenie: rozumienie ze wzorca, agent ze skryptu przez MCP (25 razy understand, 4 razy agent,
+      0 wywołań LLM-a); sprawdzenia pytań o dane są „nie dotyczy”, bo mierzyłyby skrypt, a nie model.
+      Mierzy port: rozmowy, pauzy, osoby zatwierdzające, stan wniosku i zapis przebiegu agenta (25/25 itd.)
+      oraz serwer MCP (7 wywołań macierzy w turach skryptu, 0 nieudanych, zgodność 20/20).
+notes:
+  - "Zgodność z kursem: kolumna „Kurs” i „Na żywo” zgodne we wszystkich 13 wierszach sprawdzeń; liczba wywołań MCP w turach 7 = 7 (kurs); różnica w tokenach wynika z innego modelu i z trafień w cache."
+  - "Zgodność z E2–E4: pytanie o karę (C1-t1 w E5, P1 w E4) daje tę samą odpowiedź i te same wywołania; tury polityki i wniosków (C2–C4, D1–D8) są identyczne z E3 (F3) w liczbach."

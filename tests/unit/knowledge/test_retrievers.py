@@ -169,3 +169,60 @@ def test_build_memory_retriever_variants(settings, fake_embeddings):
     assert isinstance(hybrid, HybridRetriever)
     hits = hybrid.retrieve("Kto zatwierdza rabat powyżej 20%?", 3)
     assert len(hits) == 3
+
+
+# ---------------------------------------------------------------------------
+# F5: LazyRetriever przeniesiony do knowledge (kontrakt F5, 2 i 13.2)
+# ---------------------------------------------------------------------------
+
+
+def test_lazy_retriever_opens_once_and_retries_after_error(toy_retriever):
+    """`LazyRetriever(opener)`: jedno otwarcie przy wielu wątkach; wyjątek otwarcia leci
+    z `retrieve`, a następne `retrieve` próbuje ponownie; po sukcesie nie otwiera już więcej."""
+    import threading
+    import time
+
+    from kovalo.knowledge.pgvector import IndexUnavailableError
+    from kovalo.knowledge.retrievers import LazyRetriever
+
+    attempts: list[int] = []
+
+    def opener():
+        attempts.append(1)
+        time.sleep(0.05)  # okno na wyścig wątków
+        if len(attempts) == 1:
+            raise IndexUnavailableError("Postgres niedostępny")
+        return toy_retriever
+
+    lazy = LazyRetriever(opener)
+    with pytest.raises(IndexUnavailableError):
+        lazy.retrieve("kto zatwierdza", 2)
+    assert len(attempts) == 1
+
+    results: list = []
+    errors: list = []
+
+    def worker():
+        try:
+            results.append(lazy.retrieve("kto zatwierdza", 2))
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+    assert errors == [] and len(results) == 8
+    assert len(attempts) == 2, "drugie otwarcie (po błędzie) raz, mimo ośmiu wątków"
+    assert results[0] == toy_retriever.retrieve("kto zatwierdza", 2)
+    assert lazy.name == "lazy"
+
+
+def test_lazy_retriever_has_no_llm_import():
+    """`knowledge/` nie importuje kovalo.llm: opener przychodzi z zewnątrz (kontrakt F5, 2.3)."""
+    import inspect
+
+    import kovalo.knowledge.retrievers as module
+
+    assert "kovalo.llm" not in inspect.getsource(module)

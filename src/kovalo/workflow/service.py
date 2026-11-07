@@ -122,7 +122,8 @@ class TurnEvent(BaseModel):
     """Zdarzenie strumienia tury (ADR-0012 pkt 2).
 
     tool_start: {call_id, parent_call_id, agent, tool, arguments, origin}
-    tool_end:   {call_id, parent_call_id, tool, status, brief, result, error}
+    tool_end:   {call_id, parent_call_id, tool, status, brief, result, error, transport,
+                 invocation_id}  (transport 'mcp' albo None; F5, kontrakt 9.2)
     final:      TurnResult.model_dump(mode='json')
     error:      {error: 'internal_error' | 'copilot_unavailable', detail}
     """
@@ -320,6 +321,8 @@ def _tool_end(event: Mapping[str, Any]) -> TurnEvent:
             "brief": brief(event.get("result")) if ok else None,
             "result": event.get("result"),
             "error": event.get("error"),
+            "transport": event.get("transport"),
+            "invocation_id": event.get("invocation_id"),
         },
     )
 

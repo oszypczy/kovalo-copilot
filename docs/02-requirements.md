@@ -54,7 +54,7 @@
 
 | ID | Wymaganie | Kryterium akceptacji |
 |---|---|---|
-| FR-5.1 | Serwer FastMCP „kovalo”: 6 narzędzi (cienkie nakładki na FR-4), dokumenty jako zasoby, prompt; transporty `stdio` i `streamable-http` | MCP Inspector widzi narzędzia, zasoby i prompt |
+| FR-5.1 | Serwer FastMCP „kovalo”: 6 narzędzi kursu + `check_termination_condition` (FR-4.7; cienkie nakładki na FR-4, [ADR-0013](adr/0013-mcp-server-client-f5.md)), dokumenty jako zasoby, prompt; transporty `stdio` i `streamable-http` | MCP Inspector widzi narzędzia, zasoby i prompt |
 | FR-5.2 | Klient MCP w asystencie: narzędzia z `list_tools()`, wywołania `call_tool()` z zachowaniem `structuredContent` i walidacją zgodności z rekordem z FR-4 | 4 klasy błędów z warstwą: `tool / protocol / transport / validation` |
 | FR-5.3 | Limity: start 60 s, wywołanie 120 s, zamknięcie 10 s; połączenie po przekroczeniu limitu nie jest używane ponownie | testy z serwerami symulującymi błędy |
 | FR-5.4 | Asystent = graf z FR-3 z jednym podmienionym węzłem: `document_question → answer_with_tools` (agent z FR-4 przez MCP); prompt `assistant_understand_system` | ewaluacja asystenta: ścieżka 25/25 (cel) |
@@ -65,7 +65,7 @@
 | ID | Wymaganie | Kryterium akceptacji |
 |---|---|---|
 | FR-6.1 | API (FastAPI): `POST /threads`, `POST /threads/{id}/messages`, `POST /threads/{id}/resume`, `GET /threads/{id}` (stan, pauza), `GET /threads/{id}/trace`, `GET /health` | kontrakt OpenAPI, testy API. F3: JSON (`TurnResult`) bez `/trace`; SSE i `/trace` w F4 ([ADR-0010](adr/0010-api-ui-f3.md)) |
-| FR-6.2 | UI (Chainlit): czat, strumieniowanie odpowiedzi, kroki agenta (tool calls) jako rozwijane `Step`, pauzy jako przyciski akceptacji (`cl.Action` z `action_callback`, [ADR-0010](adr/0010-api-ui-f3.md)) i wpis marży w polu czatu, źródła jako elementy z treścią chunku | F3: scenariusz D2 z MP3 da się przeklikać; F5: ręczny scenariusz C1–C5 z MP5 przechodzi w UI |
+| FR-6.2 | UI (Chainlit): czat, strumieniowanie odpowiedzi, kroki agenta (tool calls) jako rozwijane `Step`, pauzy jako przyciski akceptacji (`cl.Action` z `action_callback`, [ADR-0010](adr/0010-api-ui-f3.md)) i wpis marży w polu czatu, źródła jako elementy z treścią chunku | F3: scenariusz D2 z MP3 da się przeklikać; F5: ręczny scenariusz C1–C5 z MP5 przechodzi w UI, kroki agenta z dopiskiem „(przez MCP)” |
 | FR-6.3 | Indeksowanie jako polecenie `kovalo ingest` (`make ingest`), idempotentne | ponowne uruchomienie nie duplikuje chunków |
 | FR-6.4 | Ewaluacja jako zadanie (`eval`) z raportem Markdown/JSON w `reports/` | raport porównuje wynik z referencyjnym |
 | FR-6.5 | Licznik kosztów i tokenów per tura i per przebieg | widoczny w UI i raporcie ewaluacji |

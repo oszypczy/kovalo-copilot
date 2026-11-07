@@ -393,7 +393,7 @@ def test_stream_errors_are_eager(settings):
     entered, release = threading.Event(), threading.Event()
     inner = agent_answerer(agent_trace())
 
-    def gated(question, *, on_event=None):
+    def gated(question, *, on_event=None, callbacks=None):
         entered.set()
         release.wait(timeout=10)
         return inner(question, on_event=on_event)
@@ -429,7 +429,7 @@ def test_closing_stream_does_not_stop_turn(settings):
     release = threading.Event()
     inner = agent_answerer(agent_trace(answer="Odpowiedź dla nieobecnego klienta."))
 
-    def slow(question, *, on_event=None):
+    def slow(question, *, on_event=None, callbacks=None):
         first = inner(question, on_event=on_event)
         release.wait(timeout=10)
         return first
@@ -505,7 +505,7 @@ def test_close_waits_for_turns(settings):
     release = threading.Event()
     inner = agent_answerer(agent_trace())
 
-    def slow(question, *, on_event=None):
+    def slow(question, *, on_event=None, callbacks=None):
         release.wait(timeout=10)
         return inner(question, on_event=on_event)
 
@@ -632,7 +632,7 @@ def test_internal_error_event_hides_details(settings):
     class Boom(BaseException):
         pass
 
-    def exploding(question, *, on_event=None):
+    def exploding(question, *, on_event=None, callbacks=None):
         raise Boom
 
     # wyjątek spoza Exception z węzła: tura kończy się zdarzeniem error 'internal_error'
@@ -684,3 +684,23 @@ def test_locks_are_released(settings):
         release.set()
         worker.join(timeout=10)
     assert len(busy._locks) == 0
+
+
+def test_tool_end_carries_transport(settings):
+    """F5 (kontrakt 9.2): `tool_end.data` ma `transport` i `invocation_id` ze zdarzenia trace;
+    `tool_start` bez zmian (transport znany dopiero po wywołaniu); wywołania bezpośrednie: None."""
+    events = july_events()
+    events[0].transport, events[0].invocation_id = "mcp", "inv-0001"
+    trace = agent_trace(events=events)
+    service = service_with(settings, [DOC_TURN], agent=agent_answerer(trace))
+    items = list(service.start_message("t", "Ile wynosi kara?"))
+    starts = [i for i in items if i.type == "tool_start"]
+    ends = [i for i in items if i.type == "tool_end"]
+    assert len(ends) == 4
+    assert ends[0].data["transport"] == "mcp" and ends[0].data["invocation_id"] == "inv-0001"
+    for end in ends[1:]:
+        assert end.data["transport"] is None and end.data["invocation_id"] is None
+    assert all("transport" not in s.data for s in starts), "tool_start bez zmian"
+    final = items[-1]
+    stored = final.data["trace"]["events"][0]
+    assert (stored["transport"], stored["invocation_id"]) == ("mcp", "inv-0001")

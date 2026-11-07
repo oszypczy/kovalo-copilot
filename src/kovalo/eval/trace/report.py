@@ -15,6 +15,7 @@ from typing import Any
 
 from kovalo.agents.show import architecture_label, format_trace
 from kovalo.agents.trace import Trace, save_traces
+from kovalo.eval.assistant.reference import COURSE_E4_MCP, COURSE_E4_MCP_RUN
 from kovalo.eval.review import REVIEW_FILE, Review
 from kovalo.eval.trace.e4 import E4Report, E4Run
 
@@ -138,45 +139,32 @@ def _header(report: E4Report) -> list[str]:
 def _tests_section(report: E4Report) -> list[str]:
     ref = report.reference
     live = report.live.summary if report.live else None
-    rows = [
-        [
-            label,
-            _test_value(report.course.summary, key),
-            _test_value(report.course_supervisor.summary, key),
-            _test_value(report.replay.summary, key),
-            _test_value(live, key),
-            target,
-        ]
-        for key, label, target in TESTS
+    via_mcp = report.transport != "direct"  # F5: kolumna „Kurs przez MCP” (ADR-0014 pkt 4)
+    summaries: list[dict[str, Any] | None] = [
+        report.course.summary,
+        report.course_supervisor.summary,
+        report.replay.summary,
+        live,
     ]
-    for name, key in (("wyniki: answered / error / limit", "outcomes"),):
-        rows.append(
-            [
-                name,
-                *(
-                    NONE if s is None else "{answered} / {error} / {limit}".format(**s[key])
-                    for s in (
-                        report.course.summary,
-                        report.course_supervisor.summary,
-                        report.replay.summary,
-                        live,
-                    )
-                ),
-                NONE,
-            ]
-        )
+    if via_mcp:
+        summaries.append(COURSE_E4_MCP)
+    rows = [
+        [label, *(_test_value(s, key) for s in summaries), target] for key, label, target in TESTS
+    ]
+    rows.append(
+        [
+            "wyniki: answered / error / limit",
+            *(
+                NONE if s is None else "{answered} / {error} / {limit}".format(**s["outcomes"])
+                for s in summaries
+            ),
+            NONE,
+        ]
+    )
     rows.append(
         [
             "wywołania narzędzi (nieudane)",
-            *(
-                NONE if s is None else f"{s['tool_calls']} ({s['failed']})"
-                for s in (
-                    report.course.summary,
-                    report.course_supervisor.summary,
-                    report.replay.summary,
-                    live,
-                )
-            ),
+            *(NONE if s is None else f"{s['tool_calls']} ({s['failed']})" for s in summaries),
             NONE,
         ]
     )
@@ -185,7 +173,8 @@ def _tests_section(report: E4Report) -> list[str]:
         "Kurs: jeden agent",
         "Kurs: zespół",
         "Odtworzenie",
-        "Na żywo",
+        f"Na żywo (przez MCP, {report.transport})" if via_mcp else "Na żywo",
+        *([f"Kurs przez MCP ({ref['model']})"] if via_mcp else []),
         "Cel",
     ]
     lines = ["## Testy", ""]
@@ -202,6 +191,12 @@ def _tests_section(report: E4Report) -> list[str]:
         f"({ref['supervisor']['user_stated']}), {_frac(ref['supervisor']['approval'])} (zespół). "
         "Cel na żywo z docs/06-evaluation.md; wynik poniżej celu nie zmienia kodu wyjścia.",
     ]
+    if via_mcp:
+        lines.append(
+            f"Na żywo przez MCP ({report.transport}): narzędzia agenta z serwera MCP Kovalo; "
+            f"kolumna „Kurs przez MCP” to README MP5 (`run_agent_mcp.py`, przebieg "
+            f"{COURSE_E4_MCP_RUN}, około {_num(COURSE_E4_MCP['cost_cents'])} centa)."
+        )
     return lines
 
 

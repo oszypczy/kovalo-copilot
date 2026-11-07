@@ -247,8 +247,14 @@ workflow:                           # NASZE (ADR-0009, ADR-0011)
   answerer: agent                   # agent | rag: kto odpowiada na document_question w aplikacji (E3 zawsze rag)
   understand_prompt: assistant_understand_system   # understand_system | assistant_understand_system (E3 zawsze understand_system)
 
-tools:                              # NASZE (ADR-0011)
+tools:                              # NASZE (ADR-0011, ADR-0013)
   variant: ours                     # course (6 narzędzi kursu) | ours (+ check_termination_condition)
+  source: mcp                       # direct | mcp: skąd agent w aplikacji bierze narzędzia (E4 domyślnie direct, E5 zawsze mcp)
+  mcp_transport: http               # http (services.mcp_url) | stdio (podproces kovalo-mcp): tylko przy source: mcp
+
+mcp_server:                         # NASZE (ADR-0013)
+  search: pgvector                  # pgvector | memory: wyszukiwanie w narzędziu search_documents serwera
+                                    # (stdio dla Claude Code i Inspectora: --search memory, U6)
 
 company:                            # NASZE (ADR-0011): warunki spoza contract_terms.yaml (data/ jest tylko do odczytu)
   termination_version: termination-v1

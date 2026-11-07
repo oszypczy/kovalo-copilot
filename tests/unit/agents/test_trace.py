@@ -599,3 +599,128 @@ def test_answer_from_content_blocks_is_plain_text():
     model = ScriptedModel(script=[AIMessage(content=blocks)])
     trace = run_question(create_agent(model, []), "kara?", Budget(3, 60))
     assert (trace.status, trace.answer) == ("answered", "Kara wynosi 7 296,00 PLN.")
+
+
+# ---------------------------------------------------------------------------
+# F5: pochodzenie wywołania MCP (kontrakt F5, 6.3 i 13.2; ADR-0013 pkt 4)
+# ---------------------------------------------------------------------------
+
+MCP_INVOICE = {
+    "status": "ok",
+    "supplier_id": "SUP-114",
+    "supplier": "Mleczna Dolina",
+    "month": "2026-07",
+    "invoiced_grosze": 18240000,
+    "currency": "PLN",
+    "message": None,
+}
+
+
+def artifact_tool(name, record, artifact):
+    """Narzędzie jak `McpConnection.tools()`: (rekord, pochodzenie), content_and_artifact."""
+    from langchain_core.tools import StructuredTool
+
+    def run(**kwargs):
+        return record, artifact
+
+    return StructuredTool.from_function(
+        func=run,
+        name=name,
+        description="dubler narzędzia MCP",
+        args_schema={"type": "object", "properties": {"supplier": {"type": "string"}}},
+        response_format="content_and_artifact",
+    )
+
+
+def run_with_tool(tool, script):
+    from kovalo.agents.trace import Budget, run_question
+
+    agent = create_agent(ScriptedModel(script=script), [tool])
+    return run_question(agent, "pytanie?", Budget(10, 60))
+
+
+def test_provenance_from_artifact():
+    tool = artifact_tool(
+        "get_invoice_value", MCP_INVOICE, {"transport": "mcp", "invocation_id": "abc"}
+    )
+    trace = run_with_tool(
+        tool, [call("get_invoice_value", supplier="SUP-114"), answer("Faktura: 182 400 PLN.")]
+    )
+    (event,) = trace.events
+    assert (event.transport, event.invocation_id, event.status) == ("mcp", "abc", "ok")
+    assert event.result == MCP_INVOICE, "wynik to sam rekord, bez artefaktu"
+    assert "artifact" not in str(event.result) and "abc" not in str(event.result)
+    assert event.origin == "data"
+
+
+def test_artifact_without_transport_is_ignored():
+    tool = artifact_tool("get_invoice_value", MCP_INVOICE, {"note": "x"})
+    trace = run_with_tool(tool, [call("get_invoice_value", supplier="SUP-114"), answer("ok")])
+    (event,) = trace.events
+    assert (event.transport, event.invocation_id) == (None, None)
+    assert event.result == MCP_INVOICE
+
+
+def test_course_envelope_in_content_still_works():
+    """Koperta kursu `{"__mcp__": ..., "record": ...}` w treści (porty testów kursu)."""
+
+    @tool
+    def get_invoice_value(supplier: str) -> dict:
+        """Faktura (dubler testowy zwracający kopertę kursu)."""
+        return {"__mcp__": {"invocation_id": "xyz", "server": "kovalo"}, "record": MCP_INVOICE}
+
+    trace = run_with_tool(
+        get_invoice_value, [call("get_invoice_value", supplier="SUP-114"), answer("ok")]
+    )
+    (event,) = trace.events
+    assert (event.transport, event.invocation_id) == ("mcp", "xyz")
+    assert event.result == MCP_INVOICE
+
+
+def test_derived_event_over_mcp(settings):
+    """`check_termination_condition` przez narzędzie z artefaktem: zdarzenie składowe
+    `get_supplier_otif` z rekordem z pola `otif` (jak narzędzie bezpośrednie)."""
+    from tests.mcp_fakes import direct_record
+
+    record = direct_record(
+        settings,
+        "check_termination_condition",
+        {"supplier": "Mleczna Dolina", "as_of_month": "2026-09"},
+    )
+    artifact = {"transport": "mcp", "invocation_id": "t1"}
+    trace = run_with_tool(
+        artifact_tool("check_termination_condition", record, artifact),
+        [call("check_termination_condition", supplier="SUP-114"), answer("ok")],
+    )
+    parent, derived = trace.events
+    assert (parent.tool, parent.transport, parent.invocation_id) == (
+        "check_termination_condition",
+        "mcp",
+        "t1",
+    )
+    assert derived.tool == "get_supplier_otif" and derived.parent_call_id == parent.call_id
+    assert derived.result == record["otif"] and derived.status == "ok"
+    assert derived.transport == "mcp", "zdarzenie składowe dziedziczy transport rodzica (P8)"
+    assert derived.invocation_id == parent.invocation_id
+
+
+def test_failed_mcp_call_keeps_the_error_and_no_result():
+    from langchain_core.tools import StructuredTool, ToolException
+
+    def run(**kwargs):
+        raise ToolException("[błąd transportu] serwer nie odpowiedział")
+
+    broken = StructuredTool.from_function(
+        func=run,
+        name="get_invoice_value",
+        description="dubler",
+        args_schema={"type": "object", "properties": {"supplier": {"type": "string"}}},
+        response_format="content_and_artifact",
+        handle_tool_error=True,
+    )
+    trace = run_with_tool(
+        broken, [call("get_invoice_value", supplier="SUP-114"), answer("nie wiem")]
+    )
+    (event,) = trace.events
+    assert event.status == "error" and event.result is None
+    assert "[błąd transportu]" in event.error

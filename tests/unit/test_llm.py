@@ -442,3 +442,109 @@ def test_offline_model_makes_no_request(tmp_path: Path):
     model = get_chat_model(settings=load_settings(), cache=strict, offline=True)
     with pytest.raises(LlmCacheMiss):
         model.invoke([HumanMessage("Cześć")])
+
+
+# ---------------------------------------------------------------------------
+# F5 (po A7): odtworzenie z cache tury odebranej na żywo przez fallback
+# ---------------------------------------------------------------------------
+
+
+def cache_fakes(monkeypatch, *, failing: str | None):
+    """`_build_model` → atrapa nazwana modelem ze specyfikacji, z cache z fabryki. Model
+    `failing` zgłasza 429 (błąd dostępności), reszta odpowiada; liczniki per model."""
+    from typing import Any
+
+    from langchain_core.language_models.chat_models import BaseChatModel
+    from langchain_core.messages import AIMessage
+    from langchain_core.outputs import ChatGeneration, ChatResult
+
+    import kovalo.llm as llm_module
+
+    calls: dict[str, int] = {}
+
+    class Named(BaseChatModel):
+        name_: str
+
+        @property
+        def _llm_type(self) -> str:
+            return f"named-{self.name_}"
+
+        @property
+        def _identifying_params(self) -> dict[str, Any]:
+            return {"model": self.name_}
+
+        def bind_tools(self, tools: Any, **kwargs: Any) -> Any:
+            names = [getattr(t, "name", None) or getattr(t, "__name__", str(t)) for t in tools]
+            return self.bind(tools=names, **kwargs)
+
+        def _generate(self, messages: Any, stop: Any = None, run_manager: Any = None, **kw: Any):
+            calls[self.name_] = calls.get(self.name_, 0) + 1
+            if self.name_ == failing:
+                raise ModelRateLimitError("429 (atrapa)")
+            if "Answer" in (kw.get("tools") or []):  # structured output (schemat Answer)
+                message = AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "Answer",
+                            "id": "a1",
+                            "args": {
+                                "answer": f"od {self.name_}",
+                                "citations": [],
+                                "answerable": True,
+                            },
+                        }
+                    ],
+                )
+            else:
+                message = AIMessage(content=f"od {self.name_}")
+            return ChatResult(generations=[ChatGeneration(message=message)])
+
+    def build(settings, spec, *, temperature, params, cache=None, offline=False):
+        return Named(name_=spec.model, cache=cache)
+
+    monkeypatch.setattr(llm_module, "_build_model", build)
+    return calls
+
+
+def test_strict_cache_falls_back_to_the_fallback_entry(monkeypatch, tmp_path: Path):
+    """Na żywo model główny zawiódł (429), odpowiedział fallback i to jego wpis jest w cache.
+    Powtórka `--cache-only` (offline, strict): brak trafienia u modelu głównego przełącza na
+    fallback, który trafia w swój wpis; zero wywołań modelu. Bez żadnego wpisu → LlmCacheMiss."""
+    from kovalo.config import load_settings
+    from kovalo.eval.llm_cache import JsonFileLlmCache, LlmCacheMiss
+    from kovalo.llm import get_structured_model
+    from kovalo.rag.records import Answer
+
+    settings = load_settings(google_api_key="k")
+    primary, fallback = settings.llm.model, settings.llm.fallbacks[0].model
+    assert primary != fallback
+
+    calls = cache_fakes(monkeypatch, failing=primary)
+    live = get_structured_model(Answer, settings=settings, cache=JsonFileLlmCache(tmp_path / "llm"))
+    assert live.invoke("pytanie")["parsed"].answer == f"od {fallback}"
+    assert calls == {primary: 1, fallback: 1}
+
+    calls = cache_fakes(monkeypatch, failing=None)
+    strict = JsonFileLlmCache(tmp_path / "llm", mode="strict")
+    replay = get_structured_model(Answer, settings=load_settings(), cache=strict, offline=True)
+    assert replay.invoke("pytanie")["parsed"].answer == f"od {fallback}"
+    assert calls == {}, "odtworzenie bez wywołań modelu"
+    assert strict.hits == 1
+
+    empty = JsonFileLlmCache(tmp_path / "pusty", mode="strict")
+    nothing = get_structured_model(Answer, settings=load_settings(), cache=empty, offline=True)
+    with pytest.raises(LlmCacheMiss):
+        nothing.invoke("pytanie")
+    assert calls == {}
+
+
+def test_live_mode_does_not_fall_back_on_a_cache_miss():
+    """Poza trybem offline brak w cache nie jest błędem dostępności (ADR-0008 bez zmian)."""
+    from kovalo.eval.llm_cache import LlmCacheMiss
+    from kovalo.llm import FALLBACK_EXCEPTIONS, CacheMissError, fallback_exceptions
+
+    assert issubclass(LlmCacheMiss, CacheMissError)
+    assert fallback_exceptions(offline=False) == FALLBACK_EXCEPTIONS
+    assert CacheMissError not in FALLBACK_EXCEPTIONS
+    assert fallback_exceptions(offline=True) == (*FALLBACK_EXCEPTIONS, CacheMissError)

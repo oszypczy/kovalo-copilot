@@ -26,7 +26,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from langchain_core.callbacks import Callbacks
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from kovalo.config import AgentConfig
@@ -231,6 +233,10 @@ def _record_result(trace: Trace, events: dict[str, TraceEvent], message: ToolMes
         event.transport = "mcp"
         event.invocation_id = event.result["__mcp__"].get("invocation_id")
         event.result = event.result["record"]
+    artifact = message.artifact  # NASZE (ADR-0013 pkt 4): pochodzenie MCP poza treścią
+    if isinstance(artifact, dict) and "transport" in artifact:
+        event.transport = artifact["transport"]
+        event.invocation_id = artifact.get("invocation_id")
     event.origin = _origin(event.tool, event.result)  # type: ignore[assignment]
     if event.origin == "worker_summary":  # specjalista: jego wywołania jako zagnieżdżone
         worker = event.result
@@ -266,6 +272,8 @@ def _derived_event(event: TraceEvent) -> TraceEvent | None:
         origin=ORIGINS[tool],  # type: ignore[arg-type]
         status="ok",
         result=record,
+        transport=event.transport,  # ten sam odczyt na serwerze (P8)
+        invocation_id=event.invocation_id,
     )
 
 
@@ -302,6 +310,7 @@ def run_question(
     agent_name: str = "agent",
     *,
     on_event: EventCallback | None = None,
+    callbacks: Callbacks = None,
 ) -> Trace:
     """Uruchamia skompilowanego agenta na jednym pytaniu, od świeżego stanu, i zwraca Trace.
 
@@ -309,16 +318,20 @@ def run_question(
     kroków lub czasu kończą się Trace ze statusem "error" albo "limit", który zachowuje
     wszystkie dotychczasowe zdarzenia. NASZE: `model_calls`, `on_event('start'|'end', event)`
     (wyjątek w nim jest logowany i połykany) i zdarzenia składowe (start rodzica, end rodzica,
-    start składowego, end składowego; nie liczą się do budżetu).
+    start składowego, end składowego; nie liczą się do budżetu). `callbacks` (F5, R1-2) trafiają
+    do konfiguracji przebiegu agenta (zagnieżdżenie pod runem grafu); None → jak F4.
     """
     trace = Trace(question_id=question_id, question=question, status="error")
     events: dict[str, TraceEvent] = {}
     started = time.monotonic()
     try:
         budget.admit()  # wyczerpany budżet nie zaczyna nowej pracy
+        config: RunnableConfig = {"recursion_limit": 2 * budget.max_steps + 1}
+        if callbacks is not None:
+            config["callbacks"] = callbacks
         stream = agent.stream(
             {"messages": [HumanMessage(question)]},
-            {"recursion_limit": 2 * budget.max_steps + 1},
+            config,
             stream_mode=["updates", "tasks"],
         )
         for mode, chunk in stream:

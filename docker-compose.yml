@@ -34,12 +34,21 @@ services:
     <<: *app-env
     environment:
       KOVALO_DB__HOST: postgres
+      # adres, pod którym api łączy się z serwerem: jego host trafia do dozwolonych nagłówków Host
+      KOVALO_SERVICES__MCP_URL: http://mcp-server:8765/mcp
       KOVALO_EMBEDDINGS__LOCAL__LOCAL_FILES_ONLY: "true"
     volumes:
       - embeddings-cache:/app/.cache/embeddings
+      - ./data:/app/data:ro
+    # host 0.0.0.0 w kontenerze; ochrona DNS rebinding włączona w kodzie: Host tylko loopback
+    # i host z KOVALO_SERVICES__MCP_URL (mcp-server); na hoście port związany z 127.0.0.1
     command: ["kovalo-mcp", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8765"]
     ports:
       - "127.0.0.1:8765:8765"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 15s
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health', timeout=3)"]
       interval: 10s
@@ -60,6 +69,8 @@ services:
       KOVALO_SERVICES__MCP_URL: http://mcp-server:8765/mcp
       KOVALO_EMBEDDINGS__LOCAL__LOCAL_FILES_ONLY: "true"
     command: ["kovalo-api"]
+    # R1-10: agent.timeout_s 180 + mcp.cleanup_timeout_s 10 + margines
+    stop_grace_period: 200s
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     volumes:

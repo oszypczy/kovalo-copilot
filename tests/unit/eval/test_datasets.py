@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 
 def test_load_mp1_and_mp2_sets(settings):
     from kovalo.eval.datasets import load_eval_queries, load_mp2_retrieval_queries
@@ -122,3 +124,74 @@ def test_load_agent_gold_missing_file(tmp_path):
 
     with pytest.raises(FileNotFoundError):
         load_agent_gold(tmp_path / "nie-ma.yaml")
+
+
+# ---------------------------------------------------------------------------
+# F5: rozmowy E5 (kontrakt F5, 10.1 i 13.2)
+# ---------------------------------------------------------------------------
+
+
+def test_load_conversations(settings):
+    from kovalo.eval.datasets import Dialogue, load_conversations, load_dialogues
+
+    mp5, mp3 = (
+        settings.paths.mini_project_5_conversations,
+        settings.paths.mini_project_3_dialogues,
+    )
+    conversations = load_conversations(mp5, mp3)
+    assert [d.id for d in conversations] == ["C1", "C2", "C3", "C4", "C5"] + [
+        f"D{i}" for i in range(1, 9)
+    ]
+    assert all(isinstance(d, Dialogue) for d in conversations)
+    assert [len(d.turns) for d in conversations] == [4, 2, 2, 2, 2, 3, 2, 1, 2, 1, 1, 2, 1]
+    assert sum(len(d.turns) for d in conversations) == 25
+
+    d7 = {d.id: d for d in conversations}["D7"]
+    assert d7.turns[0].expect["agent"]["needs"][0]["doc_id"] == "MTG-402"
+    # plik MP3 nietknięty: nakładka dotyczy tylko wyniku
+    original = {d.id: d for d in load_dialogues(mp3)}
+    assert "agent" not in original["D7"].turns[0].expect
+    again = {d.id: d for d in load_conversations(mp5, mp3)}
+    assert "agent" not in original["D7"].turns[0].expect
+    assert again["D7"].turns[0].expect["agent"] == d7.turns[0].expect["agent"]
+    again["D7"].turns[0].expect["agent"]["needs"].clear()
+    assert d7.turns[0].expect["agent"]["needs"], "głębokie kopie: wyniki wywołań są niezależne"
+
+    data_turns = [
+        (d.id, n)
+        for d in conversations
+        for n, t in enumerate(d.turns, start=1)
+        if t.expect["kind"] == "document_question" and "agent" in t.expect
+    ]
+    assert data_turns == [("C1", 1), ("C1", 3), ("C5", 1), ("D7", 1)]
+    # pozostałe tury D1-D8 nie dostały wzorca agenta
+    assert all(
+        "agent" not in t.expect
+        for d in conversations
+        if d.id.startswith("D") and d.id != "D7"
+        for t in d.turns
+    )
+
+
+def test_load_conversations_validates_agent_gold(settings, tmp_path):
+    """`expect.agent` (needs, calculations, key_facts) walidowany przy wczytaniu jako AgentGold
+    bez id; zły kształt → ValueError z nazwą pliku."""
+    import yaml
+
+    from kovalo.eval.datasets import load_conversations
+
+    mp5 = yaml.safe_load(settings.paths.mini_project_5_conversations.read_text(encoding="utf-8"))
+    mp5["conversations"][0]["turns"][0]["expect"]["agent"]["needs"] = [
+        {"tool": "x", "months": "2026-07"}
+    ]
+    bad = tmp_path / "zle_rozmowy.yaml"
+    bad.write_text(yaml.safe_dump(mp5, allow_unicode=True), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"zle_rozmowy\.yaml"):
+        load_conversations(bad, settings.paths.mini_project_3_dialogues)
+
+
+def test_load_conversations_missing_file(settings, tmp_path):
+    from kovalo.eval.datasets import load_conversations
+
+    with pytest.raises(FileNotFoundError):
+        load_conversations(tmp_path / "brak.yaml", settings.paths.mini_project_3_dialogues)

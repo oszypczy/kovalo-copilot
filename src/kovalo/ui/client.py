@@ -87,6 +87,8 @@ class ToolEventView(_View):
     status: str | None = None
     brief: str | None = None
     error: str | None = None
+    transport: str | None = None  # F5: "mcp", gdy wywołanie przeszło przez serwer MCP (tool_end)
+    invocation_id: str | None = None
 
 
 class TraceView(_View):

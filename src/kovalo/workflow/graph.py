@@ -21,11 +21,11 @@ import contextvars
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Final, Literal, Protocol
+from typing import Any, Final, Literal, Protocol, cast
 
 from langchain_core.language_models import LanguageModelInput
 from langchain_core.messages import AIMessage, HumanMessage
-from langchain_core.runnables import Runnable
+from langchain_core.runnables import Runnable, RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
@@ -81,7 +81,7 @@ class Node(Protocol):
     def __call__(self, state: CopilotState) -> dict[str, Any]: ...
 
 
-# (question, *, on_event=...) -> Trace; produkcja: AgentRunner / LazyAgentRunner (F4)
+# (question, *, on_event=None, callbacks=None) -> Trace; produkcja: AgentRunner / LazyAgentRunner
 AgentAnswerer = Callable[..., Trace]
 
 
@@ -161,9 +161,12 @@ def conversation_nodes(deps: CopilotDeps) -> dict[str, Node]:
             "calls": [result.call.model_dump(mode="json")],
         }
 
-    def answer_with_agent(state: CopilotState, agent: AgentAnswerer) -> dict[str, Any]:
+    def answer_with_agent(
+        state: CopilotState, agent: AgentAnswerer, config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
         """Port `answer_with_tools` (krok 3 MP5): odpowiedź agenta albo krótkie przeprosiny,
-        koperta trace w `record`; kroki agenta do strumienia `custom` (ADR-0012 pkt 4)."""
+        koperta trace w `record`; kroki agenta do strumienia `custom` (ADR-0012 pkt 4).
+        Agent dostaje tylko callbacki konfiguracji węzła (F5, R1-2: run agenta pod runem grafu)."""
         turn = _turn(state)
         writer = get_stream_writer()
         node_context = contextvars.copy_context()  # writer działa tylko w kontekście węzła
@@ -179,8 +182,12 @@ def conversation_nodes(deps: CopilotDeps) -> dict[str, Node]:
         try:
             # Pusty kontekst: agent (create_agent, checkpointer=False) nie dziedziczy konfiguracji
             # zewnętrznego grafu (durability="sync", przestrzeń checkpointów), więc biegnie jak
-            # zwykła funkcja; zdarzenia idą do strumienia przez writer pobrany wyżej.
-            trace = contextvars.Context().run(agent, turn.standalone, on_event=on_event)
+            # zwykła funkcja; zdarzenia idą do strumienia przez writer pobrany wyżej. Przekazujemy
+            # tylko callbacki węzła (R1-2), żeby run agenta zagnieżdżał się pod turą grafu.
+            callbacks = (config or {}).get("callbacks")
+            trace = contextvars.Context().run(
+                agent, turn.standalone, on_event=on_event, callbacks=callbacks
+            )
         except Exception as exc:  # run_question nie zgłasza wyjątków; to tylko zabezpieczenie
             trace = Trace(question=turn.standalone, status="error", error=error_text(exc))
         if trace.answer is not None:
@@ -209,9 +216,10 @@ def conversation_nodes(deps: CopilotDeps) -> dict[str, Node]:
             "messages": [_say(text)],
         }
 
-    def answer_documents(state: CopilotState) -> dict[str, Any]:
+    def answer_documents(state: CopilotState, config: RunnableConfig) -> dict[str, Any]:
+        # `config` wymagany i typu RunnableConfig: tylko wtedy LangGraph go wstrzykuje (R1-2)
         if deps.agent is not None:
-            return answer_with_agent(state, deps.agent)
+            return answer_with_agent(state, deps.agent, config)
         turn = _turn(state)
         answerer = deps.document_answerer
         if answerer is None:  # CopilotDeps.__post_init__ pilnuje, że jest jedno z dwóch
@@ -365,7 +373,7 @@ def conversation_nodes(deps: CopilotDeps) -> dict[str, Node]:
 
     return {
         "understand": understand,
-        "answer_documents": answer_documents,
+        "answer_documents": cast(Node, answer_documents),  # (state, config): config z LangGraph
         "answer_policy": answer_policy,
         "reply_other": reply_other,
         "update_request": update_request_node,

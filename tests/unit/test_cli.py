@@ -159,8 +159,8 @@ def test_eval_unknown_stage_or_model_exit_2(capsys, fake_embeddings, tmp_path):
     from kovalo.cli import main
     from kovalo.llm import override_embeddings
 
-    assert main(["eval", "e5"]) == 2
-    assert "Etap e5 jeszcze nie istnieje (F5)." in capsys.readouterr().err
+    assert main(["eval", "e6"]) == 2
+    assert "Etap e6 jeszcze nie istnieje (F6)." in capsys.readouterr().err
     with override_embeddings(fake_embeddings):
         assert main(["eval", "e1", "--model", "nieznany", "--out", str(tmp_path)]) == 2
     assert "nieznany" in capsys.readouterr().err
@@ -341,9 +341,9 @@ def test_eval_e2_errors_exit_codes(capsys, tmp_path, fake_embeddings):
         assert main([*base, "--variants", "nieznany"]) == 2
         assert main([*base, "--with-llm", "--ids", "X99"]) == 2
         assert main([*base, "--no-cache", "--cache-only"]) == 2
-        assert main(["eval", "e5"]) == 2
+        assert main(["eval", "e6"]) == 2
         err = capsys.readouterr().err
-        assert "nieznany" in err and "X99" in err and "Etap e5 jeszcze nie istnieje (F5)." in err
+        assert "nieznany" in err and "X99" in err and "Etap e6 jeszcze nie istnieje (F6)." in err
 
         failing = FakeStructuredChatModel(error=ValueError("sztuczny błąd"))
         with override_chat_model(failing):
@@ -511,8 +511,8 @@ def test_eval_e3_exit_codes(capsys, tmp_path, monkeypatch, fake_embeddings):
         assert "GOOGLE_API_KEY" not in err, "--cache-only nie wymaga klucza"
         assert "dialogues.live.json" in _e3_names(out_dir), "raporty zapisane mimo błędów"
 
-        assert main(["eval", "e5"]) == 2
-        assert "Etap e5 jeszcze nie istnieje (F5)." in capsys.readouterr().err
+        assert main(["eval", "e6"]) == 2
+        assert "Etap e6 jeszcze nie istnieje (F6)." in capsys.readouterr().err
 
 
 def test_eval_e3_plan(capsys, tmp_path):
@@ -614,8 +614,8 @@ def test_eval_e4_exit_codes(capsys, tmp_path, monkeypatch, fake_embeddings, e4_f
         assert "agent_run.live.json" in _names(out_dir)
         capsys.readouterr()
 
-        assert main(["eval", "e5"]) == 2
-        assert "Etap e5 jeszcze nie istnieje (F5)." in capsys.readouterr().err
+        assert main(["eval", "e6"]) == 2
+        assert "Etap e6 jeszcze nie istnieje (F6)." in capsys.readouterr().err
 
 
 def test_eval_e4_cache_only_with_key_never_touches_network(
@@ -801,3 +801,164 @@ def test_show_trace_reads_replay_report(capsys, tmp_path, fake_embeddings):
     capsys.readouterr()
     assert main(["show-trace", "T1", "--run", "replay", "--out", str(out_dir)]) == 0
     assert "search_documents(" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# F5: `kovalo eval e5`, `eval e4 --transport/--count-errors` (kontrakt F5, 10.6 i 13.2)
+# ---------------------------------------------------------------------------
+
+E5_REPLAY_LINE = "odtworzenie: ścieżka 25/25, status 25/25"
+
+
+def _e5_names(out_dir) -> set[str]:
+    return {p.name for p in out_dir.iterdir()}
+
+
+def test_eval_e5_offline_ok(capsys, tmp_path, fake_embeddings):
+    """Kod 0, pliki §10.5 bez `assistant_run.live.json`, zero wywołań LLM-a."""
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+    from tests.workflow_fakes import ExplodingChatModel
+
+    out_dir = tmp_path / "mp5"
+    exploding = ExplodingChatModel()
+    with override_chat_model(exploding), override_embeddings(fake_embeddings):
+        assert main(["eval", "e5", "--transport", "memory", "--out", str(out_dir)]) == 0
+    assert exploding.calls == [], "zero wywołań LLM-a"
+    names = _e5_names(out_dir)
+    assert any(n.endswith("-e5.md") for n in names) and any(n.endswith("-e5.json") for n in names)
+    assert "assistant_run.replay.json" in names and "assistant_run.live.json" not in names
+    out = capsys.readouterr().out
+    assert str(out_dir) in out and "20/20" in out, "ścieżki raportów i zgodność MCP"
+    md = next(out_dir.glob("*-e5.md")).read_text(encoding="utf-8")
+    assert "# E5: końcowy asystent (MP5)" in md
+
+
+def test_eval_e5_plan(capsys, tmp_path):
+    from kovalo.cli import main
+
+    out_dir = tmp_path / "mp5"
+    assert main(["eval", "e5", "--live", "--plan", "--out", str(out_dir)]) == 0
+    out = capsys.readouterr().out
+    assert "understand 25" in out and "agent ≈ 9" in out
+    assert "szacunek 34" in out and "górna granica 73" in out and "limit 40" in out
+    assert not out_dir.exists() or not list(out_dir.iterdir()), "--plan nic nie zapisuje"
+
+
+def test_eval_e5_exit_codes(capsys, tmp_path, monkeypatch, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    monkeypatch.setenv("KOVALO_PATHS__LLM_CACHE_DIR", str(tmp_path / "llm-cache"))
+    out_dir = tmp_path / "mp5"
+    base = ["eval", "e5", "--transport", "memory", "--out", str(out_dir)]
+    with override_embeddings(fake_embeddings):
+        assert main([*base, "--ids", "X9"]) == 2
+        assert "X9" in capsys.readouterr().err
+        assert main([*base, "--no-cache", "--cache-only"]) == 2
+        capsys.readouterr()
+        assert not out_dir.exists() or not list(out_dir.iterdir()), "błąd argumentów przed zapisem"
+
+        # brak klucza przy --live (bez --cache-only): kod 2, odtworzenie zapisane
+        assert main([*base, "--live", "--no-cache", "--ids", "C5"]) == 2
+        assert "GOOGLE_API_KEY" in capsys.readouterr().err
+        names = _e5_names(out_dir)
+        assert "assistant_run.replay.json" in names and "assistant_run.live.json" not in names
+
+        # --live --cache-only bez klucza i z pustym cache: wszystkie tury na żywo to błędy -> 3
+        assert main([*base, "--live", "--cache-only", "--ids", "C5"]) == 3
+        err = capsys.readouterr().err
+        assert "GOOGLE_API_KEY" not in err, "--cache-only nie wymaga klucza"
+        assert "assistant_run.live.json" in _e5_names(out_dir), "raporty zapisane mimo błędów"
+
+
+def test_eval_e5_max_calls_exit_7(capsys, tmp_path, fake_embeddings, conversations, ctx_chunks):
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+    from tests.agent_fakes import ScriptedModel
+    from tests.mcp_fakes import e5_interleaved_script
+
+    out_dir = tmp_path / "mp5"
+    script = e5_interleaved_script(conversations, ctx_chunks)
+    model = ScriptedModel(script=list(script))
+    with override_chat_model(model), override_embeddings(fake_embeddings):
+        code = main(
+            ["eval", "e5", "--live", "--no-cache", "--transport", "memory", "--max-calls", "5",
+             "--out", str(out_dir)]
+        )  # fmt: skip
+    assert code == 7, capsys.readouterr().err
+    assert model.calls == 5, "wspólny limit: understand + agent, nie więcej niż 5 prób"
+    assert "assistant_run.live.json" in _e5_names(out_dir), "raport częściowy zapisany"
+
+
+def test_eval_e5_mcp_startup_failure_exit_8(capsys, tmp_path, monkeypatch):
+    """Serwer stdio, który nie startuje, → kod 8 z komunikatem o serwerze MCP. Podproces dziedziczy
+    zmienne KOVALO_* (kontrakt 8.2), a nie ma katalogu korpusu (serwer czyta go przy starcie
+    i kończy kodem 2), więc `McpStartupError` pojawia się przed jakimkolwiek wywołaniem."""
+    from kovalo.cli import main
+
+    monkeypatch.setenv("KOVALO_PATHS__CORPUS_CATALOG", str(tmp_path / "nie-ma-katalogu.csv"))
+    code = main(
+        [
+            "eval",
+            "e5",
+            "--transport",
+            "stdio",
+            "--backend",
+            "memory",
+            "--out",
+            str(tmp_path / "mp5"),
+        ]
+    )
+    err = capsys.readouterr().err
+    assert code == 8, err
+    assert "serwer MCP" in err
+
+
+def test_eval_e5_reads_review(capsys, tmp_path, fake_embeddings):
+    from kovalo.cli import main
+    from kovalo.llm import override_embeddings
+
+    out_dir = tmp_path / "mp5"
+    out_dir.mkdir()
+    (out_dir / "review.yaml").write_text(
+        "version: 1\nreviewed_on: 2026-11-04\nintro: Wstęp przeglądu E5 z CLI.\nitems: []\n",
+        encoding="utf-8",
+    )
+    argv = ["eval", "e5", "--transport", "memory", "--out", str(out_dir)]
+    with override_embeddings(fake_embeddings):
+        assert main(argv) == 0
+    md = next(p for p in out_dir.iterdir() if p.name.endswith("-e5.md")).read_text(encoding="utf-8")
+    assert "Wstęp przeglądu E5 z CLI." in md
+    (out_dir / "review.yaml").write_text(
+        "version: 1\nreviewed_on: 2026-11-04\nitems:\n"
+        "  - {variants: [ours-nieznany], id: C1-t1, comment: x}\n",
+        encoding="utf-8",
+    )
+    with override_embeddings(fake_embeddings):
+        assert main(argv) == 2, "zły review.yaml (nieznana etykieta)"
+    assert "review.yaml" in capsys.readouterr().err
+
+
+def test_eval_e4_transport_and_count_errors_flags(capsys, tmp_path, fake_embeddings, e4_fakes):
+    """`eval e4 --live --transport memory`: zdarzenia agenta przez MCP, zero błędów, kod 0;
+    `--count-errors` przyjęte; zła wartość `--transport` to kod 2 (argparse)."""
+    from kovalo.cli import main
+    from kovalo.llm import override_chat_model, override_embeddings
+
+    out_dir = tmp_path / "mp4"
+    model = e4_fakes()
+    with override_chat_model(model), override_embeddings(fake_embeddings):
+        code = main(
+            ["eval", "e4", "--live", "--no-cache", "--transport", "memory", "--max-calls", "0",
+             "--count-errors", "--out", str(out_dir)]
+        )  # fmt: skip
+    assert code == 0, capsys.readouterr().err
+    assert len(model.script) == model.calls
+    import re
+
+    live = next(out_dir.glob("*-e4.json")).read_text(encoding="utf-8")
+    assert re.search(r'"transport":\s*"mcp"', live)
+    with pytest.raises(SystemExit) as info:
+        main(["eval", "e4", "--transport", "smtp", "--out", str(out_dir)])
+    assert info.value.code == 2

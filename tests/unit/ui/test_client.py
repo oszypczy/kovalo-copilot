@@ -286,3 +286,21 @@ async def test_turn_view_accepts_f4_turn_result():
         )
     )
     assert plain.trace is None and plain.evidence_path is None
+
+
+async def test_tool_end_transport_fields_are_optional(mock_stream):
+    """F5: `ToolEventView.transport` i `.invocation_id` opcjonalne (stare zdarzenia bez pól)."""
+    final = turn_result(
+        status="answered", replies=["ok"], trace={"status": "answered", "events": []}
+    )
+    body = sse_body(
+        ("tool_start", tool_start()),
+        ("tool_end", tool_end(transport="mcp", invocation_id="inv-1")),
+        ("tool_start", tool_start("c2", "get_invoice_value")),
+        ("tool_end", tool_end("c2", "get_invoice_value")),
+        ("final", final),
+    )
+    items = await collect(make_client(mock_stream(("sse", body))))
+    ends = [item for kind, item in items if kind == "tool_end"]
+    assert (ends[0].transport, ends[0].invocation_id) == ("mcp", "inv-1")
+    assert (ends[1].transport, ends[1].invocation_id) == (None, None)

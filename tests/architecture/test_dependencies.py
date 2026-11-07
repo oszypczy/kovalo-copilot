@@ -80,8 +80,14 @@ def test_ui_does_not_import_backend_logic():
 
 
 def test_workflow_does_not_import_mcp():
+    """F5 (kontrakt 2.3): od F5 wyjątek TYLKO `workflow/factory.py` (kovalo.mcp_client); graf,
+    serwis i reszta nadal bez `mcp`, `kovalo.mcp_*`. Zmiana świadoma (F0-F4 zakazywały całego
+    pakietu)."""
     forbidden = ("mcp", "kovalo.mcp_client", "kovalo.mcp_server")
-    assert _violations(_py_files("workflow"), forbidden) == []
+    others = [f for f in _py_files("workflow") if f.name != "factory.py"]
+    assert _violations(others, forbidden) == []
+    factory = SRC / "workflow" / "factory.py"
+    assert _violations([factory], ("mcp", "kovalo.mcp_server")) == [], "factory: tylko mcp_client"
 
 
 @pytest.mark.parametrize(
@@ -347,6 +353,7 @@ def test_workflow_allowlist():
             "kovalo.tools",
             "kovalo.company",
             "kovalo.agents",
+            "kovalo.mcp_client",  # F5: open_tool_source, McpStartupError
         ),
         # jedyny moduł z Postgresem
         "workflow/checkpoint.py": ("psycopg", "psycopg_pool", "langgraph.checkpoint.postgres"),
@@ -636,3 +643,164 @@ def test_eval_may_use_agents_tools_company_but_not_entrypoints():
     # eval/ może importować kovalo.agents, kovalo.tools, kovalo.company, kovalo.quantities
     assert _violations(_py_files("eval"), ("kovalo.cli", "kovalo.api", "kovalo.ui")) == []
     assert (SRC / "eval" / "trace" / "e4.py").is_file()
+
+
+# ---------------------------------------------------------------------------
+# F5 (kontrakt: docs/contracts/f5.md, sekcja 2.3)
+# ---------------------------------------------------------------------------
+
+
+def test_f5_modules_exist():
+    for rel in (
+        "mcp_server/__init__.py",
+        "mcp_server/__main__.py",
+        "mcp_server/server.py",
+        "mcp_server/registry.py",
+        "mcp_client/__init__.py",
+        "mcp_client/contract.py",
+        "mcp_client/connection.py",
+        "mcp_client/source.py",
+        "eval/assistant/__init__.py",
+        "eval/assistant/scoring.py",
+        "eval/assistant/parity.py",
+        "eval/assistant/reference.py",
+        "eval/assistant/e5.py",
+        "eval/assistant/report.py",
+    ):
+        assert (SRC / rel).is_file(), f"brak src/kovalo/{rel}"
+
+
+def test_mcp_server_allowlist():
+    files = _py_files("mcp_server")
+    assert (SRC / "mcp_server" / "server.py").is_file() and (
+        SRC / "mcp_server" / "registry.py"
+    ).is_file()
+    allowed = (
+        "pydantic",
+        "yaml",
+        "anyio",
+        "mcp",
+        "kovalo.config",
+        "kovalo.tools",
+        "kovalo.company",
+        "kovalo.knowledge",
+        "kovalo.mcp_server",
+    )
+    extra = {
+        # /health (starlette), raport zdrowia i embeddingi zapytań: tylko server.py
+        "mcp_server/server.py": ("starlette", "kovalo.health", "kovalo.llm"),
+    }
+    assert _allowlist_violations(files, allowed, extra=extra) == []
+    forbidden = (
+        "langchain_core.tools",
+        "kovalo.agents",
+        "kovalo.workflow",
+        "kovalo.mcp_client",
+        "kovalo.eval",
+        "kovalo.api",
+        "kovalo.ui",
+        "fastapi",
+    )
+    assert _violations(files, forbidden) == []
+
+
+def test_mcp_server_uses_only_embeddings_from_llm():
+    """`kovalo.llm` w mcp_server/ tylko `get_embeddings` (żadnego modelu czatu; NFR-7)."""
+    for f in _py_files("mcp_server"):
+        for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.ImportFrom) and node.module == "kovalo.llm":
+                assert {a.name for a in node.names} == {"get_embeddings"}, f.name
+            if isinstance(node, ast.Import):
+                assert not any(a.name.startswith("kovalo.llm") for a in node.names), f.name
+
+
+def test_mcp_client_allowlist():
+    files = _py_files("mcp_client")
+    for module in ("contract", "connection", "source"):
+        assert (SRC / "mcp_client" / f"{module}.py").is_file(), f"brak mcp_client/{module}.py"
+    allowed = (
+        "pydantic",
+        "anyio",
+        "mcp",
+        "langchain_core.tools",
+        "kovalo.config",
+        "kovalo.tools.specs",
+        "kovalo.mcp_client",
+    )
+    assert _allowlist_violations(files, allowed) == []
+    forbidden = (
+        "kovalo.mcp_server",
+        "kovalo.agents",
+        "kovalo.workflow",
+        "kovalo.llm",
+        "kovalo.eval",
+        "langchain.agents",
+        "langchain_mcp_adapters",
+        "langchain.mcp",
+    )
+    assert _violations(files, forbidden) == []
+
+
+def test_mcp_package_isolated():
+    """Pakiet `mcp` importują tylko mcp_server/ i mcp_client/ (oraz testy)."""
+    own = set(_py_files("mcp_server", "mcp_client"))
+    assert own, "brak mcp_server/ i mcp_client/"
+    others = [f for f in sorted(SRC.rglob("*.py")) if f not in own]
+    assert _violations(others, ("mcp",)) == []
+    assert any(n == "mcp" or n.startswith("mcp.") for f in own for n in _import_targets(f))
+
+
+def test_no_langchain_mcp_adapters():
+    """ADR-0013: własny klient na MCP SDK; ani `langchain-mcp-adapters`, ani `langchain.mcp`."""
+    assert _violations(sorted(SRC.rglob("*.py")), ("langchain_mcp_adapters", "langchain.mcp")) == []
+    pyproject = (SRC.parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    assert "langchain-mcp-adapters" not in pyproject and "langchain[mcp]" not in pyproject
+
+
+def test_mcp_client_only_in_factory():
+    """`kovalo.mcp_client` w workflow/ tylko w factory.py (open_tool_source, McpStartupError);
+    api/, ui/, agents/, tools/, knowledge/, policy/, company/ bez `kovalo.mcp_*`."""
+    factory = SRC / "workflow" / "factory.py"
+    imported = _import_targets(factory)
+    assert any(n == "kovalo.mcp_client" or n.startswith("kovalo.mcp_client.") for n in imported)
+    names = {
+        alias.name
+        for node in ast.walk(ast.parse(factory.read_text(encoding="utf-8")))
+        if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("kovalo.mcp_client")
+        for alias in node.names
+    }
+    assert {"open_tool_source", "McpStartupError"} <= names
+    others = [f for f in _py_files("workflow") if f != factory]
+    assert _violations(others, ("kovalo.mcp_client", "kovalo.mcp_server")) == []
+    rest = _py_files("api", "ui", "agents", "tools", "knowledge", "policy", "company", "rag")
+    assert _violations(rest, ("kovalo.mcp_client", "kovalo.mcp_server", "mcp")) == []
+
+
+def test_lazy_retriever_lives_in_knowledge():
+    """`LazyRetriever` przeniesiony z workflow/factory.py do knowledge/retrievers.py."""
+    factory = (SRC / "workflow" / "factory.py").read_text(encoding="utf-8")
+    assert "class LazyRetriever" not in factory
+    retrievers = (SRC / "knowledge" / "retrievers.py").read_text(encoding="utf-8")
+    assert "class LazyRetriever" in retrievers
+    assert "kovalo.llm" not in _import_targets(SRC / "knowledge" / "retrievers.py")
+
+
+def test_eval_may_use_mcp_client_and_server_but_not_mcp_or_entrypoints():
+    eval_files = _py_files("eval")
+    assert _violations(eval_files, ("kovalo.cli", "kovalo.api", "kovalo.ui")) == []
+    assert _violations(eval_files, ("mcp", "langchain_mcp_adapters")) == [], (
+        "SDK tylko przez klienta"
+    )
+    e5 = SRC / "eval" / "assistant" / "e5.py"
+    imported = _import_targets(e5)
+    assert any(n.startswith("kovalo.mcp_client") for n in imported)
+    assert any(n.startswith("kovalo.mcp_server") for n in imported), (
+        "build_server dla serwera w pamięci"
+    )
+
+
+def test_api_and_ui_do_not_learn_about_mcp():
+    """Transport narzędzi przychodzi jako pole `tool_end.transport` (listy z F4 bez zmian)."""
+    assert (
+        _violations(_py_files("api", "ui"), ("mcp", "kovalo.mcp_client", "kovalo.mcp_server")) == []
+    )
