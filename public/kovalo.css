@@ -1,0 +1,32 @@
+/* Kovalo Decision Copilot: drobne poprawki wyglądu Chainlita (custom_css w .chainlit/config.toml). */
+
+/* Wskaźnik „copilot pracuje”: zamiast białej pulsującej kropki trzy kropki w kolorze marki
+   z przesuwającą się falą jasności. Chainlit rysuje go jako span.loading-cursor i pozwala
+   go stylować zmiennymi --loading-cursor-*. */
+.loading-cursor {
+  --loading-cursor-color: hsl(var(--primary));
+  --loading-cursor-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 8'><circle cx='4' cy='4' r='3.2'/><circle cx='14' cy='4' r='3.2'/><circle cx='24' cy='4' r='3.2'/></svg>");
+  --loading-cursor-animation: kovalo-dots-wave 1.2s linear infinite;
+  width: 1.75rem !important;
+  height: 0.5rem !important;
+  border-radius: 0 !important;
+  vertical-align: middle;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 35%,
+    hsl(var(--background) / 0.65) 50%,
+    transparent 65%,
+    transparent 100%
+  );
+  background-size: 300% 100%;
+}
+
+@keyframes kovalo-dots-wave {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}

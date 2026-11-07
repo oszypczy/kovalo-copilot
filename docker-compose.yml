@@ -68,6 +68,7 @@ services:
       KOVALO_DB__HOST: postgres
       KOVALO_SERVICES__MCP_URL: http://mcp-server:8765/mcp
       KOVALO_EMBEDDINGS__LOCAL__LOCAL_FILES_ONLY: "true"
+    # Jeden proces Uvicorna (bez --workers): zamknięcie przerwanej tury zakłada jeden proces (kontrakt F6 §7, §11.1)
     command: ["kovalo-api"]
     # R1-10: agent.timeout_s 180 + mcp.cleanup_timeout_s 10 + margines
     stop_grace_period: 200s

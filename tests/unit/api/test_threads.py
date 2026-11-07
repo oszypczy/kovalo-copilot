@@ -231,3 +231,74 @@ def test_resume_value_accepts_numbers_and_decisions():
     assert ResumeIn.model_validate({"value": 10}).value == 10
     assert ResumeIn.model_validate({"value": 10.5}).value == 10.5
     assert ResumeIn.model_validate({"value": "approved"}).value == "approved"
+
+
+# ---------------------------------------------------------------------------
+# F6: przerwana tura i koszt w odpowiedzi (kontrakt F6, 6 i 7)
+# ---------------------------------------------------------------------------
+
+
+class _Abort(BaseException):
+    """Awaria spoza Exception: wychodzi z grafu i zostawia przerwaną turę."""
+
+
+def test_messages_after_interrupted_turn(settings):
+    """Po awarii w węźle następna wiadomość to 200 z dwiema odpowiedziami, nie 409 thread_stuck."""
+    from fastapi.testclient import TestClient
+
+    from kovalo.api.main import create_app
+    from kovalo.workflow.replies import INTERRUPTED_TURN_REPLY
+    from tests.workflow_fakes import service_with
+
+    def aborting(question):
+        raise _Abort
+
+    service = service_with(
+        settings,
+        [
+            turn(kind="document_question", standalone="P?"),
+            turn(kind="policy_question", discount_pct=3),
+        ],
+        answerer=aborting,
+    )
+    thread = str(uuid.uuid4())
+    with pytest.raises(_Abort):
+        service.send_message(thread, "Pytanie, przy którym proces ginie")
+    client = TestClient(create_app(settings, service=service))
+    r = client.post(f"/threads/{thread}/messages", json={"text": "Kto zatwierdza 3%?"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["replies"]) == 2 and body["replies"][0] == INTERRUPTED_TURN_REPLY
+    assert "3%" in body["replies"][1] and body["status"] == "answered"
+    assert client.get(f"/threads/{thread}").json()["status"] == "answered"
+
+
+def test_usage_cost_in_openapi(client):
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    usage = next(v for k, v in schemas.items() if k.startswith("TurnUsage"))
+    assert {"by_model", "cost"} <= set(usage["properties"])
+    assert any(k.startswith("TurnCost") for k in schemas), "schemat kosztu tury w kontrakcie API"
+    assert any(k.startswith("ModelUsage") for k in schemas)
+
+
+def test_usage_cost_in_message_response(settings):
+    """Z cennikiem w serwisie odpowiedź API niesie by_model i cost (liczby jak w serwisie)."""
+    from fastapi.testclient import TestClient
+
+    from kovalo.api.main import create_app
+    from kovalo.workflow.service import CopilotService
+    from tests.agent_fakes import agent_answerer
+    from tests.unit.workflow.test_service import DOC_TURN, _two_model_trace
+    from tests.workflow_fakes import graph_with
+
+    graph, _ = graph_with(settings, [DOC_TURN], agent=agent_answerer(_two_model_trace()))
+    service = CopilotService(graph, pricing=settings.cost)
+    client = TestClient(create_app(settings, service=service))
+    thread = client.post("/threads").json()["thread_id"]
+    r = client.post(f"/threads/{thread}/messages", json={"text": "Ile wynosi kara?"})
+    usage = r.json()["usage"]
+    assert {m["model"] for m in usage["by_model"]} >= {"gemini-3.5-flash-lite", "gemini-3.6-flash"}
+    assert (
+        usage["cost"]["ours_usd"] > 0 and usage["cost"]["reference_usd"] > usage["cost"]["ours_usd"]
+    )
+    assert usage["cost"]["unpriced_models"] == []

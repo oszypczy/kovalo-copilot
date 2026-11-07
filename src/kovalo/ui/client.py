@@ -19,12 +19,15 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 __all__ = [
     "ApiCallError",
     "CopilotApiClient",
+    "ModelUsageView",
     "PendingView",
     "SourceView",
     "StreamItem",
     "ToolEventView",
     "TraceView",
+    "TurnCostView",
     "TurnView",
+    "UsageView",
     "pause_ref",
 ]
 
@@ -63,6 +66,33 @@ class PendingView(_View):
     options: list[str] = []
 
 
+class ModelUsageView(_View):
+    model: str | None = None
+    calls: int
+    input_tokens: int
+    output_tokens: int
+
+
+class TurnCostView(_View):
+    """Koszt tury policzony przez api (UI nie zna cen, tylko sumuje i formatuje kwoty)."""
+
+    ours_usd: float | None = None
+    reference_usd: float
+    unpriced_models: list[str] = []
+
+
+class UsageView(_View):
+    """Wywołania LLM-a tury (TurnResult.usage; F6: podział na modele i koszt)."""
+
+    calls: int
+    input_tokens: int
+    output_tokens: int
+    reasoning_tokens: int | None = None
+    models: list[str] = []
+    by_model: list[ModelUsageView] = []
+    cost: TurnCostView | None = None
+
+
 class TurnView(_View):
     thread_id: str
     status: str | None
@@ -73,6 +103,7 @@ class TurnView(_View):
     error: str | None = None
     evidence_path: str | None = None  # F4: ścieżka dowodowa tury z agentem
     trace: dict[str, Any] | None = None  # F4: nieprzezroczysty dla UI poza trace["status"]
+    usage: UsageView | None = None  # F6: None przy wznowieniu pauzy i turze bez LLM-a
 
 
 class ToolEventView(_View):

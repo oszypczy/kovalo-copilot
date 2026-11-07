@@ -16,3 +16,6 @@ Jeden kontener `pgvector/pgvector:pg16`: indeks przez `langchain-postgres` (`PGV
 ## Rozważane alternatywy
 - Chroma + SQLite checkpointer: dwie technologie zamiast jednej.
 - FAISS w pliku: brak współdzielenia między kontenerami bez wolumenu i blokad.
+
+## Aktualizacja (F6)
+Tabela `agent_traces` nie powstała. Trace agenta zostaje w checkpointach LangGraph (koperta `agent_trace` w stanie wątku, [ADR-0011](0011-agent-tools-f4.md) pkt 7), a zbiorczy widok ewaluacji czyta raporty, nie tury produkcyjne ([ADR-0015](0015-polish-f6.md)). Indeks to `PGVectorStore` (`PGVector` jest przestarzały, [ADR-0007](0007-knowledge-index-f1.md)).

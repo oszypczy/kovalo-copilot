@@ -11,6 +11,9 @@ reports/**
 !reports/*/
 !reports/*/*-e[0-9].md
 !reports/*/review.yaml
+!reports/dashboard.yaml
+!reports/dashboard.md
+!reports/dashboard.json
 .DS_Store
 # Chainlit: śledzimy tylko konfigurację i polskie tłumaczenie (reszta generuje się sama)
 .chainlit/*

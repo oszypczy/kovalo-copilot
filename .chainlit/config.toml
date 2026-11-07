@@ -56,7 +56,8 @@ reaction_on_message_received = false
 
 # Authorize users to spontaneously upload files with messages
 [features.spontaneous_file_upload]
-    enabled = true
+    # Kovalo: copilot odpowiada tylko na tekst (bez spinacza w polu wiadomości)
+    enabled = false
     # Define accepted file types using MIME types
     # Examples:
     # 1. For specific file types:
@@ -144,14 +145,16 @@ cot = "full"
 
 # Specify a CSS file that can be used to customize the user interface.
 # The CSS file can be served from the public directory or via an external link.
-# custom_css = "/public/test.css"
+# Kovalo: kropka ładowania w kolorze marki (trzy kropki z falą) — public/kovalo.css
+custom_css = "/public/kovalo.css"
 
 # Specify additional attributes for a custom CSS file
 # custom_css_attributes = "media=\"print\""
 
 # Specify a JavaScript file that can be used to customize the user interface.
 # The JavaScript file can be served from the public directory.
-# custom_js = "/public/test.js"
+# Kovalo: panel boczny tylko po kliknięciu linku (Chainlit otwiera go sam przy nowych elementach)
+custom_js = "/public/kovalo.js"
 
 # The style of alert boxes. Can be "classic" or "modern".
 alert_style = "classic"

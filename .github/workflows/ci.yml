@@ -26,6 +26,9 @@ jobs:
       - run: uv run ruff format --check
       - run: uv run mypy
       - run: uv run pytest
+      # Kontrakt F6 §11.1: dashboard zgodny z dashboard.yaml/json (bez klucza, bez sieci).
+      - name: Dashboard ewaluacji (--check)
+        run: uv run kovalo eval dashboard --check
 
   docker-build:
     runs-on: ubuntu-24.04

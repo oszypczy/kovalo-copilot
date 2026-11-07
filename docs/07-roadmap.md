@@ -68,7 +68,11 @@ serwer FastMCP (stdio + streamable HTTP) jako kontener, klient MCP z limitami i 
 
 ## F6: dopracowanie
 
-licznik kosztów w UI, dashboard ewaluacji, README z demo (GIF), porządki w dokumentacji, odświeżony diagram architektury, prezentacja projektu.
+licznik kosztów w UI, zamknięcie przerwanej tury, dashboard ewaluacji, README ze scenariuszem pokazu, porządki w dokumentacji, odświeżony diagram architektury, pokaz aplikacji na żywo (bez slajdów i bez nagrania).
+
+**Kontrakt i zadania:** [contracts/f6.md](contracts/f6.md) (zadania D1, T1, A1–A4, T2, D2, W1–W2, H2, R1; H1, nagranie GIF, skreślone 2026-11-07; w tym R1-8, R1-9, R1-10 z F5); decyzje: [ADR-0015](adr/0015-polish-f6.md) (przyjęty). Decyzje użytkownika: [contracts/f6.md §13.3](contracts/f6.md).
+
+**Status (2026-11-07):** A1–A4, D1, T1, T2, D2, W1, W2 i R1 zrobione; 1442 testy bez LLM-a, `-m integration` 25/25, `kovalo eval dashboard --check` zielone; przegląd R1 bez naruszeń zależności ([contracts/f6.md §15](contracts/f6.md)). Licznik kosztów w UI przeklikany przez użytkownika (P1 → 7296,00 PLN, linia „Tura: 4 wywołania … 0,44 centa (Gemini) / 0,92 centa (cennik kursu)”, suma rozmowy, brak linii po Zatwierdź); przerwana tura po `docker compose kill api` zamknięta komunikatem, bez 409. Dashboard: [reports/dashboard.md](../reports/dashboard.md). Diagram: nowa strona 8 „Koszty, dashboard, przerwana tura”, poprawione strony 1 i 6. Zużycie Gemini w F6: około 9 wywołań (D2 ≈ 4, UI ≈ 5), plus pokaz (≈ 16 w dniu pokazu: poranna próba i pokaz). **F6 zamknięte warunkowo:** zostaje pokaz aplikacji na żywo (H2) według [demo/scenario.md](demo/scenario.md), do potwierdzenia przez użytkownika.
 
 ## Kamienie milowe a testy cząstkowe kursu
 

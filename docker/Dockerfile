@@ -66,5 +66,7 @@ FROM runtime-base AS ui
 RUN mkdir -p /app/.chainlit/translations
 COPY --chown=kovalo:kovalo .chainlit/config.toml ./.chainlit/config.toml
 COPY --chown=kovalo:kovalo .chainlit/translations/pl-PL.json ./.chainlit/translations/pl-PL.json
+# własny CSS i JS (custom_css, custom_js w .chainlit/config.toml): Chainlit serwuje /public z katalogu roboczego
+COPY --chown=kovalo:kovalo public/kovalo.css public/kovalo.js ./public/
 EXPOSE 8000
 CMD ["kovalo-ui"]

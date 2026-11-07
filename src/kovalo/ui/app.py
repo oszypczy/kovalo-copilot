@@ -11,6 +11,9 @@ UI nie importuje backendu (workflow, api): tylko kovalo.ui.client i kovalo.ui.re
   nie cl.Step: nagłówek kroku zawsze ma prefiks „Używam/Użyto”, a ścieżka nie jest narzędziem.
 - Gdy wątek czeka na pauzę, tekst wpisany w czacie idzie do /resume jako `text` (marża „7,5”,
   „zatwierdź”, „odrzuć”, „anuluj”), jak chat.py kursu; przyciski to cl.Action z callbackiem.
+- F6: koszt tury jako element boczny „Koszt tury” (obok ścieżki dowodowej, link w linii
+  „Szczegóły: …” ostatniej wiadomości tury); suma rozmowy w cl.user_session["usage_total"].
+  Panel boczny otwiera się tylko po kliknięciu (public/kovalo.js).
 """
 
 from __future__ import annotations
@@ -23,15 +26,20 @@ from kovalo.config import get_settings
 from kovalo.ui.client import ApiCallError, CopilotApiClient, PendingView, TurnView, pause_ref
 from kovalo.ui.render import (
     INTERRUPTED,
+    NO_TEXT,
     UiMessage,
     UiStep,
+    UsageTotal,
+    add_usage,
     message_text,
+    render_cost,
     render_error,
     render_evidence,
     render_pending,
     render_tool_end,
     render_tool_start,
     render_turn,
+    render_usage,
 )
 
 STALE = "Ta decyzja jest nieaktualna: wątek czeka już na inną odpowiedź."
@@ -44,7 +52,9 @@ def _client() -> CopilotApiClient:
     return client
 
 
-async def _send(message: UiMessage, evidence: UiStep | None = None) -> cl.Message:
+async def _send(
+    message: UiMessage, evidence: UiStep | None = None, cost: UiStep | None = None
+) -> cl.Message:
     actions = [
         cl.Action(
             name=RESUME_ACTION,
@@ -60,8 +70,12 @@ async def _send(message: UiMessage, evidence: UiStep | None = None) -> cl.Messag
         elements.append(
             cl.Text(name=evidence.name, content=evidence.output, display="side", language="text")
         )
+    if cost is not None:  # lista Markdown: tura, tokeny, koszt tury, suma rozmowy
+        elements.append(cl.Text(name=cost.name, content=cost.output, display="side"))
     # nazwy elementów w treści (message_text): Chainlit podlinkuje ich panele boczne
-    msg = cl.Message(content=message_text(message, evidence), actions=actions, elements=elements)
+    msg = cl.Message(
+        content=message_text(message, evidence, cost), actions=actions, elements=elements
+    )
     await msg.send()
     return msg
 
@@ -74,6 +88,20 @@ async def _clear_pause_actions() -> None:
     cl.user_session.set("pause_message", None)
 
 
+def _usage_details(view: TurnView) -> UiStep | None:
+    """Dodaje turę do sumy rozmowy w sesji i zwraca element „Koszt tury” (None bez usage)."""
+    if view.usage is None:
+        return None
+    total = cl.user_session.get("usage_total")
+    if not isinstance(total, UsageTotal):  # sesja bez sumy: liczymy od zera
+        total = UsageTotal()
+    total = add_usage(total, view.usage)
+    cl.user_session.set("usage_total", total)
+    shown = cl.user_session.get("cost_count", 0)
+    cl.user_session.set("cost_count", shown + 1)
+    return render_cost(render_usage(view.usage, total), number=shown + 1)
+
+
 async def _show(view: TurnView) -> None:
     """Renderuje turę i zapamiętuje bieżącą pauzę (albo jej brak) w sesji."""
     await _clear_pause_actions()
@@ -82,11 +110,13 @@ async def _show(view: TurnView) -> None:
     evidence = render_evidence(view, number=shown + 1)
     if evidence is not None:
         cl.user_session.set("evidence_count", shown + 1)
-    if evidence is not None and not messages:
+    cost = _usage_details(view)
+    if (evidence is not None or cost is not None) and not messages:
         messages = [UiMessage(content="")]
     last: cl.Message | None = None
-    for n, message in enumerate(messages, start=1):  # ścieżka dowodowa przy ostatniej
-        last = await _send(message, evidence if n == len(messages) else None)
+    for n, message in enumerate(messages, start=1):  # ścieżka dowodowa i koszt przy ostatniej
+        is_last = n == len(messages)
+        last = await _send(message, evidence if is_last else None, cost if is_last else None)
     cl.user_session.set("pending", view.pending)
     if view.pending is not None:
         cl.user_session.set("pause_message", last)
@@ -113,6 +143,7 @@ class _ToolSteps:
             parent_id=parent.id if parent is not None else self.root_id,
             show_input="json",
             language="json",
+            metadata={"icon": ui.icon} if ui.icon else None,
         )
         step.input = ui.input
         await step.send()
@@ -170,6 +201,9 @@ async def _refresh_pending(thread_id: str) -> None:
 
 async def _handle_error(error: ApiCallError, thread_id: str) -> None:
     await _send(render_error(error))
+    if error.error == "not_paused":  # F6: np. po zamknięciu przerwanej tury
+        cl.user_session.set("pending", None)
+        await _clear_pause_actions()
     if error.error in ("thread_paused", "stale_pause"):
         try:
             await _refresh_pending(thread_id)
@@ -187,6 +221,8 @@ async def on_chat_start() -> None:
     cl.user_session.set("pending", None)
     cl.user_session.set("pause_message", None)
     cl.user_session.set("evidence_count", 0)
+    cl.user_session.set("usage_total", UsageTotal())
+    cl.user_session.set("cost_count", 0)
     cl.user_session.set("thread_id", None)
     # bez powitania: domyślny pusty ekran Chainlita; możliwości opisuje OTHER_REPLY
     try:
@@ -211,6 +247,9 @@ async def _thread_id() -> str | None:
 
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
+    if not (message.content or "").strip():  # np. sam obraz: api wymaga tekstu (422)
+        await _send(UiMessage(content=NO_TEXT))
+        return
     thread_id = await _thread_id()
     if thread_id is None:
         return

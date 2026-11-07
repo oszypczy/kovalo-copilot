@@ -1,0 +1,609 @@
+{
+  "version": 1,
+  "as_of": "2026-11-04",
+  "stages": [
+    {
+      "stage": "e1",
+      "title": "wyszukiwanie i koszty (MP1)",
+      "date": "2026-11-02",
+      "model": "gemini-3.6-flash",
+      "embedding_model": "intfloat/multilingual-e5-large",
+      "report_md": "mp1/2026-11-02-e1.md",
+      "related_md": [],
+      "headline": "E1: hit@1 / hit@3 na Q01–Q10 0,9 / 0,9 → 0,9 / 1,0 (intfloat/multilingual-e5-large); M03 trafione; koszt kursu $17,78 / $69,86 odtworzony",
+      "metrics": [
+        {
+          "name": "hit@1 (MP1, Q01–Q10)",
+          "reference": "0,9",
+          "replay": "0,9",
+          "live": null,
+          "target": "≥ 0,8",
+          "met": true
+        },
+        {
+          "name": "hit@3 (MP1, Q01–Q10)",
+          "reference": "0,9",
+          "replay": "1,0",
+          "live": null,
+          "target": "≥ 0,9",
+          "met": true
+        },
+        {
+          "name": "hit@1 (MP2, M01–M10)",
+          "reference": "0,9",
+          "replay": "0,9",
+          "live": null,
+          "target": "≥ 0,8",
+          "met": true
+        },
+        {
+          "name": "hit@3 (MP2, M01–M10)",
+          "reference": "0,9",
+          "replay": "1,0",
+          "live": null,
+          "target": "≥ 0,9",
+          "met": true
+        },
+        {
+          "name": "M03 (SUP-114) w top-3",
+          "reference": "nietrafione",
+          "replay": "trafione",
+          "live": null,
+          "target": "trafione",
+          "met": true
+        },
+        {
+          "name": "Koszt miesięczny: retrieval / cały korpus (ceny referencyjne kursu)",
+          "reference": "$17,78 / $69,86",
+          "replay": "$17,78 / $69,86",
+          "live": null,
+          "target": "równy kursowi ($17,78 / $69,86)",
+          "met": true
+        },
+        {
+          "name": "Koszt miesięczny po cenach gemini-3.6-flash (płatny tier Gemini)",
+          "reference": null,
+          "replay": "$15,58 / $67,65",
+          "live": null,
+          "target": null,
+          "met": null
+        }
+      ],
+      "calls": {
+        "planned": 1,
+        "network": 1,
+        "cached": 0,
+        "failed": 0,
+        "seconds": 12.3,
+        "source": "report",
+        "run_id": "20261102-104911",
+        "origin": null
+      },
+      "cost": {
+        "tokens_in": 804,
+        "tokens_out": 959,
+        "ours_cents": 0.4199,
+        "reference_cents": 0.4919,
+        "course_cents": null,
+        "includes_cached": false
+      },
+      "notes": [
+        "Koszt miesięczny liczony dla tokenów przebiegu kursu (wiersz „referencja kursu” raportu E1) po cenach gemini-3.6-flash, modelu z pomiaru E1. Od F2 model odpowiedzi i cost.our_model to gemini-3.5-flash-lite: $9,17 / $30,00 (FR-1.2, ADR-0006); model embeddingów z configu (intfloat/multilingual-e5-large) daje po cenach gemini-3.6-flash $15,66 / $67,65, i tę kwotę podaje 06-evaluation.",
+        "Koszt E1 w scenariuszu to dolna granica: faktyczne wywołanie z myśleniem zużyło 959 tokenów wyjścia (w tym 714 myślenia) wobec 350 w scenariuszu kursu (raport E1, przebieg 20261102-104911). ADR-0006 podaje 677 tokenów: to starszy pomiar z F1 (06-evaluation podaje oba); raport E1 jest nowszy i to jego liczbę bierze dashboard."
+      ]
+    },
+    {
+      "stage": "e2",
+      "title": "odpowiedzi ze źródłami (MP2)",
+      "date": "2026-11-02",
+      "model": "gemini-3.5-flash-lite",
+      "embedding_model": "intfloat/multilingual-e5-large",
+      "report_md": "mp2/2026-11-02-e2.md",
+      "related_md": [],
+      "headline": "E2: odpowiedzi 8/10 → 9/10 / 9/10, sędzia 8/8 → 9/9 / 9/9 (ctx / hybrid); poziomy 1–2 jak kurs",
+      "metrics": [
+        {
+          "name": "Poziomy 1–2, mp1: hit@1, hit@3, komplet dowodów, tokeny promptu",
+          "reference": "9/10, 9/10, 9/10, 850,3",
+          "replay": "9/10, 10/10, 9/10, 874,6",
+          "live": null,
+          "target": "równe kursowi (check.py)",
+          "met": true
+        },
+        {
+          "name": "Poziomy 1–2, ctx: hit@1, hit@3, komplet dowodów, tokeny promptu",
+          "reference": "9/10, 9/10, 8/10, 610,4",
+          "replay": "10/10, 10/10, 9/10, 649,3",
+          "live": null,
+          "target": "równe kursowi (check.py)",
+          "met": true
+        },
+        {
+          "name": "Poziomy 1–2, hybrid: hit@1, hit@3, komplet dowodów, tokeny promptu",
+          "reference": null,
+          "replay": "9/10, 10/10, 9/10, 638,5",
+          "live": null,
+          "target": null,
+          "met": null
+        },
+        {
+          "name": "Poziom 1: znaleziono trafny dokument (ctx / hybrid)",
+          "reference": "9/10",
+          "replay": null,
+          "live": "10/10 / 10/10",
+          "target": "≥ referencja − 1",
+          "met": true
+        },
+        {
+          "name": "Poziom 2: komplet fraz dowodowych w kontekście (ctx / hybrid)",
+          "reference": "8/10",
+          "replay": null,
+          "live": "9/10 / 9/10",
+          "target": "≥ referencja − 1",
+          "met": true
+        },
+        {
+          "name": "Poziom 3: udzielone odpowiedzi (ctx / hybrid)",
+          "reference": "8/10",
+          "replay": null,
+          "live": "9/10 / 9/10",
+          "target": "≥ referencja − 1",
+          "met": true
+        },
+        {
+          "name": "Poziom 3: wszystkie kluczowe fakty (ctx / hybrid)",
+          "reference": "8/8",
+          "replay": null,
+          "live": "9/9 / 9/9",
+          "target": "≥ referencja − 1",
+          "met": true
+        },
+        {
+          "name": "Poziom 3: sędzia, odpowiedź poprawna (ctx / hybrid)",
+          "reference": "8/8",
+          "replay": null,
+          "live": "9/9 / 9/9",
+          "target": "≥ referencja − 1",
+          "met": true
+        },
+        {
+          "name": "Poziom 3: sędzia, odpowiedź oparta na kontekście (ctx / hybrid)",
+          "reference": "8/8",
+          "replay": null,
+          "live": "9/9 / 9/9",
+          "target": "≥ referencja − 1",
+          "met": true
+        },
+        {
+          "name": "Poziom 4: odwołania prawidłowe (ctx / hybrid)",
+          "reference": "8/8",
+          "replay": null,
+          "live": "9/9 / 9/9",
+          "target": "≥ referencja − 1",
+          "met": true
+        },
+        {
+          "name": "Poziom 4: odwołania do trafnego dokumentu (ctx / hybrid)",
+          "reference": "8/8",
+          "replay": null,
+          "live": "9/9 / 9/9",
+          "target": "≥ referencja − 1",
+          "met": true
+        },
+        {
+          "name": "Odmowy trafne (pytania spoza korpusu) (ctx / hybrid)",
+          "reference": "2/2",
+          "replay": null,
+          "live": "2/2 / 2/2",
+          "target": "≥ referencja − 1",
+          "met": true
+        }
+      ],
+      "calls": {
+        "planned": 48,
+        "network": 0,
+        "cached": 42,
+        "failed": 0,
+        "seconds": null,
+        "source": "report",
+        "run_id": "20261102-155513-ccd9ddd2",
+        "origin": null
+      },
+      "cost": {
+        "tokens_in": 15132,
+        "tokens_out": 1776,
+        "ours_cents": 0.898,
+        "reference_cents": 1.9341,
+        "course_cents": null,
+        "includes_cached": false
+      },
+      "notes": [
+        "JSON E2 to przeliczenie z cache (--with-llm --cache-only): 0 wywołań sieciowych, 42 z cache. Pierwszy przebieg na gemini-3.5-flash-lite (20261102-153627-87b0e6c8): 11 wywołań, 31 z cache (przegląd w raporcie E2).",
+        "Wiersz hybrid (poziomy 1–2) bez kolumny „Kurs”: kurs nie ma wariantu hybrid. Z embeddingami referencyjnymi kursu hybrid daje 9/10, 10/10, 10/10, 631 tokenów (raport E2).",
+        "Tokeny i koszt E2 to szacunek: średnie tokeny odpowiedzi z raportu razy liczba odpowiedzi (ctx i hybrid, bez sędziego).",
+        "Sędzia to ten sam model co odpowiedzi: „sędzia 9/9” to górna granica (M09, ADR-0008); M04 to realne pudło wyszukiwania (pytanie PL, dokument EN)."
+      ]
+    },
+    {
+      "stage": "e3",
+      "title": "workflow decyzyjny (MP3)",
+      "date": "2026-11-03",
+      "model": "gemini-3.5-flash-lite",
+      "embedding_model": "intfloat/multilingual-e5-large",
+      "report_md": "mp3/2026-11-03-e3.md",
+      "related_md": [],
+      "headline": "E3: na żywo kierowanie 13/13 → 13/13, pola 11/11 → 10/11; odtworzenie 100%; 0,56 centa",
+      "metrics": [
+        {
+          "name": "Kierowanie (rodzaj wiadomości)",
+          "reference": "13/13",
+          "replay": "13/13",
+          "live": "13/13",
+          "target": "odtworzenie 100%; na żywo ≥ 12/13",
+          "met": true
+        },
+        {
+          "name": "Pola odczytane przez LLM",
+          "reference": "11/11",
+          "replay": "11/11",
+          "live": "10/11",
+          "target": "odtworzenie 100%",
+          "met": true
+        },
+        {
+          "name": "Stan wniosku po aktualizacji",
+          "reference": "8/8",
+          "replay": "8/8",
+          "live": "8/8",
+          "target": "odtworzenie 100%",
+          "met": true
+        },
+        {
+          "name": "Osoby zatwierdzające (polityka)",
+          "reference": "11/11",
+          "replay": "11/11",
+          "live": "11/11",
+          "target": "odtworzenie 100%",
+          "met": true
+        },
+        {
+          "name": "Pauzy (typ, rola, kolejność)",
+          "reference": "13/13",
+          "replay": "13/13",
+          "live": "13/13",
+          "target": "odtworzenie 100%",
+          "met": true
+        },
+        {
+          "name": "Status końcowy",
+          "reference": "13/13",
+          "replay": "13/13",
+          "live": "13/13",
+          "target": "odtworzenie 100%",
+          "met": true
+        },
+        {
+          "name": "Błędy (nieudane tury)",
+          "reference": "0",
+          "replay": "0",
+          "live": "0",
+          "target": "0",
+          "met": true
+        }
+      ],
+      "calls": {
+        "planned": 14,
+        "network": 0,
+        "cached": 14,
+        "failed": 0,
+        "seconds": 0.1,
+        "source": "report",
+        "run_id": "20261103T081441-e6c75d13",
+        "origin": null
+      },
+      "cost": {
+        "tokens_in": 6626,
+        "tokens_out": 1439,
+        "ours_cents": 0.5585,
+        "reference_cents": 1.1445,
+        "course_cents": 1.65,
+        "includes_cached": false
+      },
+      "notes": [
+        "JSON E3 to powtórka --live --cache-only (0 wywołań sieciowych, 14 z cache). Oryginalny przebieg na żywo: 14 wywołań (13 understand + 1 odpowiedź RAG), 64 s, bez fallbacku (contracts/f3.md, A9); identyfikatora tamtego przebiegu nie zapisano, więc bez first_live.",
+        "D2-t2: na żywo pola 10/11, model nie przejął marży 10% z rozmowy; skutek zerowy (reports/mp3/review.yaml). Cel E3 dla pól to odtworzenie 100%."
+      ]
+    },
+    {
+      "stage": "e4",
+      "title": "agent z narzędziami (MP4)",
+      "date": "2026-11-03",
+      "model": "gemini-3.5-flash-lite",
+      "embedding_model": "intfloat/multilingual-e5-large",
+      "report_md": "mp4/2026-11-03-e4.md",
+      "related_md": [
+        "mp4/2026-11-04-e4.md"
+      ],
+      "headline": "E4: na żywo narzędzia 8/9 → 8/9, fakty 8/9 → 8/9 (cel 9/9 niespełniony: B1); T1 67% / 0% → 100% / 100%; 2,49 centa",
+      "metrics": [
+        {
+          "name": "Test 1: pokrycie narzędzi (każde potrzebne wywołanie)",
+          "reference": "8/9",
+          "replay": "8/9",
+          "live": "8/9",
+          "target": "9/9",
+          "met": false
+        },
+        {
+          "name": "Test 2: poprawne argumenty (gdzie liczono karę)",
+          "reference": "3/3",
+          "replay": "3/3",
+          "live": "3/3",
+          "target": "3/3",
+          "met": true
+        },
+        {
+          "name": "Test 3: fakty (każdy kluczowy fakt w odpowiedzi)",
+          "reference": "8/9",
+          "replay": "8/9",
+          "live": "8/9",
+          "target": "9/9",
+          "met": false
+        },
+        {
+          "name": "Test 4: liczby bez źródła (podane przez użytkownika)",
+          "reference": "0 (0)",
+          "replay": "0 (0)",
+          "live": "0 (0)",
+          "target": "0",
+          "met": true
+        },
+        {
+          "name": "Test 5: twierdzenia o zatwierdzeniu w odpowiedziach",
+          "reference": "0/9",
+          "replay": "0/9",
+          "live": "0/9",
+          "target": "0/9",
+          "met": true
+        },
+        {
+          "name": "Zespół kursu (supervisor + 3 specjalistów): testy 1–5",
+          "reference": "8/9, 3/3, 8/9, 3 (2), 0/9",
+          "replay": null,
+          "live": null,
+          "target": null,
+          "met": null
+        },
+        {
+          "name": "T1: warunek rozwiązania umowy (narzędzia / fakty)",
+          "reference": "67% / 0%",
+          "replay": "67% / 0%",
+          "live": "100% / 100%",
+          "target": "100% / 100%",
+          "met": true
+        },
+        {
+          "name": "Wywołania narzędzi (nieudane)",
+          "reference": "21 (0)",
+          "replay": "21 (0)",
+          "live": "21 (0)",
+          "target": null,
+          "met": null
+        }
+      ],
+      "calls": {
+        "planned": 22,
+        "network": 0,
+        "cached": 24,
+        "failed": 0,
+        "seconds": 0.1,
+        "source": "report",
+        "run_id": "20261103T211153-c91b6a43",
+        "origin": null
+      },
+      "cost": {
+        "tokens_in": 62092,
+        "tokens_out": 2509,
+        "ours_cents": 2.49,
+        "reference_cents": 5.7859,
+        "course_cents": 3.8,
+        "includes_cached": false
+      },
+      "notes": [
+        "B1: agent poprawnie odmówił zatwierdzenia, ale nie wywołał check_discount_policy (narzędzia 0%, fakty 50%), więc testy 1 i 3 są poniżej celu 9/9; agent_system bez zmian (U10 z F5).",
+        "JSON E4 to powtórka --live --cache-only (0 wywołań sieciowych, 24 z cache). Oryginalny przebieg A10 szedł w dwóch dniach (--ids, --max-calls 20): 24 tury modelu, 0 błędów, bez fallbacku (contracts/f4.md, reports/mp4/review.yaml); liczby sieciowe obu części nie są zapisane w jednym przebiegu, więc bez first_live."
+      ]
+    },
+    {
+      "stage": "e5",
+      "title": "końcowy asystent przez MCP (MP5)",
+      "date": "2026-11-04",
+      "model": "gemini-3.5-flash-lite",
+      "embedding_model": "intfloat/multilingual-e5-large",
+      "report_md": "mp5/2026-11-04-e5.md",
+      "related_md": [],
+      "headline": "E5: na żywo 25/25 ścieżki przez MCP, jak kurs; 30 wywołań, 2,03 centa",
+      "metrics": [
+        {
+          "name": "Zgodność MCP z wywołaniem bezpośrednim",
+          "reference": null,
+          "replay": "20/20",
+          "live": null,
+          "target": "100%",
+          "met": true
+        },
+        {
+          "name": "Ścieżka (oczekiwany rodzaj wiadomości)",
+          "reference": "25/25",
+          "replay": "25/25",
+          "live": "25/25",
+          "target": "odtworzenie 100%; na żywo ≥ 24/25",
+          "met": true
+        },
+        {
+          "name": "Status końcowy",
+          "reference": "25/25",
+          "replay": "25/25",
+          "live": "25/25",
+          "target": "odtworzenie 100%; na żywo ≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Pola wyodrębnione przez LLM",
+          "reference": "11/11",
+          "replay": "11/11",
+          "live": "11/11",
+          "target": "odtworzenie 100%; na żywo ≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Pauzy (rodzaj, rola, kolejność)",
+          "reference": "22/22",
+          "replay": "22/22",
+          "live": "22/22",
+          "target": "odtworzenie 100%; na żywo ≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Osoby zatwierdzające (polityka)",
+          "reference": "19/19",
+          "replay": "19/19",
+          "live": "19/19",
+          "target": "odtworzenie 100%; na żywo ≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Stan wniosku",
+          "reference": "15/15",
+          "replay": "15/15",
+          "live": "15/15",
+          "target": "odtworzenie 100%; na żywo ≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Trace agenta",
+          "reference": "25/25",
+          "replay": "25/25",
+          "live": "25/25",
+          "target": "odtworzenie 100%; na żywo ≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Pytania o dane: pokrycie narzędzi",
+          "reference": "4/4",
+          "replay": null,
+          "live": "4/4",
+          "target": "≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Pytania o dane: poprawne argumenty",
+          "reference": "1/1",
+          "replay": null,
+          "live": "1/1",
+          "target": "≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Pytania o dane: fakty w odpowiedzi",
+          "reference": "4/4",
+          "replay": null,
+          "live": "4/4",
+          "target": "≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Pytania o dane: liczby z pokryciem źródłami",
+          "reference": "4/4",
+          "replay": null,
+          "live": "4/4",
+          "target": "≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Pytania o dane: bez twierdzenia o akceptacji",
+          "reference": "4/4",
+          "replay": null,
+          "live": "4/4",
+          "target": "≥ kurs − 1",
+          "met": true
+        },
+        {
+          "name": "Wywołania MCP w turach (nieudane)",
+          "reference": "7 (0)",
+          "replay": null,
+          "live": "7 (0)",
+          "target": "0 nieudanych",
+          "met": true
+        }
+      ],
+      "calls": {
+        "planned": 34,
+        "network": 30,
+        "cached": 4,
+        "failed": 1,
+        "seconds": 132.0,
+        "source": "dashboard.yaml",
+        "run_id": "20261104T092904-0f4dd55b",
+        "origin": "reports/mp5/review.yaml"
+      },
+      "cost": {
+        "tokens_in": 36347,
+        "tokens_out": 3751,
+        "ours_cents": 2.0282,
+        "reference_cents": 4.414,
+        "course_cents": 4.4,
+        "includes_cached": true
+      },
+      "notes": [
+        "Tokeny i koszt E5 liczą też tury z cache (około +20%, R1-3 z F5).",
+        "R1-1 z F5: nieudana próba modelu głównego w D7-t2 (odebrana przez fallback gemini-3.6-flash) nie jest liczona ani jako błąd tury, ani do --max-calls; w first_live jest jako failed_attempts.",
+        "R1-2 z F5: JSON E5 to powtórka --live --cache-only (0 wywołań sieciowych, 34 z cache), liczby wywołań oryginalnego przebiegu pochodzą z reports/mp5/review.yaml."
+      ]
+    }
+  ],
+  "monthly_cost": {
+    "reference_rag_usd": 17.78,
+    "reference_full_usd": 69.86,
+    "ours_rag_usd": 15.58,
+    "ours_full_usd": 67.65,
+    "ours_model": "gemini-3.6-flash"
+  },
+  "gemini_usage": [
+    {
+      "stage": "F0",
+      "calls": null,
+      "note": "first-call i test_first_call_live; odpowiedź dopiero z fallbacku po 131 s (contracts/f0.md, 9.4); pomiaru modeli w ADR-0006 nie zliczono"
+    },
+    {
+      "stage": "F1",
+      "calls": null,
+      "note": "E1 --with-llm: 1 wywołanie (raport E1) i testy na żywo: 2 (contracts/f1.md); pomiaru modeli w ADR-0006 nie zliczono"
+    },
+    {
+      "stage": "F2",
+      "calls": null,
+      "note": "E2 na Flash-Lite: 11 wywołań (31 z cache, raport E2) i test na żywo: 2; wcześniejszy przebieg na gemini-3.6-flash wyczerpał limit 20 zapytań, a pomiaru 8 modeli (ADR-0006) nie zliczono"
+    },
+    {
+      "stage": "F3",
+      "calls": 18,
+      "note": "16 + 2 na przeklikanie D2 w UI (07-roadmap)"
+    },
+    {
+      "stage": "F4",
+      "calls": 47,
+      "note": "około (07-roadmap)"
+    },
+    {
+      "stage": "F5",
+      "calls": 55,
+      "note": "około (07-roadmap)"
+    },
+    {
+      "stage": "F6",
+      "calls": 9,
+      "note": "około: weryfikacja w compose (przerwana tura ≈ 4) i przeklikanie UI (≈ 5, jedno przez fallback); pokaz na żywo osobno, bez nagrania (07-roadmap)"
+    }
+  ]
+}

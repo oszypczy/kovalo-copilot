@@ -304,3 +304,34 @@ async def test_tool_end_transport_fields_are_optional(mock_stream):
     ends = [item for kind, item in items if kind == "tool_end"]
     assert (ends[0].transport, ends[0].invocation_id) == ("mcp", "inv-1")
     assert (ends[1].transport, ends[1].invocation_id) == (None, None)
+
+
+async def test_client_parses_usage_with_cost(mock_api):
+    """F6: `usage.by_model` i `usage.cost` z odpowiedzi api trafiają do TurnView.usage."""
+    usage = {
+        "calls": 5,
+        "input_tokens": 9120,
+        "output_tokens": 612,
+        "reasoning_tokens": 210,
+        "models": ["gemini-3.5-flash-lite"],
+        "by_model": [
+            {
+                "model": "gemini-3.5-flash-lite",
+                "calls": 5,
+                "input_tokens": 9120,
+                "output_tokens": 612,
+                "reasoning_tokens": 210,
+            }
+        ],
+        "cost": {
+            "ours_usd": 0.004266,
+            "reference_usd": 0.009594,
+            "unpriced_models": [],
+            "our_prices_checked_on": "2026-11-02",
+        },
+    }
+    client = make_client(mock_api((200, turn_result(usage=usage)), (200, turn_result(usage=None))))
+    view = await client.send_message("T1", "x")
+    assert view.usage.calls == 5 and view.usage.by_model[0].input_tokens == 9120
+    assert view.usage.cost.ours_usd == 0.004266 and view.usage.cost.reference_usd == 0.009594
+    assert (await client.send_message("T1", "y")).usage is None

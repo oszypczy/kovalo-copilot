@@ -1,4 +1,4 @@
-.PHONY: up down logs test test-integration test-model test-live lint first-call first-call-local db-reset ingest ingest-local eval eval-local mcp-inspector mcp-inspector-http mcp-tools
+.PHONY: up down logs test test-integration test-model test-live lint first-call first-call-local db-reset ingest ingest-local eval eval-local mcp-inspector mcp-inspector-http mcp-tools dashboard dashboard-check
 
 S ?=
 STAGE ?= e1
@@ -64,15 +64,25 @@ eval-local:
 	uv run --env-file .env kovalo eval $(STAGE) $(ARGS)
 
 # MCP Inspector na serwerze stdio (wyszukiwanie w pamięci, bez Postgresa)
+# --protocol-era auto: Inspector 2.x w domyślnym trybie „legacy” nie odbiera odpowiedzi na
+# tools/list itp. (zapytania wiszą jako PENDING), choć serwer odpowiada od razu
 mcp-inspector:
-	npx @modelcontextprotocol/inspector uv run kovalo-mcp --search memory
+	npx @modelcontextprotocol/inspector --web --protocol-era auto uv run kovalo-mcp --search memory
 
-# Inspector dla serwera z compose (make up): uruchom `npx @modelcontextprotocol/inspector`,
-# wybierz transport "Streamable HTTP" i URL http://localhost:8765/mcp
+# Inspector dla serwera z compose (make up): Streamable HTTP, http://localhost:8765/mcp
 mcp-inspector-http:
-	@echo 'Uruchom: npx @modelcontextprotocol/inspector'
-	@echo 'Transport: Streamable HTTP, URL: http://localhost:8765/mcp (wymaga make up)'
+	npx @modelcontextprotocol/inspector --web --transport http --server-url http://localhost:8765/mcp --protocol-era auto
 
 # Lista narzędzi serwera (wynik do opisu PR-a)
 mcp-tools:
 	npx @modelcontextprotocol/inspector --cli uv run kovalo-mcp --search memory --method tools/list
+
+# Dashboard ewaluacji (0 wywołań LLM-a, bez klucza): reports/dashboard.{md,json} z raportów i reports/dashboard.yaml.
+# To samo w obrazie: make eval STAGE=dashboard
+dashboard:
+	uv run kovalo eval dashboard
+
+# Nic nie zapisuje; kod 1, gdy pliki dashboardu odbiegają od wygenerowanych (używane w CI)
+dashboard-check:
+	uv run kovalo eval dashboard --check
+

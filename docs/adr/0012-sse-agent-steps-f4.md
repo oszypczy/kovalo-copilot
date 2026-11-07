@@ -29,3 +29,6 @@ Graf jest synchroniczny (ADR-0009 pkt 6). Jeśli tura biegnie w generatorze odpo
 - Strumieniowanie tokenów odpowiedzi agenta (`stream_mode="messages"` z podgrafu): odpowiedź końcowa przychodzi po wszystkich narzędziach i jest krótka, a tokeny z podgrafu wywołanego w węźle wymagają przekazania konfiguracji i filtrowania tur z wywołaniami narzędzi.
 - Asynchroniczny graf i `AsyncPostgresSaver`: nadal bez korzyści przy synchronicznych modelach i narzędziach (ADR-0009).
 - Własny parser SSE w UI zamiast `httpx-sse`: kilkadziesiąt linii do utrzymania; biblioteka już jest w zależnościach pośrednich.
+
+## Aktualizacja (F6)
+Tokeny w SSE („kandydat na F6”) rozstrzygnięte w [ADR-0015](0015-polish-f6.md): nie strumieniujemy tokenów odpowiedzi. FR-6.2 „strumieniowanie odpowiedzi” oznacza strumień kroków agenta i wyniku tury. Zdarzenie `final` niesie od F6 koszt tury (`TurnResult.usage.by_model`, `usage.cost`), zmiana addytywna bez nowych zdarzeń. Przerwana tura nie kończy się już 409 `thread_stuck` przy następnej wiadomości: serwis ją zamyka (ADR-0015).

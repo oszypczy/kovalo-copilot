@@ -1,5 +1,6 @@
 """Polecenie `kovalo`: first-call (F0, 7), ingest, eval e1 (F1, 7), e2 (F2, 8.7), e3 (F3, 10.6),
-eval e4, ask, show-trace (F4, 11.6), eval e5 i eval e4 --transport (F5, 10.6)."""
+eval e4, ask, show-trace (F4, 11.6), eval e5 i eval e4 --transport (F5, 10.6),
+eval dashboard (F6, 8.5)."""
 
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
 DEFAULT_PROMPT = "Przedstaw się jednym zdaniem po polsku."
 
 EXIT_OK = 0
+EXIT_CHECK_DIFF = 1  # eval dashboard --check: pliki różnią się od wygenerowanych
 EXIT_CONFIG = 2
 EXIT_PROVIDER = 3
 EXIT_EMPTY = 4
@@ -228,6 +230,8 @@ def eval_command(
         return eval_e4(settings, args=args, out=out, err=err)
     if stage == "e5":
         return eval_e5(settings, args=args, out=out, err=err)
+    if stage == "dashboard":
+        return eval_dashboard(settings, args=args, out=out, err=err)
     if stage != "e1":
         phase = f"F{stage[1:]}" if stage[:1] == "e" and stage[1:].isdigit() else "?"
         print(f"Etap {stage} jeszcze nie istnieje ({phase}).", file=err)
@@ -922,6 +926,51 @@ def eval_e5(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: T
     return EXIT_OK
 
 
+def eval_dashboard(
+    settings: Settings, *, args: argparse.Namespace, out: TextIO, err: TextIO
+) -> int:
+    """`kovalo eval dashboard [--reports-dir DIR] [--check]` (F6, 8.5): zero wywołań LLM-a.
+
+    Kody: 0 ok, 1 różnica w `--check`, 2 błąd specyfikacji albo danych raportu."""
+    from kovalo.eval.dashboard import build_dashboard, write_dashboard
+    from kovalo.eval.dashboard.build import (
+        JSON_NAME,
+        MARKDOWN_NAME,
+        SPEC_NAME,
+        check_dashboard,
+        load_previous,
+    )
+    from kovalo.eval.dashboard.spec import load_spec
+    from kovalo.eval.dashboard.stages import DashboardDataError
+
+    reports_dir = Path(args.reports_dir) if args.reports_dir else settings.paths.reports_dir
+    try:
+        spec = load_spec(reports_dir / SPEC_NAME)
+        previous = load_previous(reports_dir)
+        dashboard = build_dashboard(
+            spec, reports_dir, previous, warn=lambda message: print(message, file=err)
+        )
+    except (ConfigError, DashboardDataError) as exc:
+        print(str(exc), file=err)
+        return EXIT_CONFIG
+    if args.check:
+        diffs = check_dashboard(dashboard, reports_dir)
+        if diffs:
+            print(
+                f"Dashboard nieaktualny w {reports_dir}: {', '.join(diffs)}. "
+                "Wygeneruj go poleceniem `uv run kovalo eval dashboard`.",
+                file=err,
+            )
+            return EXIT_CHECK_DIFF
+        print(f"Dashboard aktualny ({reports_dir}).", file=out)
+        return EXIT_OK
+    write_dashboard(dashboard, reports_dir)
+    print(f"Dashboard (stan na {dashboard.as_of.isoformat()}):", file=out)
+    for name in (MARKDOWN_NAME, JSON_NAME):
+        print(f"  {reports_dir / name}", file=out)
+    return EXIT_OK
+
+
 def ask(settings: Settings, *, args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     """`kovalo ask "pytanie"`: jedno pytanie do agenta bez rozmowy (port ask_agent.py):
     odpowiedź i ścieżka dowodowa na stdout; 0 answered, 3 error/limit, 2 konfiguracja."""
@@ -1018,8 +1067,11 @@ def _parser() -> argparse.ArgumentParser:
         help="wariant chunków (domyślnie oba: mp1, potem ctx)",
     )
     ing.add_argument("--table", default=None, help="tabela indeksu (tylko z --chunks mp1 albo ctx)")
-    ev = sub.add_parser("eval", help="ewaluacja etapu (e1–e5), raporty w reports/")  # noqa: RUF001
-    ev.add_argument("stage", help="etap ewaluacji: e1, e2, e3, e4 albo e5")
+    ev = sub.add_parser(
+        "eval",
+        help="ewaluacja etapu (e1–e5) albo dashboard, raporty w reports/",  # noqa: RUF001
+    )
+    ev.add_argument("stage", help="etap ewaluacji: e1, e2, e3, e4, e5 albo dashboard")
     ev.add_argument("--candidates", action="store_true", help="e1: także embeddings.candidates")
     ev.add_argument("--model", action="append", help="e1: tylko wskazany model (można powtórzyć)")
     ev.add_argument(
@@ -1074,6 +1126,16 @@ def _parser() -> argparse.ArgumentParser:
     )
     ev.add_argument("--plan", action="store_true", help="e2, e3: wypisz plan wywołań i zakończ")
     ev.add_argument("--out", default=None, help="katalog raportów")
+    ev.add_argument(
+        "--reports-dir",
+        default=None,
+        help="dashboard: katalog z dashboard.yaml (domyślnie paths.reports_dir)",
+    )
+    ev.add_argument(
+        "--check",
+        action="store_true",
+        help="dashboard: tylko porównaj z zapisanymi plikami (kod 1 przy różnicy)",
+    )
     ask_p = sub.add_parser("ask", help="jedno pytanie do agenta z narzędziami (bez rozmowy)")
     ask_p.add_argument("question", help="pytanie po polsku")
     ask_p.add_argument("--tools", choices=["course", "ours"], default=None, help="wariant narzędzi")

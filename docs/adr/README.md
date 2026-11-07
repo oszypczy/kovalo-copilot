@@ -16,5 +16,6 @@
 | [0012](0012-sse-agent-steps-f4.md) | strumień SSE na osobnych ścieżkach (`tool_start`, `tool_end`, `final`, `error`), tura w wątku roboczym niezależna od połączenia, `GET /threads/{id}/trace`, kroki agenta jako `cl.Step`, 503 przy utracie Postgresa, blokady wątków bez wycieku | przyjęty |
 | [0013](0013-mcp-server-client-f5.md) | MCP w F5: serwer FastMCP z `TOOL_SPECS` (7 narzędzi tylko do odczytu, nakładki asynchroniczne, zasoby, prompt, `/health` z indeksem), własny klient na MCP SDK (port `mcp_runtime`, 4 warstwy błędów, rekord zagnieżdżony), pochodzenie wywołania w artefakcie `ToolMessage`, `tools.source: mcp` z jednym połączeniem na proces, callbacki grafu w agencie, serwer `kovalo` w `.mcp.json` | przyjęty |
 | [0014](0014-assistant-eval-e5.md) | E5: zgodność MCP (20 wywołań), odtworzenie 25 tur przez MCP, przebieg na żywo z cache i wspólnym `--max-calls` liczącym błędy; E4 przez MCP (`--transport`); `agent_system` bez zmian | przyjęty |
+| [0015](0015-polish-f6.md) | dopracowanie F6: koszt tury w `TurnResult.usage` (`by_model`, `cost` z cennika `cost`), zamknięcie przerwanej tury zamiast `thread_stuck`, dashboard ewaluacji z raportów (`reports/dashboard.{yaml,md,json}`, `--check` w CI); bez tokenów w SSE, listy rozmów, tabeli `agent_traces` i nagrania demo | przyjęty |
 
 Nowy ADR: skopiuj [0000-template.md](0000-template.md).
