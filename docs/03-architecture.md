@@ -1,6 +1,6 @@
 # 03. Architektura
 
-Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-architecture.drawio). Plik ma osiem stron: kontenery, graf copilota, indeksowanie i wyszukiwanie, odpowiedź ze źródłami i ewaluacja E2, workflow F3 (API, UI, checkpointy, E3), agent F4 (narzędzia, trace, SSE, E4), MCP i końcowy asystent F5 (serwer, klient, E5), koszty, dashboard i przerwana tura F6. Eksporty PNG (z osadzonym XML-em, edytowalne w draw.io) leżą obok pliku.
+Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-architecture.drawio). Plik ma trzy strony: kontenery, graf copilota, indeksowanie i wyszukiwanie. Eksporty PNG (z osadzonym XML-em, edytowalne w draw.io) leżą obok pliku.
 
 ![Kontenery](architecture/kovalo-architecture-1-containers.png)
 
@@ -15,7 +15,7 @@ Diagramy: [`architecture/kovalo-architecture.drawio`](architecture/kovalo-archit
 
 Indeksowanie, ewaluacja i dashboard to **nie osobne usługi**, tylko polecenia CLI (`kovalo ingest`, `kovalo eval`) uruchamiane jednorazowo w obrazie `api`: `make ingest` = `docker compose run --rm api kovalo ingest` (korpus → chunki MP1 i chunki z kontekstem → embeddingi → podmiana tabel `kovalo_mp1` i `kovalo_ctx`), `make eval STAGE=e2` = `docker compose run --rm api kovalo eval e2` (raport w `reports/`, montowanym jako wolumen). Dashboard (`make dashboard` = `uv run kovalo eval dashboard`, w obrazie `make eval STAGE=dashboard`) czyta raporty i `reports/dashboard.yaml` i pisze `reports/dashboard.md` i `.json`, bez LLM-a i bez sieci.
 
-Zewnętrznie: **Gemini API** (domyślny LLM, darmowy klucz z Google AI Studio), opcjonalnie **LangSmith** (tracing, darmowy plan dla jednej osoby).
+Zewnętrznie: **Gemini API** (domyślny LLM, darmowy klucz z Google AI Studio), **LangSmith** (tracing każdej tury: węzły grafu, wywołania LLM-a, narzędzia; darmowy plan dla jednej osoby).
 
 Embeddingi liczymy **lokalnie** (fastembed, model ONNX wbudowany w obraz), więc ani indeksowanie, ani `mcp-server` nie potrzebują klucza.
 
@@ -91,15 +91,12 @@ START → understand ─┬─ document_question ─> answer_documents   (E3: RA
 - **Serwis od F6:** `TurnResult.usage` (z kanału `calls` tury) ma podział na faktyczne modele (`by_model`) i koszt (`cost`: `ours_usd` po cenach `cost.our_prices_per_1m_tokens`, `reference_usd` po cenach `cost.reference_model`), liczony przez `cost/usage.py` przy składaniu wyniku; koszt nie trafia do stanu grafu. Przerwana tura (ostatni checkpoint z `next != ()` bez pauzy, np. po zabiciu `api` w trakcie węzła) jest zamykana leniwie przy następnej wiadomości, pod blokadą wątku: `update_state(..., as_node="reply_other")` ze statusem `error` (`turn_interrupted`) i komunikatem o niedokończonej odpowiedzi, potem nowa wiadomość biegnie normalnie; przerwanej tury nie dokańczamy ([ADR-0015](adr/0015-polish-f6.md), [contracts/f6.md §7](contracts/f6.md)). Warunek: jeden proces `api`.
 - **Serwis od F4:** `start_message` / `start_resume` zwracają `TurnStream` (tura w wątku roboczym, zdarzenia z `stream_mode=["custom", "updates"]`), `send_message` / `resume` czytają go do `final`; `get_trace` czyta ostatnią kopertę `agent_trace` z historii stanu. Błędy połączenia z Postgresem → `CheckpointerUnavailableError` (API: 503).
 
-![Workflow F3](architecture/kovalo-architecture-5-workflow.png)
 
 **Agent w węźle `answer_documents` (F4).** W aplikacji (`workflow.answerer: agent`, `understand_prompt: assistant_understand_system`) węzeł uruchamia `AgentRunner`: `create_agent` z promptem `agent_system`, 7 narzędziami tylko do odczytu, budżetem kursu (24 kroki, 180 s), fallbackiem tylko przy błędach dostępności, `checkpointer=False`, w pustym `contextvars.Context`. Wywołania narzędzi idą do strumienia przez `get_stream_writer`; wynik to odpowiedź agenta (albo przeprosiny), status i trace w `record`. `check_termination_condition` liczy warunek CON-101 w kodzie, a jej odczyt OTIF trafia do trace jako zdarzenie składowe `get_supplier_otif`. E3 dalej buduje graf z RAG i `understand_system` ([ADR-0011](adr/0011-agent-tools-f4.md)).
 
-![Agent F4](architecture/kovalo-architecture-6-agent.png)
 
 **Agent przez MCP i końcowy asystent (F5).** Z `tools.source: mcp` `LazyAgentRunner` przy pierwszym pytaniu otwiera `McpToolSource` (`tools.mcp_transport: http` → `services.mcp_url`; `stdio` → podproces `kovalo-mcp`) i buduje tego samego agenta na narzędziach z `list_tools()`. Graf, węzły, serwis i koperta trace się nie zmieniają (ADR-0011 pkt 6). Każde wywołanie przechodzi przez `check_record` (surowy `structuredContent` wobec rekordu z `TOOL_SPECS`, zanim cokolwiek uzupełni wartości domyślne); błąd ma warstwę `tool / protocol / transport / validation`, a połączenie po błędzie transportu nie jest używane ponownie (następne wywołanie otwiera nowe). Model widzi przez MCP dokładnie ten sam rekord co przy narzędziu bezpośrednim; pochodzenie wywołania (`transport`, `invocation_id`) idzie w artefakcie `ToolMessage`, którego `StableUsageMiddleware` nie wysyła do modelu, więc klucze cache są te same co w F4. Agent dostaje callbacki węzła (run agenta pod turą grafu w LangSmith). Pytania o politykę i akceptacje nie używają MCP. Inni klienci (Claude Code przez `.mcp.json`, Inspector, Claude Desktop) uruchamiają własny proces `kovalo-mcp --search memory` przez stdio i widzą tylko narzędzia, zasoby i prompt, nie workflow akceptacji (FR-5.5). E5: [contracts/f5.md §10](contracts/f5.md), [ADR-0014](adr/0014-assistant-eval-e5.md).
 
-![MCP i asystent F5](architecture/kovalo-architecture-7-mcp.png)
 
 ## 4. Kontrakty
 
@@ -131,16 +128,14 @@ Wyszukiwanie (`knowledge.Retriever`): tryb `retrieval.mode` = `vector` (cosine, 
 
 ## 5a. Odpowiedź ze źródłami i E2
 
-![RAG i E2](architecture/kovalo-architecture-4-rag.png)
 
 `rag.answer_question`: pytanie → `Retriever` (top 3) → `build_prompt(answer_system)` → `get_structured_model(Answer)` (Gemini z fallbackiem, `include_raw=True`) → `RunRecord` (kontekst, prompt, `Answer` albo błąd, tokeny, model). Ewaluacja E2 ocenia rekord bez LLM-a (`score_record`: dowody, fakty, odwołania, odmowy) i sędzią (`judge_record`, prompt `judge_system`), a odpowiedzi modeli trzyma w cache na dysku (`paths.llm_cache_dir`), więc powtórny przebieg nie zużywa limitu ([contracts/f2.md §8](contracts/f2.md)).
 
 ## 6. Obserwowalność i koszty
 
-![Koszty, dashboard i przerwana tura F6](architecture/kovalo-architecture-8-costs.png)
 
 - Licznik tokenów i kosztów per tura z `usage_metadata` (kanał `calls` stanu tury → `group_by_model` → `price_usage` → `TurnResult.usage.cost`). Ceny z sekcji `cost` w `config.yaml`: `our_prices_per_1m_tokens` dla faktycznego modelu (płatny tier Gemini, NASZE) i `prices_per_1m_tokens[reference_model]` (cennik kursu, PINNED); ta sama funkcja `tokens_cost` co w raportach E2–E5. Nieznany model daje „brak ceny”, nie zgadywanie; free tier = 0 USD. UI pokazuje linię kosztu na końcu ostatniej wiadomości tury i sumę rozmowy z sesji Chainlita ([ADR-0015](adr/0015-polish-f6.md)).
 - Dashboard ewaluacji: `reports/dashboard.md` i `.json` z JSON-ów raportów E1–E5 (gdy są), poprzedniego `dashboard.json` i ręcznych danych w `reports/dashboard.yaml` (liczby oryginalnych przebiegów na żywo, zużycie limitu na etap, znane ograniczenia); wynik deterministyczny, `--check` w CI ([contracts/f6.md §8](contracts/f6.md)).
 - Trace agenta w checkpointach Postgresa (kanał `record`, koperta `agent_trace` v1 z MP5; bez osobnej tabeli `agent_traces`: decyzja ostateczna, ADR-0011 pkt 7 i ADR-0015; dashboard czyta raporty ewaluacji, nie tury produkcyjne), widoczny w UI (kroki `cl.Step` na żywo, „Ścieżka dowodowa”) i przez `GET /threads/{id}/trace`.
-- Opcjonalnie LangSmith (`LANGSMITH_TRACING=true`); od F5 run agenta jest zagnieżdżony pod turą grafu (callbacki węzła, R1-2 z F4).
+- LangSmith (`LANGSMITH_TRACING=true`, klucz w `.env`, projekt `kovalo-copilot`): każda tura to drzewo runów; od F5 run agenta jest zagnieżdżony pod turą grafu (callbacki węzła, R1-2 z F4).
 - Wywołania MCP: `invocation_id` w trace (koperta w checkpoincie) i w logu `mcp-server` (stderr, z czasem i statusem rekordu).

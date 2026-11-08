@@ -50,7 +50,7 @@ Przegląd R1 z 2026-11-07 ([contracts/f6.md §15](../contracts/f6.md)):
 ### Aktualizacja po klikaniu UI (2026-11-07)
 
 Zmiany w UI po przeglądzie R1, na prośbę użytkownika (bez zmian w API i kontrakcie odpowiedzi):
-- **Koszt tury jako panel boczny** zamiast linii na końcu wiadomości: element `cl.Text(display="side")` „Koszt tury” (numerowany w rozmowie: „Koszt tury 2”…) obok „Ścieżki dowodowej”, link w linii „Szczegóły: …” ostatniej wiadomości tury. Treść to lista: tura (modele), tokeny, koszt tury (0 USD w darmowym tierze, ceny płatne Gemini / cennik kursu), suma rozmowy.
+- **Koszt tury jako panel boczny** zamiast linii na końcu wiadomości: element `cl.Text(display="side")` „Koszt tury” (numerowany w rozmowie: „Koszt tury 2”…) obok „Ścieżki dowodowej”, link w linii „Szczegóły: …” ostatniej wiadomości tury. Treść to lista: tura (modele), tokeny, koszt tury i suma rozmowy. Koszt tylko po cenie faktycznie użytego modelu (`usage.cost.ours_usd`), jako ułamek dolara do 6 miejsc („0,003412 $”); bez dopisku o darmowym tierze i bez cennika kursu (`reference_usd` zostaje w API i raportach).
 - **Panel boczny tylko po kliknięciu:** Chainlit 2.12 otwiera panel przy każdej zmianie elementów bocznych i nie ma na to opcji w configu; `public/kovalo.js` zamyka panel, gdy otworzył się bez kliknięcia linku `a.element-link` w ostatnich 1,5 s.
 - **Wygląd:** `public/kovalo.css` zastępuje biały kursor ładowania trzema kropkami w kolorze motywu; kroki narzędzi mają ikony lucide (`metadata.icon`: `file-search`, `database`, `calculator`, domyślnie `wrench`) zamiast pustych szarych awatarów.
 - **Tylko tekst:** wysyłanie plików wyłączone (`features.spontaneous_file_upload`); wiadomość bez tekstu dostaje podpowiedź `NO_TEXT` zamiast angielskiego błędu 422 z API.

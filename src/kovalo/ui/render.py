@@ -336,16 +336,18 @@ def _plural(count: int, one: str, few: str, many: str) -> str:
     return many
 
 
-_CENT_STEP = Decimal("0.01")
+_USD_STEP = Decimal("0.000001")
 
 
-def _cents(usd: float) -> str:
-    """USD → centy z dwoma miejscami po przecinku; dodatnia kwota poniżej 0,005 centa → „< 0,01”."""
-    cents = Decimal(str(usd)) * 100
-    rounded = cents.quantize(_CENT_STEP, rounding=ROUND_HALF_UP)
-    if cents > 0 and rounded == 0:
-        return "< 0,01"
-    return f"{rounded:.2f}".replace(".", ",")
+def _usd(usd: float) -> str:
+    """USD jako ułamek dolara: do 6 miejsc po przecinku, bez zer na końcu („0,003412 $”);
+    dodatnia kwota poniżej 0,0000005 $ → „< 0,000001 $”."""
+    value = Decimal(str(usd))
+    rounded = value.quantize(_USD_STEP, rounding=ROUND_HALF_UP)
+    if value > 0 and rounded == 0:
+        return "< 0,000001 $"
+    text = f"{rounded:f}".rstrip("0").rstrip(".")
+    return f"{text.replace('.', ',')} $"
 
 
 def _models(usage: UsageView) -> str:
@@ -371,19 +373,14 @@ def render_usage(usage: UsageView | None, total: UsageTotal) -> str | None:
         f"{number(usage.output_tokens)} wyjścia",
     ]
     cost = usage.cost
-    if cost is not None:
-        reference = f"{_cents(cost.reference_usd)} centa (cennik kursu)"
+    if cost is not None:  # tylko cena faktycznie użytego modelu, bez cennika kursu
         if cost.ours_usd is None:
             missing = ", ".join(cost.unpriced_models) or "nieznany model"
-            paid = f"po cenach płatnych: brak ceny dla {missing} / {reference}"
+            lines.append(f"- **Koszt tury:** brak ceny dla {missing}")
         else:
-            paid = f"po cenach płatnych {_cents(cost.ours_usd)} centa (Gemini) / {reference}"
-        lines.append(f"- **Koszt tury:** 0 USD w darmowym tierze; {paid}")
+            lines.append(f"- **Koszt tury:** {_usd(cost.ours_usd)}")
         turns = f"{number(total.turns)} {_plural(total.turns, 'tura', 'tury', 'tur')}"
-        conversation = (
-            f"- **Rozmowa:** {turns}, {_cents(total.ours_usd)} / "
-            f"{_cents(total.reference_usd)} centa"
-        )
+        conversation = f"- **Rozmowa:** {turns}, {_usd(total.ours_usd)}"
         if total.partial:
             conversation += " (część tur bez ceny)"
         lines.append(conversation)
