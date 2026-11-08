@@ -379,8 +379,8 @@ def total_after(*usages):
 
 
 def test_render_usage_details():
-    """Przykład z kontraktu 6.4 jako lista do panelu „Koszt tury”: polskie liczby, odmiana,
-    centy z dwoma miejscami, suma rozmowy."""
+    """Lista do panelu „Koszt tury”: polskie liczby, odmiana, koszt faktycznie użytego modelu
+    jako ułamek dolara (bez darmowego tieru i cennika kursu), suma rozmowy."""
     from kovalo.ui.render import render_usage
 
     first = usage_view(
@@ -392,9 +392,8 @@ def test_render_usage_details():
     assert details == (
         "- **Tura:** 5 wywołań (gemini-3.5-flash-lite)\n"
         "- **Tokeny:** 9120 wejścia, 612 wyjścia\n"
-        "- **Koszt tury:** 0 USD w darmowym tierze; po cenach płatnych 0,43 centa (Gemini) / "
-        "0,96 centa (cennik kursu)\n"
-        "- **Rozmowa:** 2 tury, 0,71 / 1,52 centa"
+        "- **Koszt tury:** 0,004266 $\n"
+        "- **Rozmowa:** 2 tury, 0,0071 $"
     )
 
 
@@ -457,7 +456,15 @@ def test_render_usage_thousands_and_tiny_cost():
     usage = usage_view(input_tokens=1234567, output_tokens=89, ours=1e-8, reference=2e-8)
     text = squash(render_usage(usage, total_after(usage)))
     assert "1 234 567 wejścia" in text and "89 wyjścia" in text
-    assert "< 0,01 centa (Gemini)" in text and "< 0,01 centa (cennik kursu)" in text
+    assert "**Koszt tury:** < 0,000001 $" in text and "**Rozmowa:** 1 tura, < 0,000001 $" in text
+
+
+def test_render_usage_dollar_fraction_format():
+    from kovalo.ui.render import render_usage
+
+    for ours, shown in ((0.0034, "0,0034 $"), (0.12, "0,12 $"), (1.5, "1,5 $"), (0.0, "0 $")):
+        usage = usage_view(ours=ours)
+        assert f"**Koszt tury:** {shown}" in squash(render_usage(usage, total_after(usage)))
 
 
 def test_render_usage_unpriced_and_missing_cost():
@@ -470,14 +477,14 @@ def test_render_usage_unpriced_and_missing_cost():
     assert total.partial is True
     text = squash(render_usage(unpriced, total))
     assert "brak ceny dla model-x" in text
-    assert "0,96 centa (cennik kursu)" in text, "cennik kursu zawsze znany"
+    assert "cennik kursu" not in text and "darmow" not in text
     assert "(część tur bez ceny)" in text
 
     no_cost = usage_view(cost=False)
     total = add_usage(total_after(), no_cost)
     text = squash(render_usage(no_cost, total))
     assert text.startswith("- **Tura:** 5 wywołań")
-    assert "Koszt" not in text and "centa" not in text and "USD" not in text
+    assert "Koszt" not in text and "$" not in text
 
 
 def test_add_usage_accumulates():

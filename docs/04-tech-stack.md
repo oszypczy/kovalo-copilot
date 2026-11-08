@@ -51,7 +51,7 @@ embeddings:
 
 ```
 GOOGLE_API_KEY=        # https://aistudio.google.com/apikey (darmowy)
-LANGSMITH_API_KEY=     # opcjonalny tracing
+LANGSMITH_API_KEY=     # tracing (https://smith.langchain.com, darmowy plan)
 OPENAI_API_KEY=        # opcjonalny tryb zgodny z kursem
 ```
 

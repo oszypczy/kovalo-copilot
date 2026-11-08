@@ -6,38 +6,35 @@ To projekt zaliczeniowy z przedmiotu **Technologie Generatywne (TEG)**. Łączy 
 
 **Stos:** LangChain 1.x · LangGraph 1.x · MCP (FastMCP) · Gemini Flash-Lite (darmowy tier) · fastembed · Postgres + pgvector · FastAPI · Chainlit · Docker.
 
-Scenariusz pokazu aplikacji (cztery tury jednej rozmowy, około 5–7 minut): [docs/demo/scenario.md](docs/demo/scenario.md).
+Prompty do pokazu, po jednym na każdą ścieżkę grafu: [docs/demo/scenario.md](docs/demo/scenario.md).
 
-## Status
-
-Etapy **F0–F6 zrobione**: licznik kosztów w UI, zamknięcie przerwanej tury, dashboard ewaluacji i przegląd końcowy F6 są gotowe; zostaje pokaz aplikacji na żywo. Szczegóły i definicje ukończenia: [roadmapa](docs/07-roadmap.md).
+## Architektura
 
 ![Architektura](docs/architecture/kovalo-architecture-1-containers.png)
 
 ## Co potrafi
 
-Cztery scenariusze z demo, w jednej rozmowie:
-
-1. **Pytanie o dane z obliczeniem.** „Ile wynosi kara, którą Mleczna Dolina jest winna Kovalo za lipiec 2026 r.?” Agent wywołuje narzędzia przez serwer MCP (warunki umowy, OTIF, faktury, kalkulator kary; w UI kroki z dopiskiem „(przez MCP)”) i odpowiada: 7296,00 PLN. W panelu „Ścieżka dowodowa” widać, z którego narzędzia pochodzi każda liczba.
-2. **Wniosek o rabat z akceptacją.** „Prześlij do akceptacji rabat 14% na wodę niegazowaną dla Biedronki…” Polityka rabatowa (kod, nie prompt) wskazuje dyrektora handlowego, workflow zatrzymuje się na pauzie z przyciskami Zatwierdź / Odrzuć / Anuluj. Akceptacja jest symulowana: przyciski zastępują osoby zatwierdzające, nic nie trafia do CRM-u.
-3. **Pytanie w trakcie sprawy.** „A jaki był OTIF dostawcy Aqua Kryształ w lipcu 2026 r.?” → 95,1%; zatwierdzony wniosek się nie zmienia.
-4. **Ponowne przesłanie.** „Prześlij jeszcze raz ten sam rabat dla Biedronki.” → „Już zatwierdzone”, bez nowej pauzy.
-
-Poza tym: odpowiedzi z dokumentów z odwołaniami do źródeł (`[POL-001]`), pytania o politykę („kto zatwierdza rabat 22%…?”), dopytanie o brakującą marżę, a pod każdą turą z LLM-em linia z tokenami i kosztem tury oraz sumą rozmowy.
+- **Odpowiedzi z dokumentów firmy ze źródłami.** Umowy, polityki, notatki ze spotkań i raporty są zindeksowane w pgvector; odpowiedź cytuje dokumenty (`[POL-001]`), a gdy w nich czegoś nie ma, copilot to mówi zamiast zgadywać.
+- **Obliczenia na danych firmy.** Agent ReAct wywołuje narzędzia przez serwer MCP (warunki umów, OTIF, faktury, kary umowne, warunek rozwiązania umowy). Liczby pochodzą z narzędzi, nie z modelu, a panel „Ścieżka dowodowa” pokazuje, skąd jest każda z nich.
+- **Polityka rabatowa i workflow akceptacji.** Reguły polityki są w kodzie, nie w prompcie. Wniosek o rabat przechodzi przez sprawdzenie polityki, dopytanie o brakujące dane i pauzę na decyzję (Zatwierdź / Odrzuć / Anuluj); stan sprawy przeżywa restart dzięki checkpointom w Postgresie. Akceptacja jest symulowana: przyciski zastępują osoby zatwierdzające, nic nie trafia do CRM-u.
+- **Pytania w trakcie sprawy.** W trakcie sprawy można zadać inne pytanie bez utraty wniosku; ponowne przesłanie tego samego wniosku nie tworzy nowej pauzy.
+- **Koszty i obserwowalność.** Przy każdej turze z LLM-em panel „Koszt tury” (tokeny, koszt tury i suma rozmowy); każda tura w LangSmith jako drzewo: węzły grafu, wywołania Gemini, narzędzia MCP.
+- **Narzędzia dla innych klientów MCP.** Ten sam serwer MCP (narzędzia, zasoby, prompt) działa z MCP Inspector, Claude Code i Claude Desktop.
 
 ## Szybki start
 
-**Wymagania:** Docker Desktop z Compose v2 (około 6 GB miejsca na obrazy; obraz `api` zawiera model embeddingów), `make`, darmowy klucz Gemini z [Google AI Studio](https://aistudio.google.com/apikey). Do testów, dashboardu i serwera MCP na hoście: Python 3.12 i [uv](https://docs.astral.sh/uv/).
+**Wymagania:** Docker Desktop z Compose v2 (około 6 GB miejsca na obrazy; obraz `api` zawiera model embeddingów), `make`, darmowy klucz Gemini z [Google AI Studio](https://aistudio.google.com/apikey) i darmowy klucz [LangSmith](https://smith.langchain.com) (Settings → API Keys). Do testów, dashboardu i serwera MCP na hoście: Python 3.12 i [uv](https://docs.astral.sh/uv/).
 
 ```bash
-cp .env.example .env      # wpisz swój klucz w GOOGLE_API_KEY (reszta pól jest opcjonalna)
+cp .env.example .env      # wpisz klucze: GOOGLE_API_KEY i LANGSMITH_API_KEY
 make up                   # docker compose up -d --build: postgres, mcp-server, api, ui
 make ingest               # pierwsze indeksowanie korpusu (jednorazowo, bez klucza)
 open http://localhost:8000
 ```
 
 - Pierwsze `make up` buduje obrazy i pobiera model `intfloat/multilingual-e5-large` (około 2,2 GB), więc trwa kilka do kilkunastu minut zależnie od łącza; kolejne starty to kilkadziesiąt sekund.
-- Klucza nie wpisuj nigdzie poza `.env` (plik jest w `.gitignore`). Bez klucza aplikacja wstaje, ale `/health` zgłasza `degraded`, a pytania kończą się błędem.
+- Kluczy nie wpisuj nigdzie poza `.env` (plik jest w `.gitignore`). Bez klucza Gemini aplikacja wstaje, ale `/health` zgłasza `degraded`, a pytania kończą się błędem.
+- Trace'y: [smith.langchain.com](https://smith.langchain.com) → Tracing → projekt `kovalo-copilot` (pojawia się po pierwszej turze). Konto w regionie EU wymaga w `.env` także `LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com`.
 - Porty (tylko `127.0.0.1`): UI `8000`, API `8080` (zmiana: `API_PORT=8081 make up` albo wpis w `.env`), serwer MCP `8765`, Postgres `5432`. Stan usług: `curl http://localhost:8080/health`.
 - Sprawdzenie klucza jednym wywołaniem: `make first-call`. Logi: `make logs` (jednej usługi: `make logs S=api`). Zatrzymanie: `make down`; wyczyszczenie bazy: `make db-reset`.
 

@@ -421,9 +421,9 @@ async def test_cost_panel_on_last_message(fake_cl, mock_stream):
     text1 = " ".join(cost1.content.split())
     assert text1.startswith("- **Tura:** 5 wywołań (gemini-3.5-flash-lite)")
     assert "9120 wejścia" in text1
-    assert "0,43 centa (Gemini) / 0,96 centa (cennik kursu)" in text1
+    assert "**Koszt tury:** 0,004266 $" in text1 and "cennik kursu" not in text1
     assert "**Rozmowa:** 1 tura" in text1
-    assert "**Rozmowa:** 2 tury, 0,85 / 1,92 centa" in " ".join(cost2.content.split())
+    assert "**Rozmowa:** 2 tury, 0,008532 $" in " ".join(cost2.content.split())
 
     total = fake_cl.session["usage_total"]
     assert (total.turns, total.calls, total.input_tokens, total.output_tokens) == (
