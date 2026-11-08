@@ -201,7 +201,8 @@ def test_live_data_turns_carry_mcp_provenance(e5_live_report):
         trace = trace_from_record(t["entry"]["record"])
         top = [e for e in trace.events if e.parent_call_id is None]
         assert top and all(e.transport == "mcp" and e.invocation_id for e in top)
-        assert [e.invocation_id for e in top] == [c["invocation_id"] for c in t["mcp"]]
+        # równoległe narzędzia: captures wg zakończenia, trace wg kolejności wywołań
+        assert sorted(e.invocation_id for e in top) == sorted(c["invocation_id"] for c in t["mcp"])
         assert all(c["outcome"] == "ok" for c in t["mcp"])
         assert all(c["thread_id"] and c["turn"] == t["n"] for c in t["mcp"])
     assert [len(t["mcp"]) for t in data] == [4, 1, 1, 1]
